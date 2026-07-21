@@ -1,0 +1,133 @@
+import type { TrendEntity } from "@ai-trend-radar/types";
+
+const updatedAt = "2026-07-19T12:35:00.000Z";
+
+const base = {
+  pricingType: "open_source" as const,
+  isOpenSource: true,
+  scoreBreakdown: {
+    crossSource: 22,
+    velocity: 17,
+    productGrowth: 13,
+    threads: 9,
+    reddit: 8,
+    novelty: 7,
+    instagram: 3,
+    quality: 5,
+  },
+  strengths: ["빠른 시작", "활발한 오픈소스 생태계", "확장 가능한 구조"],
+  weaknesses: ["운영 환경별 안정성 편차", "초기 설정에 기술 지식 필요"],
+  useCases: ["반복 업무 자동화", "프로토타입 검증", "AI 워크플로 구축"],
+  targetUsers: ["AI 제품 개발자", "업무 자동화 담당자", "기술 기획자"],
+  benchmarkPoints: ["명확한 온보딩", "실행 과정 가시화", "커뮤니티 확장 전략"],
+  koreaOpportunity: "국내 업무 시스템과 한국어 데이터 흐름에 특화한 버티컬 제품으로 확장 가능성이 있습니다.",
+  updatedAt,
+  firstDetectedAt: "2026-07-18T03:00:00.000Z",
+};
+
+export const trends: TrendEntity[] = [
+  {
+    ...base,
+    id: "browser-use",
+    slug: "browser-use",
+    name: "Browser Use",
+    logoText: "BU",
+    tagline: "자연어로 브라우저 업무를 실행하는 오픈소스 AI 에이전트",
+    description: "브라우저 조작과 웹 리서치를 에이전트가 수행하도록 돕는 자동화 프레임워크입니다.",
+    category: "AI 에이전트",
+    canonicalUrl: "https://browser-use.com",
+    githubUrl: "https://github.com/browser-use/browser-use",
+    status: "SURGING",
+    rank: 1,
+    rankChange: 4,
+    trendScore: 92,
+    trustScore: 84,
+    sources: ["github", "hacker_news", "reddit", "threads"],
+    signals: [
+      { source: "github", label: "GitHub Stars", value: 68420, delta24h: 1420, unit: "stars", measuredAt: updatedAt, reliability: "verified" },
+      { source: "threads", label: "Threads 언급", value: 892, delta24h: 280, unit: "mentions", measuredAt: updatedAt, reliability: "estimated" },
+      { source: "hacker_news", label: "HN 점수", value: 318, delta24h: 188, unit: "points", measuredAt: updatedAt, reliability: "verified" },
+    ],
+    whyTrending: ["GitHub 스타가 24시간 동안 1,420개 증가했습니다.", "Hacker News와 Reddit에서 독립적인 기술 토론이 동시에 발생했습니다.", "Threads의 비개발자 대상 소개가 빠르게 늘었습니다."],
+    sparkline: [41, 43, 48, 52, 54, 63, 67, 74, 79, 88, 92],
+  },
+  {
+    ...base,
+    id: "mcp-inspector",
+    slug: "mcp-inspector",
+    name: "MCP Inspector",
+    logoText: "MI",
+    tagline: "MCP 서버를 시각적으로 테스트하고 디버깅하는 개발 도구",
+    description: "Model Context Protocol 서버의 도구와 리소스를 브라우저에서 확인하는 공식 디버깅 도구입니다.",
+    category: "개발·코딩",
+    canonicalUrl: "https://github.com/modelcontextprotocol/inspector",
+    githubUrl: "https://github.com/modelcontextprotocol/inspector",
+    status: "RISING",
+    rank: 2,
+    rankChange: 7,
+    trendScore: 88,
+    trustScore: 91,
+    sources: ["github", "hacker_news", "reddit"],
+    signals: [{ source: "github", label: "GitHub Stars", value: 7210, delta24h: 860, unit: "stars", measuredAt: updatedAt, reliability: "verified" }],
+    whyTrending: ["MCP 개발 수요 증가와 함께 공식 검사 도구 검색량이 늘었습니다.", "새 릴리스 이후 GitHub 스타 증가 속도가 빨라졌습니다."],
+    sparkline: [33, 36, 38, 44, 49, 55, 60, 68, 75, 82, 88],
+  },
+  {
+    ...base,
+    id: "open-lovable",
+    slug: "open-lovable",
+    name: "Open Lovable",
+    logoText: "OL",
+    tagline: "대화로 웹앱을 만드는 로컬 우선 오픈소스 빌더",
+    description: "프롬프트와 코드 편집을 결합해 빠르게 웹앱을 만드는 오픈소스 도구입니다.",
+    category: "노코드",
+    canonicalUrl: "https://example.com/open-lovable",
+    githubUrl: "https://github.com/example/open-lovable",
+    status: "NEW",
+    rank: 3,
+    rankChange: 12,
+    trendScore: 84,
+    trustScore: 76,
+    sources: ["product_hunt", "github", "threads"],
+    signals: [{ source: "product_hunt", label: "Product Hunt 투표", value: 1180, delta24h: 640, unit: "votes", measuredAt: updatedAt, reliability: "verified" }],
+    whyTrending: ["오늘 Product Hunt 상위권에 진입했습니다.", "로컬 실행 가능한 대안으로 개발자 커뮤니티에서 공유되고 있습니다."],
+    sparkline: [12, 18, 24, 29, 38, 46, 57, 64, 72, 79, 84],
+  },
+  ...[
+    ["Context Forge", "CF", "문서·RAG", "RISING", 82, 2],
+    ["Voxtral Studio", "VS", "음성·음악", "NEW", 79, 6],
+    ["Agent Deck", "AD", "생산성", "RISING", 77, 3],
+    ["FrameFlow AI", "FF", "영상", "STABLE", 74, 0],
+    ["Prompt Ledger", "PL", "AI 인프라·API", "REVIVAL", 71, 9],
+    ["Data Canvas", "DC", "데이터 분석", "WATCH", 68, 1],
+    ["Local Lens", "LL", "이미지", "FALLING", 65, -3],
+  ].map((item, index): TrendEntity => {
+    const [name, logoText, category, status, trendScore, rankChange] = item as [string, string, string, TrendEntity["status"], number, number];
+    const rank = index + 4;
+    const slug = name.toLowerCase().replaceAll(" ", "-");
+    return {
+      ...base,
+      id: slug,
+      slug,
+      name,
+      logoText,
+      tagline: `${category} 워크플로의 마찰을 줄이는 주목할 만한 신규 AI 서비스`,
+      description: `${name}은 ${category} 분야에서 최근 반응 증가 속도가 확인된 서비스입니다.`,
+      category,
+      canonicalUrl: `https://example.com/${slug}`,
+      status,
+      rank,
+      rankChange,
+      trendScore,
+      trustScore: Math.max(61, trendScore - 4),
+      sources: rank % 2 === 0 ? ["github", "reddit", "threads"] : ["product_hunt", "hacker_news", "threads"],
+      signals: [{ source: "github", label: "GitHub Stars", value: 1000 + rank * 731, delta24h: 120 + rank * 37, unit: "stars", measuredAt: updatedAt, reliability: "verified" }],
+      whyTrending: ["최근 24시간 반응 속도가 7일 평균보다 높습니다.", "서로 다른 커뮤니티에서 독립적인 언급이 확인됐습니다."],
+      sparkline: [32, 36, 35, 42, 47, 51, 56, 59, 62, trendScore - 2, trendScore],
+    };
+  }),
+];
+
+export function getTrend(slug: string) {
+  return trends.find((trend) => trend.slug === slug);
+}

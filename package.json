@@ -1,0 +1,23 @@
+{
+  "name": "ai-trend-radar",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.9.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @ai-trend-radar/web dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
+    "collect:github": "pnpm --filter @ai-trend-radar/collectors collect:github",
+    "collect:live": "pnpm --filter @ai-trend-radar/collectors collect:live",
+    "collect:preview": "pnpm --filter @ai-trend-radar/collectors collect:preview",
+    "process:live": "pnpm --filter @ai-trend-radar/pipeline process:live",
+    "verify:live": "pnpm --filter @ai-trend-radar/pipeline verify:live",
+    "preview:live": "pnpm --filter @ai-trend-radar/pipeline preview:live"
+  }
+}

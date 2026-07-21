@@ -1,0 +1,292 @@
+import type { TrendAnalysisResult } from "@ai-trend-radar/llm";
+import type { SourceCode } from "@ai-trend-radar/types";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { z } from "zod";
+import type { EntityCandidate } from "./schema";
+import { databaseRawItemSchema } from "./schema";
+
+const sourceSchema = z.object({ id: z.uuid(), code: z.string() });
+const categorySchema = z.object({ id: z.uuid(), slug: z.string() });
+const entitySchema = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  slug: z.string(),
+  canonical_url: z.url(),
+  official_domain: z.string().nullable(),
+  github_url: z.string().nullable(),
+  description: z.string().nullable(),
+  category_id: z.string().nullable(),
+  pricing_type: z.string(),
+  is_open_source: z.boolean(),
+  first_detected_at: z.iso.datetime({ offset: true }),
+  last_detected_at: z.iso.datetime({ offset: true }),
+});
+
+type EntityRow = z.infer<typeof entitySchema>;
+
+export interface BootstrapScoreRecord {
+  breakdown: {
+    crossSource: number;
+    velocity: number;
+    productGrowth: number;
+    threads: number;
+    reddit: number;
+    novelty: number;
+    instagram: number;
+    quality: number;
+  };
+  totalScore: number;
+  status: "WATCH" | "NEW" | "RISING" | "SURGING" | "PEAK" | "STABLE" | "FALLING" | "REVIVAL";
+  trustScore: number;
+  scoringVersion: string;
+}
+
+export class PipelineRepositoryError extends Error {
+  constructor(message: string, readonly operation: string) {
+    super(message);
+    this.name = "PipelineRepositoryError";
+  }
+}
+
+export class SupabasePipelineRepository {
+  private readonly client: SupabaseClient;
+  private readonly sourceIds = new Map<SourceCode, string>();
+  private readonly categoryIds = new Map<string, string>();
+  private readonly entitiesByCanonical = new Map<string, EntityRow>();
+  private readonly entitiesByGithub = new Map<string, EntityRow>();
+  private readonly entitiesByDomain = new Map<string, EntityRow>();
+  private readonly usedSlugs = new Set<string>();
+
+  constructor(client: SupabaseClient) {
+    this.client = client;
+  }
+
+  static fromEnvironment(env: NodeJS.ProcessEnv = process.env) {
+    const url = env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+    const secretKey = env.SUPABASE_SECRET_KEY ?? env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+    if (!url || !secretKey) {
+      throw new PipelineRepositoryError("Supabase URL과 서버 비밀키가 필요합니다.", "configure");
+    }
+    return new SupabasePipelineRepository(createClient(url, secretKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    }));
+  }
+
+  async initialize() {
+    const [sourcesResult, categoriesResult, entitiesResult] = await Promise.all([
+      this.client.from("sources").select("id,code"),
+      this.client.from("categories").select("id,slug").eq("enabled", true),
+      this.client.from("entities").select("id,name,slug,canonical_url,official_domain,github_url,description,category_id,pricing_type,is_open_source,first_detected_at,last_detected_at"),
+    ]);
+    if (sourcesResult.error) throw new PipelineRepositoryError(sourcesResult.error.message, "load_sources");
+    if (categoriesResult.error) throw new PipelineRepositoryError(categoriesResult.error.message, "load_categories");
+    if (entitiesResult.error) throw new PipelineRepositoryError(entitiesResult.error.message, "load_entities");
+
+    for (const source of z.array(sourceSchema).parse(sourcesResult.data ?? [])) {
+      if (source.code === "github" || source.code === "hacker_news") this.sourceIds.set(source.code, source.id);
+    }
+    for (const category of z.array(categorySchema).parse(categoriesResult.data ?? [])) {
+      this.categoryIds.set(category.slug, category.id);
+    }
+    for (const entity of z.array(entitySchema).parse(entitiesResult.data ?? [])) this.indexEntity(entity);
+  }
+
+  async loadRawItems() {
+    const output = [];
+    for (const source of ["github", "hacker_news"] as const) {
+      const sourceId = this.sourceIds.get(source);
+      if (!sourceId) throw new PipelineRepositoryError(`source seed가 없습니다: ${source}`, "load_raw_items");
+      const { data, error } = await this.client
+        .from("raw_items")
+        .select("id,source_id,source_item_id,title,body,url,canonical_url,author_name,published_at,collected_at,raw_metrics_json,raw_payload_json")
+        .eq("source_id", sourceId)
+        .order("published_at", { ascending: false })
+        .limit(1_000);
+      if (error) throw new PipelineRepositoryError(error.message, "load_raw_items");
+      for (const row of data ?? []) output.push(databaseRawItemSchema.parse({ ...row, source }));
+    }
+    return output;
+  }
+
+  async upsertCandidate(candidate: EntityCandidate) {
+    const existing = this.findEntity(candidate);
+    const categoryId = this.categoryIds.get(candidate.categorySlug) ?? this.categoryIds.get("other") ?? null;
+    let entity: EntityRow;
+
+    if (existing) {
+      const firstDetectedAt = new Date(existing.first_detected_at) <= new Date(candidate.firstDetectedAt)
+        ? existing.first_detected_at
+        : candidate.firstDetectedAt;
+      const { data, error } = await this.client.from("entities").update({
+        last_detected_at: candidate.lastDetectedAt,
+        first_detected_at: firstDetectedAt,
+        github_url: existing.github_url ?? candidate.githubUrl,
+        description: existing.description ?? candidate.description,
+        category_id: existing.category_id ?? categoryId,
+        pricing_type: existing.pricing_type === "unknown" ? candidate.pricingType : existing.pricing_type,
+        is_open_source: existing.is_open_source || candidate.isOpenSource,
+        updated_at: candidate.lastDetectedAt,
+      }).eq("id", existing.id).select("id,name,slug,canonical_url,official_domain,github_url,description,category_id,pricing_type,is_open_source,first_detected_at,last_detected_at").single();
+      if (error) throw new PipelineRepositoryError(error.message, "update_entity");
+      entity = entitySchema.parse(data);
+    } else {
+      const slug = this.uniqueSlug(candidate.slugBase, candidate.canonicalUrl);
+      const { data, error } = await this.client.from("entities").insert({
+        name: candidate.name,
+        slug,
+        canonical_url: candidate.canonicalUrl,
+        official_domain: candidate.officialDomain,
+        github_url: candidate.githubUrl,
+        description: candidate.description,
+        category_id: categoryId,
+        pricing_type: candidate.pricingType,
+        is_open_source: candidate.isOpenSource,
+        first_detected_at: candidate.firstDetectedAt,
+        last_detected_at: candidate.lastDetectedAt,
+        status: "WATCH",
+        visibility: "review",
+      }).select("id,name,slug,canonical_url,official_domain,github_url,description,category_id,pricing_type,is_open_source,first_detected_at,last_detected_at").single();
+      if (error) throw new PipelineRepositoryError(error.message, "insert_entity");
+      entity = entitySchema.parse(data);
+    }
+    this.indexEntity(entity);
+    await this.saveAliasMentionAndMetric(entity.id, candidate);
+    return entity;
+  }
+
+  async saveScore(entityId: string, score: BootstrapScoreRecord, scoreDate: string) {
+    const { breakdown } = score;
+    const { error } = await this.client.from("trend_scores").upsert({
+      entity_id: entityId,
+      score_date: scoreDate,
+      total_score: score.totalScore,
+      cross_source_score: breakdown.crossSource,
+      velocity_score: breakdown.velocity,
+      product_growth_score: breakdown.productGrowth,
+      threads_score: breakdown.threads,
+      reddit_score: breakdown.reddit,
+      novelty_score: breakdown.novelty,
+      instagram_score: breakdown.instagram,
+      quality_score: breakdown.quality,
+      trust_score: score.trustScore,
+      status: score.status,
+      scoring_version: score.scoringVersion,
+      calculated_at: new Date().toISOString(),
+    }, { onConflict: "entity_id,score_date,scoring_version" });
+    if (error) throw new PipelineRepositoryError(error.message, "upsert_trend_score");
+
+    const { error: entityError } = await this.client.from("entities")
+      .update({ status: score.status, updated_at: new Date().toISOString() })
+      .eq("id", entityId);
+    if (entityError) throw new PipelineRepositoryError(entityError.message, "update_entity_status");
+  }
+
+  async hasRecentAnalysis(entityId: string, model: string, promptVersion: string, since: string) {
+    const { count, error } = await this.client.from("ai_analyses")
+      .select("id", { count: "exact", head: true })
+      .eq("entity_id", entityId)
+      .eq("model_name", model)
+      .eq("prompt_version", promptVersion)
+      .gte("generated_at", since);
+    if (error) throw new PipelineRepositoryError(error.message, "check_analysis");
+    return (count ?? 0) > 0;
+  }
+
+  async saveAnalysis(entityId: string, result: TrendAnalysisResult) {
+    const { analysis } = result;
+    const { error } = await this.client.from("ai_analyses").insert({
+      entity_id: entityId,
+      summary: analysis.summary,
+      why_trending_json: analysis.whyTrending,
+      target_users_json: analysis.targetUsers,
+      strengths_json: analysis.strengths,
+      weaknesses_json: analysis.weaknesses,
+      use_cases_json: analysis.useCases,
+      benchmark_points_json: analysis.benchmarkPoints,
+      korea_opportunity: analysis.koreaOpportunity,
+      business_potential: analysis.businessPotential,
+      development_difficulty: analysis.developmentDifficulty,
+      model_provider: result.provider,
+      model_name: result.model,
+      prompt_version: result.promptVersion,
+      generated_at: result.generatedAt,
+    });
+    if (error) throw new PipelineRepositoryError(error.message, "insert_analysis");
+  }
+
+  async autoApproveAnalyzedCandidates() {
+    const { data: analysisRows, error: analysisError } = await this.client
+      .from("ai_analyses")
+      .select("entity_id");
+    if (analysisError) throw new PipelineRepositoryError(analysisError.message, "load_analyzed_candidates");
+
+    const entityIds = [...new Set((analysisRows ?? []).map((row) => row.entity_id).filter((id): id is string => typeof id === "string"))];
+    if (entityIds.length === 0) return 0;
+
+    const { data, error } = await this.client
+      .from("entities")
+      .update({ visibility: "public", updated_at: new Date().toISOString() })
+      .in("id", entityIds)
+      .eq("visibility", "review")
+      .select("id");
+    if (error) throw new PipelineRepositoryError(error.message, "auto_approve_analyzed_candidates");
+    return data?.length ?? 0;
+  }
+
+  private findEntity(candidate: EntityCandidate) {
+    const canonical = this.entitiesByCanonical.get(candidate.canonicalUrl);
+    if (canonical) return canonical;
+    if (candidate.githubUrl) {
+      const github = this.entitiesByGithub.get(candidate.githubUrl);
+      if (github) return github;
+    }
+    if (candidate.officialDomain !== "github.com") return this.entitiesByDomain.get(candidate.officialDomain);
+    return undefined;
+  }
+
+  private indexEntity(entity: EntityRow) {
+    this.entitiesByCanonical.set(entity.canonical_url, entity);
+    if (entity.github_url) this.entitiesByGithub.set(entity.github_url, entity);
+    if (entity.official_domain && entity.official_domain !== "github.com") this.entitiesByDomain.set(entity.official_domain, entity);
+    this.usedSlugs.add(entity.slug);
+  }
+
+  private uniqueSlug(base: string, canonicalUrl: string) {
+    if (!this.usedSlugs.has(base)) return base;
+    const suffix = Buffer.from(canonicalUrl).toString("base64url").slice(0, 8).toLowerCase();
+    return `${base.slice(0, 54)}-${suffix}`;
+  }
+
+  private async saveAliasMentionAndMetric(entityId: string, candidate: EntityCandidate) {
+    const sourceId = this.sourceIds.get(candidate.source);
+    if (!sourceId) throw new PipelineRepositoryError(`source seed가 없습니다: ${candidate.source}`, "persist_candidate");
+    const metric = candidate.metrics;
+    const [aliasResult, mentionResult, metricResult] = await Promise.all([
+      this.client.from("entity_aliases").upsert({
+        entity_id: entityId,
+        alias: candidate.alias,
+        alias_type: candidate.source === "github" ? "github_full_name" : "source_title",
+        source_id: sourceId,
+      }, { onConflict: "entity_id,alias" }),
+      this.client.from("entity_mentions").upsert({
+        entity_id: entityId,
+        raw_item_id: candidate.rawItem.id,
+        match_method: candidate.matchMethod,
+        confidence: candidate.confidence,
+      }, { onConflict: "entity_id,raw_item_id" }),
+      this.client.from("metric_snapshots").upsert({
+        entity_id: entityId,
+        source_id: sourceId,
+        stars: metric.stars ?? null,
+        forks: metric.forks ?? null,
+        score: metric.points ?? null,
+        comments: metric.comments ?? null,
+        measured_at: candidate.rawItem.collected_at,
+        raw_metrics_json: metric,
+      }, { onConflict: "entity_id,source_id,measured_at" }),
+    ]);
+    if (aliasResult.error) throw new PipelineRepositoryError(aliasResult.error.message, "upsert_alias");
+    if (mentionResult.error) throw new PipelineRepositoryError(mentionResult.error.message, "upsert_mention");
+    if (metricResult.error) throw new PipelineRepositoryError(metricResult.error.message, "upsert_metric");
+  }
+}

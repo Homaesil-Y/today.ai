@@ -1,0 +1,32 @@
+{
+  "name": "@ai-trend-radar/pipeline",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "process:live": "tsx src/cli/process.ts",
+    "verify:live": "tsx src/cli/verify.ts",
+    "publish:reviewed": "tsx src/cli/publish-reviewed.ts",
+    "bootstrap:owner": "tsx src/cli/bootstrap-owner.ts",
+    "preview:live": "tsx src/cli/preview.ts"
+  },
+  "dependencies": {
+    "@ai-trend-radar/collectors": "workspace:*",
+    "@ai-trend-radar/llm": "workspace:*",
+    "@ai-trend-radar/scoring": "workspace:*",
+    "@ai-trend-radar/types": "workspace:*",
+    "@supabase/supabase-js": "^2.81.1",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}
