@@ -256,8 +256,11 @@ button { color: inherit; }
 .mini-score { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; margin-top: auto; padding-top: 16px; border-top: 1px solid var(--border-default); }
 .mini-score > div { display: flex; flex-direction: column; }
 .mini-score strong { font-size: 34px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.mini-score small { margin-top: 2px; color: var(--status-rising); font-size: 11px; font-weight: 550; }
 .sparkline { width: 110px; height: 34px; color: var(--brand-primary); overflow: visible; }
 .small-card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; color: var(--status-rising); font-size: 12px; font-weight: 650; }
+.card-detail-link { display: inline-flex; align-items: center; gap: 3px; color: var(--brand-primary); font-size: 12px; font-weight: 650; }
+.card-detail-link:hover { color: var(--brand-primary-hover); }
 
 .ranking-heading { align-items: center; }
 .filter-actions, .filter-bar { display: flex; gap: 8px; flex-wrap: wrap; }
