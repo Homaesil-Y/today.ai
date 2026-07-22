@@ -1,5 +1,6 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { AppShell } from "@/components/app-shell";
+import { PwaRegister } from "@/components/pwa-register";
 import { StructuredData } from "@/components/structured-data";
 import { absoluteUrl, siteConfig } from "@/lib/site";
 import "pretendard/dist/web/static/pretendard.css";
@@ -37,6 +38,12 @@ export const metadata: Metadata = {
     googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1, "max-video-preview": -1 },
   },
   manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, title: "오늘의 AI", statusBarStyle: "default" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#6d5dfb",
+  colorScheme: "light",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -59,5 +66,5 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     description: siteConfig.description,
     publisher: { "@id": absoluteUrl("/#organization") },
   };
-  return <html lang="ko"><body><StructuredData data={[organization, website]} /><AppShell>{children}</AppShell></body></html>;
+  return <html lang="ko"><body><StructuredData data={[organization, website]} /><PwaRegister /><AppShell>{children}</AppShell></body></html>;
 }
