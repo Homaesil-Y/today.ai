@@ -62,7 +62,7 @@ export default async function DashboardPage() {
     <div className="page">
       <StructuredData data={[collectionData, faqData]} />
       <section className="page-heading">
-        <div><p className="eyebrow">LIVE · APPROVED SIGNALS</p><h1>오늘의 AI 트렌드</h1><p>GitHub과 Hacker News에서 감지하고 검토를 통과한 AI 서비스입니다.</p></div>
+        <div><h1>오늘의 AI 트렌드</h1><p>GitHub과 Hacker News에서 감지하고 검토를 통과한 AI 서비스입니다.</p></div>
         <div className="freshness"><span className="status-dot" />데이터 업데이트 완료<small>{updatedLabel ? `데이터 기준 · ${updatedLabel}` : "공개 데이터 승인 대기"}</small></div>
       </section>
 
@@ -71,18 +71,18 @@ export default async function DashboardPage() {
       </section>
 
       <section className="section-block">
-        <div className="section-heading"><div><p className="eyebrow">TODAY&apos;S LEADERS</p><h2>가장 빠르게 확산 중</h2></div><p>누적 인기가 아닌 최근 반응 증가 속도 기준</p></div>
+        <div className="section-heading"><div><h2>가장 빠르게 확산 중</h2></div><p>누적 인기가 아닌 최근 반응 증가 속도 기준</p></div>
         {trends.length ? <div className="top-grid">{trends[0] && <TopOneCard trend={trends[0]} initialSaved={savedEntityIds.has(trends[0].id)} />}{trends.slice(1, 3).map((trend) => <TopSmallCard key={trend.id} trend={trend} />)}</div> : <div className="empty-state"><Radio size={30} /><h2>아직 공개된 후보가 없습니다</h2><p>관리자가 후보를 승인하면 실제 데이터가 이곳에 표시됩니다.</p></div>}
       </section>
 
       <section className="section-block">
-        <div className="section-heading ranking-heading"><div><p className="eyebrow">TOP 10 · LIVE SIGNAL</p><h2>전체 트렌드 랭킹</h2></div><div className="filter-actions"><button className="button button-secondary"><SlidersHorizontal size={17} />전체 카테고리</button><button className="button button-secondary">트렌드 점수순</button></div></div>
+        <div className="section-heading ranking-heading"><div><h2>전체 트렌드 랭킹</h2></div><div className="filter-actions"><button className="button button-secondary"><SlidersHorizontal size={17} />전체 카테고리</button><button className="button button-secondary">트렌드 점수순</button></div></div>
         <div className="partial-notice" role="status"><Radio size={16} /><span><strong>MVP 데이터 안내</strong> 현재 순위는 GitHub·Hacker News 수집 신호를 기준으로 계산합니다.</span></div>
         {trends.length ? <RankingTable trends={trends} savedEntityIds={savedEntityIds} /> : null}
       </section>
 
       <section className="section-block answer-section" aria-labelledby="answer-heading">
-        <div className="section-heading"><div><p className="eyebrow">QUICK ANSWERS</p><h2 id="answer-heading">오늘의 AI, 이렇게 읽으세요</h2></div><Link href="/methodology">분석 방법론 전체 보기</Link></div>
+        <div className="section-heading"><div><h2 id="answer-heading">오늘의 AI, 이렇게 읽으세요</h2></div><Link href="/methodology">분석 방법론 전체 보기</Link></div>
         <div className="answer-grid">{faqItems.map(({ question, answer }) => <article className="panel" key={question}><h3>{question}</h3><p>{answer}</p></article>)}</div>
       </section>
     </div>

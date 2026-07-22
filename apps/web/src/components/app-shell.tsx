@@ -53,7 +53,6 @@ export async function AppShell({ children }: { children: ReactNode }) {
 
       <aside className="sidebar" aria-label="주요 탐색">
         <nav>
-          <p className="nav-label">DISCOVER</p>
           {nav.map(({ label, href, icon: Icon }, index) => (
             <Link key={href} className={`nav-link ${index === 0 ? "active" : ""}`} href={href}>
               <Icon size={19} aria-hidden="true" /><span>{label}</span>{index === 0 && <ChevronRight className="nav-arrow" size={16} />}
