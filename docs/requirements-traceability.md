@@ -64,7 +64,7 @@
 | UI-019 | 온보딩 | 관심 카테고리·알림·완료 3단계 이하 | UI 12.8 | `/onboarding`, profile/preferences | P1 | DONE | 한 화면, 선택 없이 진행 허용 |
 | UI-020 | 설정 | 프로필·카테고리·알림·구독·Light·개인정보·탈퇴 | UI 12.9 | `/settings` | P1 | IN_PROGRESS | 카테고리·알림·시간·회원 탈퇴·법적 링크 완료, 구독 관리 후속 |
 | ADMIN-001 | 관리자 | 수집 KPI·채널 상태·실패·대기·호출량 | DEV 22, UI 12.10 | Phase 6 | P1 | NOT_STARTED | collector_runs schema 완료 |
-| ADMIN-002 | 관리자 | 후보 승인·스팸·수정·공개·분석 재생성 | DEV 22.2 | `/admin/review`, server actions | P1 | IN_PROGRESS | 원문 모달·검색·필터·분석 전 승인 차단 완료, 수정·재생성 후속 |
+| ADMIN-002 | 관리자 | 후보 승인·스팸·수정·공개·분석 재생성 | DEV 22.2 | `/admin/review`, server actions | P1 | IN_PROGRESS | 원문 모달·검색·필터·분석 전 승인 차단·후보 정보(서비스명·설명·카테고리) 수정 완료, AI 분석 재생성 후속 |
 | ADMIN-003 | 관리자 | 키워드·subreddit·hashtag·동적 서비스 검색 관리 | DEV 22.3 | Phase 6 | P1 | NOT_STARTED | 설정 테이블 필요 |
 | ADMIN-004 | 관리자 | 가중치·임계값·장애 제외·재계산·버전 관리 | DEV 22.4 | Phase 6 | P1 | IN_PROGRESS | 코드 상수만 존재 |
 | UX-001 | 상태 | loading skeleton, empty, error, partial, disabled, unauth, stale | 요청문, UI 14, 19 | partial banner, placeholder | P0 | IN_PROGRESS | 공통 상태 컴포넌트 후속 |
