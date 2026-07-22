@@ -12,6 +12,10 @@ const memoSchema = z.string().trim().max(500);
 
 export type WatchActionResult = { ok: true; saved: boolean } | { ok: false; saved: boolean; requiresAuth?: boolean; message: string };
 
+// 폼 액션 결과. 예상 가능한 검증 실패(중복 이름 등)는 throw 대신 이 상태로 반환해
+// 서버 에러 화면 대신 인라인 메시지로 보여준다.
+export type WatchlistFormState = { error: string };
+
 async function authenticatedClient(next = "/watchlist") {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -62,25 +66,31 @@ export async function setWatchlistItem(entityId: string, shouldSave: boolean): P
   return { ok: true, saved: shouldSave };
 }
 
-export async function createWatchlist(formData: FormData) {
-  const name = folderNameSchema.parse(String(formData.get("name") ?? ""));
+export async function createWatchlist(_prev: WatchlistFormState, formData: FormData): Promise<WatchlistFormState> {
+  const parsed = folderNameSchema.safeParse(String(formData.get("name") ?? ""));
+  if (!parsed.success) return { error: "폴더 이름은 1~40자로 입력해주세요." };
+  const name = parsed.data;
   const { supabase, user } = await authenticatedClient();
   const { data: duplicate } = await supabase.from("watchlists").select("id").eq("user_id", user.id).ilike("name", name).limit(1).maybeSingle();
-  if (duplicate) throw new Error("같은 이름의 폴더가 이미 있습니다.");
+  if (duplicate) return { error: "같은 이름의 폴더가 이미 있습니다." };
   const { data: latest } = await supabase.from("watchlists").select("sort_order").eq("user_id", user.id).order("sort_order", { ascending: false }).limit(1).maybeSingle();
   const { error } = await supabase.from("watchlists").insert({ user_id: user.id, name, sort_order: (latest?.sort_order ?? -1) + 1 });
-  if (error) throw new Error(error.code === "23505" ? "같은 이름의 폴더가 이미 있습니다." : "폴더를 만들지 못했습니다.");
+  if (error) return { error: error.code === "23505" ? "같은 이름의 폴더가 이미 있습니다." : "폴더를 만들지 못했습니다." };
   refreshWatchlist();
+  return { error: "" };
 }
 
-export async function updateWatchlistEntry(formData: FormData) {
-  const itemId = uuidSchema.parse(String(formData.get("itemId") ?? ""));
-  const watchlistId = uuidSchema.parse(String(formData.get("watchlistId") ?? ""));
-  const memo = memoSchema.parse(String(formData.get("memo") ?? ""));
+export async function updateWatchlistEntry(_prev: WatchlistFormState, formData: FormData): Promise<WatchlistFormState> {
+  const itemId = uuidSchema.safeParse(String(formData.get("itemId") ?? ""));
+  const watchlistId = uuidSchema.safeParse(String(formData.get("watchlistId") ?? ""));
+  const memo = memoSchema.safeParse(String(formData.get("memo") ?? ""));
+  if (!itemId.success || !watchlistId.success) return { error: "요청이 올바르지 않습니다." };
+  if (!memo.success) return { error: "메모는 500자 이내로 입력해주세요." };
   const { supabase } = await authenticatedClient();
-  const { error } = await supabase.from("watchlist_items").update({ watchlist_id: watchlistId, memo: memo || null }).eq("id", itemId);
-  if (error) throw new Error(error.code === "23505" ? "해당 폴더에 이미 저장된 서비스입니다." : "관심 서비스 정보를 저장하지 못했습니다.");
+  const { error } = await supabase.from("watchlist_items").update({ watchlist_id: watchlistId.data, memo: memo.data || null }).eq("id", itemId.data);
+  if (error) return { error: error.code === "23505" ? "해당 폴더에 이미 저장된 서비스입니다." : "관심 서비스 정보를 저장하지 못했습니다." };
   refreshWatchlist();
+  return { error: "" };
 }
 
 export async function deleteEmptyWatchlist(formData: FormData) {
