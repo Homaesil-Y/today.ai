@@ -4,14 +4,14 @@ import type { Route } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { GoogleLoginButton } from "@/components/google-login-button";
+import { safeNextPath } from "@/lib/navigation";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Google 로그인", robots: { index: false, follow: false } };
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
-  const requestedNext = (await searchParams).next ?? "/";
-  const nextPath = requestedNext.startsWith("/") && !requestedNext.startsWith("//") ? requestedNext : "/";
+  const nextPath = safeNextPath((await searchParams).next);
   const configured = isSupabaseConfigured();
   if (configured) {
     const supabase = await createClient();

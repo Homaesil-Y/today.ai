@@ -89,7 +89,7 @@
 | OPS-003 | 이메일 | Resend 데일리 리포트·기본 08:00 사용자 시간대 | DEV 20~21 | `report.ts`(생성 완료), Resend provider 예정 | P1 | BLOCKED | 일간 리포트 생성·공개는 완료. 실제 이메일 발송만 `RESEND_API_KEY`·발신 도메인 필요 |
 | QA-001 | 품질 | strict TypeScript, 외부·LLM Zod 검증, any 최소화 | 요청문, DEV 39 | tsconfig, collectors | P0 | DONE | exact optional 사용 |
 | QA-002 | 품질 | build·typecheck·lint·unit test 통과 | 요청문, UI 24 | root scripts/CI | P0 | DONE | production build 포함 통과 |
-| QA-003 | 테스트 | 점수·URL·통합·권한 우선 테스트 | 요청문 | scoring tests | P0 | IN_PROGRESS | 통합·권한 테스트 후속 |
+| QA-003 | 테스트 | 점수·URL·통합·권한 우선 테스트 | 요청문 | scoring/collector/pipeline tests, `navigation.test.ts` | P0 | IN_PROGRESS | 점수·수집기·대기열·오픈 리다이렉트 방지 단위 테스트, RLS 권한 매트릭스 실검증(anon: 공개/리포트만, review·프로필·관심목록 차단 7/7). 통합 테스트 후속 |
 | DOC-001 | 문서 | 요구사항 추적표 유지 | 요청문 | 본 파일 | P0 | DONE | Phase별 갱신 |
 | DOC-002 | 문서 | gap/conflict 분석 | 요청문 | `gap-and-conflict-analysis.md` | P0 | DONE | 빈 저장소 기준 |
 | DOC-003 | 문서 | Phase 0~6 구현 로드맵 | 요청문 | `implementation-roadmap.md` | P0 | DONE | 위험/완료 기준 포함 |

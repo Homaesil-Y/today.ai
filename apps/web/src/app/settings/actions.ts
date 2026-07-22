@@ -4,6 +4,7 @@ import type { Route } from "next";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { safeNextPath } from "@/lib/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -57,8 +58,7 @@ export async function completeOnboarding(formData: FormData) {
   await savePreferences(formData);
   const { error } = await supabase.from("user_profiles").update({ onboarding_completed: true, updated_at: new Date().toISOString() }).eq("id", user.id);
   if (error) throw new Error("온보딩을 완료하지 못했습니다.");
-  const requestedNext = String(formData.get("next") ?? "/");
-  const nextPath = requestedNext.startsWith("/") && !requestedNext.startsWith("//") ? requestedNext : "/";
+  const nextPath = safeNextPath(formData.get("next"));
   redirect(nextPath as Route);
 }
 
