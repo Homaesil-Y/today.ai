@@ -149,3 +149,23 @@ export const getPublishedTrend = cache(async (slug: string) => {
   const trends = await getPublishedTrends();
   return trends.find((trend) => trend.slug === slug);
 });
+
+const historyRowSchema = z.object({ total_score: z.coerce.number(), calculated_at: z.string() });
+
+export type TrendScoreHistoryPoint = { measuredAt: string; score: number };
+
+// 파이프라인이 실행될 때마다 쌓이는 실제 스냅샷(trend_scores) 이력을 시간순으로 반환한다.
+// 기간 탭(24H/7D/30D/90D)이 실제 데이터로 동작하도록 상세 페이지에서 사용한다.
+export const getTrendScoreHistory = cache(async (entityId: string): Promise<TrendScoreHistoryPoint[]> => {
+  const supabase = createPublicClient();
+  const { data, error } = await supabase
+    .from("trend_scores")
+    .select("total_score, calculated_at")
+    .eq("entity_id", entityId)
+    .order("calculated_at", { ascending: true });
+  if (error) throw new Error(`트렌드 점수 이력 조회 실패: ${error.message}`);
+  return z.array(historyRowSchema).parse(data ?? []).map((row) => ({
+    measuredAt: row.calculated_at,
+    score: Math.round(row.total_score * 10) / 10,
+  }));
+});
