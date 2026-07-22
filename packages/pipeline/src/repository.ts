@@ -18,6 +18,7 @@ const entitySchema = z.object({
   category_id: z.string().nullable(),
   pricing_type: z.string(),
   is_open_source: z.boolean(),
+  visibility: z.enum(["public", "private", "review"]),
   first_detected_at: z.iso.datetime({ offset: true }),
   last_detected_at: z.iso.datetime({ offset: true }),
 });
@@ -76,7 +77,7 @@ export class SupabasePipelineRepository {
     const [sourcesResult, categoriesResult, entitiesResult] = await Promise.all([
       this.client.from("sources").select("id,code"),
       this.client.from("categories").select("id,slug").eq("enabled", true),
-      this.client.from("entities").select("id,name,slug,canonical_url,official_domain,github_url,description,category_id,pricing_type,is_open_source,first_detected_at,last_detected_at"),
+      this.client.from("entities").select("id,name,slug,canonical_url,official_domain,github_url,description,category_id,pricing_type,is_open_source,visibility,first_detected_at,last_detected_at"),
     ]);
     if (sourcesResult.error) throw new PipelineRepositoryError(sourcesResult.error.message, "load_sources");
     if (categoriesResult.error) throw new PipelineRepositoryError(categoriesResult.error.message, "load_categories");
@@ -126,7 +127,7 @@ export class SupabasePipelineRepository {
         pricing_type: existing.pricing_type === "unknown" ? candidate.pricingType : existing.pricing_type,
         is_open_source: existing.is_open_source || candidate.isOpenSource,
         updated_at: candidate.lastDetectedAt,
-      }).eq("id", existing.id).select("id,name,slug,canonical_url,official_domain,github_url,description,category_id,pricing_type,is_open_source,first_detected_at,last_detected_at").single();
+      }).eq("id", existing.id).select("id,name,slug,canonical_url,official_domain,github_url,description,category_id,pricing_type,is_open_source,visibility,first_detected_at,last_detected_at").single();
       if (error) throw new PipelineRepositoryError(error.message, "update_entity");
       entity = entitySchema.parse(data);
     } else {
@@ -145,7 +146,7 @@ export class SupabasePipelineRepository {
         last_detected_at: candidate.lastDetectedAt,
         status: "WATCH",
         visibility: "review",
-      }).select("id,name,slug,canonical_url,official_domain,github_url,description,category_id,pricing_type,is_open_source,first_detected_at,last_detected_at").single();
+      }).select("id,name,slug,canonical_url,official_domain,github_url,description,category_id,pricing_type,is_open_source,visibility,first_detected_at,last_detected_at").single();
       if (error) throw new PipelineRepositoryError(error.message, "insert_entity");
       entity = entitySchema.parse(data);
     }
@@ -181,15 +182,29 @@ export class SupabasePipelineRepository {
     if (entityError) throw new PipelineRepositoryError(entityError.message, "update_entity_status");
   }
 
-  async hasRecentAnalysis(entityId: string, model: string, promptVersion: string, since: string) {
-    const { count, error } = await this.client.from("ai_analyses")
-      .select("id", { count: "exact", head: true })
-      .eq("entity_id", entityId)
+  /**
+   * 주어진 엔티티들에 대해 (model, promptVersion) 기준 가장 최근 분석 시각(epoch ms)을 한 번의 조회로 가져온다.
+   * 분석 기록이 없는 엔티티는 Map 에 포함되지 않으므로 "미분석" 판별에 사용할 수 있다.
+   */
+  async loadLatestAnalysisAt(entityIds: string[], model: string, promptVersion: string) {
+    const latest = new Map<string, number>();
+    if (entityIds.length === 0) return latest;
+
+    const { data, error } = await this.client.from("ai_analyses")
+      .select("entity_id,generated_at")
+      .in("entity_id", entityIds)
       .eq("model_name", model)
-      .eq("prompt_version", promptVersion)
-      .gte("generated_at", since);
-    if (error) throw new PipelineRepositoryError(error.message, "check_analysis");
-    return (count ?? 0) > 0;
+      .eq("prompt_version", promptVersion);
+    if (error) throw new PipelineRepositoryError(error.message, "load_latest_analysis");
+
+    for (const row of data ?? []) {
+      if (typeof row.entity_id !== "string" || typeof row.generated_at !== "string") continue;
+      const timestamp = new Date(row.generated_at).getTime();
+      if (Number.isNaN(timestamp)) continue;
+      const current = latest.get(row.entity_id);
+      if (current === undefined || timestamp > current) latest.set(row.entity_id, timestamp);
+    }
+    return latest;
   }
 
   async saveAnalysis(entityId: string, result: TrendAnalysisResult) {

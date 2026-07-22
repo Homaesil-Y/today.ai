@@ -76,21 +76,29 @@ export async function runEntityPipeline(options: {
   let analysesCreated = 0;
   let analysesSkipped = 0;
   let analysisStoppedReason: "RATE_LIMIT" | "AUTH" | "CONFIG" | null = null;
+  let lastRateLimitAt: string | null = null;
   const analysisErrors: Array<{ entity: string; error: string }> = [];
+  const analysisQueue = { unanalyzed: 0, stale: 0, selected: 0, remaining: 0 };
   if (options.analysisProvider) {
-    const limit = Math.max(0, options.analysisLimit ?? 3);
-    const since = new Date(now.getTime() - 24 * 3_600_000).toISOString();
-    const queue = await selectPendingAnalyses(
-      processed,
-      limit,
-      (group) => options.repository.hasRecentAnalysis(
-        group.entity.id,
-        options.analysisProvider!.model,
-        TREND_ANALYSIS_PROMPT_VERSION,
-        since,
-      ),
+    const limit = Math.max(0, options.analysisLimit ?? 50);
+    const staleThreshold = now.getTime() - 24 * 3_600_000;
+    const latestAnalysisAt = await options.repository.loadLatestAnalysisAt(
+      processed.map((group) => group.entity.id),
+      options.analysisProvider.model,
+      TREND_ANALYSIS_PROMPT_VERSION,
     );
+    // 우선순위: 미분석 review 후보 → 오래된 public 재분석. 보류(private) 후보는 제외.
+    const queue = selectPendingAnalyses(processed, limit, (group) => {
+      if (group.entity.visibility === "private") return "excluded";
+      const latest = latestAnalysisAt.get(group.entity.id);
+      if (latest === undefined) return "unanalyzed";
+      return latest < staleThreshold ? "stale" : "recent";
+    });
     analysesSkipped = queue.skipped;
+    analysisQueue.unanalyzed = queue.unanalyzed;
+    analysisQueue.stale = queue.stale;
+    analysisQueue.selected = queue.pending.length;
+    analysisQueue.remaining = queue.remaining;
     for (const group of queue.pending) {
       try {
         const result = await options.analysisProvider.analyze(toEvidence(group, now));
@@ -105,10 +113,13 @@ export async function runEntityPipeline(options: {
           error.code === "RATE_LIMIT" || error.code === "AUTH" || error.code === "CONFIG"
         )) {
           analysisStoppedReason = error.code;
+          if (error.code === "RATE_LIMIT") lastRateLimitAt = new Date().toISOString();
           break;
         }
       }
     }
+    // 이번 실행에서 처리하지 못하고 남은 대기 후보 수(중단으로 처리 못 한 pending 포함).
+    analysisQueue.remaining += queue.pending.length - analysesCreated;
   }
 
   const autoApproved = options.autoApproveAnalyzed === false
@@ -125,6 +136,8 @@ export async function runEntityPipeline(options: {
     analysesSkipped,
     analysisErrors,
     analysisStoppedReason,
+    lastRateLimitAt,
+    analysisQueue,
     autoApproved,
     leaders: processed.slice(0, 10).map((group) => ({
       id: group.entity.id,

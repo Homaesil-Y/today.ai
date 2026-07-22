@@ -39,6 +39,7 @@
 - 파일: `packages/scoring`, 향후 `packages/utils`, `packages/llm`, worker jobs, `docs/scoring.md`, `docs/prompts.md`.
 - 테스트: URL edge cases, 동일 entity fixture, false merge, score golden cases, same input reproducibility, LLM hallucination/schema rejection.
 - 완료 조건: 교차 채널 entity와 시간대별 변화가 재현 가능하게 계산되고 근거 없는 LLM 출력은 저장되지 않음.
+- AI 분석 대기열(2026-07-22): 매시간 실행당 최대 50건 순차 분석. 우선순위는 (1) 한 번도 분석되지 않은 후보 → (2) 24시간이 지난 재분석 대상 순이며, 관리자가 보류(private)한 후보는 제외한다. 결과 JSON에 `analysisQueue`(unanalyzed/stale/selected/remaining)와 `lastRateLimitAt`을 기록한다. 근거: 점수순 정렬만으로는 오래된 public 재분석이 미분석 review 후보를 밀어낼 수 있었다.
 - 외부 의존성: Gemini API 또는 대체 provider.
 - 위험: 동명이인 오병합, 신규 서비스 cold start, 조작된 소셜 신호, 비용 급증.
 
