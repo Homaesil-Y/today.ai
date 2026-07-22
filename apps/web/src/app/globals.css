@@ -80,7 +80,7 @@ button { color: inherit; }
 .brand { display: flex; align-items: center; gap: 10px; padding: 0 24px; letter-spacing: -0.02em; }
 .brand-mark { display: grid; place-items: center; width: 34px; height: 34px; color: white; border-radius: 10px; background: linear-gradient(135deg, var(--brand-primary), var(--brand-cyan)); box-shadow: 0 5px 16px rgb(109 93 251 / 18%); }
 .brand-copy { display: flex; align-items: center; white-space: nowrap; }
-.brand-copy strong { color: var(--text-primary); font-family: 'PyeongtaekAnbo', "Pretendard Variable", Pretendard, sans-serif; font-size: 22px; font-weight: 400; line-height: 1.2; letter-spacing: -.01em; }
+.brand-copy strong { color: var(--text-primary); font-family: 'PyeongtaekAnbo', "Pretendard Variable", Pretendard, sans-serif; font-size: 22px; font-weight: 400; line-height: 1.2; letter-spacing: -.01em; /* 이 폰트는 잉크가 박스 위쪽으로 치우쳐 아이콘 대비 위로 떠 보인다. 광학 중심 보정. */ transform: translateY(0.08em); }
 .global-search { display: flex; align-items: center; height: 40px; gap: 10px; padding: 0 12px; border: 1px solid var(--border-default); border-radius: 11px; background: var(--bg-surface-subtle); color: var(--text-tertiary); }
 .global-search > button { flex: none; display: grid; place-items: center; width: 24px; height: 30px; padding: 0; border: 0; color: inherit; background: transparent; cursor: pointer; }
 .global-search:focus-within { border-color: var(--border-focus); background: var(--bg-surface); box-shadow: 0 0 0 3px rgb(109 93 251 / 10%); }
