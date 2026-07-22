@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { getCurrentUserRole } from "@/lib/auth";
 import { MobileNavLinks, SidebarNavLinks } from "./app-nav";
 import { AuthControl } from "./auth-control";
+import { BackToTop } from "./back-to-top";
 
 export async function AppShell({ children }: { children: ReactNode }) {
   const { role } = await getCurrentUserRole();
@@ -34,6 +35,7 @@ export async function AppShell({ children }: { children: ReactNode }) {
 
       <main className="main-content">{children}</main>
 
+      <BackToTop />
       <MobileNavLinks isAdmin={isAdmin} />
     </div>
   );

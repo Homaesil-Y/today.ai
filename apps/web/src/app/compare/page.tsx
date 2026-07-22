@@ -62,7 +62,6 @@ export default async function ComparePage({ searchParams }: Props) {
           <GitCompareArrows size={30} />
           <h2>비교할 서비스를 선택하세요</h2>
           <p>위 목록에서 서비스를 추가하면 트렌드 점수·신뢰도·강점·약점을 나란히 비교할 수 있습니다.</p>
-          <Link className="button button-primary" href="/explore">서비스 탐색하기</Link>
         </section>
       ) : (
         <section className="compare-grid" style={{ gridTemplateColumns: `var(--compare-label-w) repeat(${selected.length}, minmax(var(--compare-col-w), 1fr))` }} aria-label="서비스 비교표">
