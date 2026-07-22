@@ -38,7 +38,7 @@ export default async function ReportDetailPage({ params }: Props) {
   const { topServices, totalPublic } = report.content;
 
   return (
-    <div className="page content-page">
+    <div className="page">
       <header className="page-heading">
         <div>
           <Link className="report-back" href="/reports"><ArrowLeft size={15} aria-hidden="true" />리포트 목록</Link>

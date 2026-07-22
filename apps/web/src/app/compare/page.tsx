@@ -42,7 +42,7 @@ export default async function ComparePage({ searchParams }: Props) {
   const compareHref = (list: string[]) => (list.length ? `/compare?slugs=${list.join(",")}` : "/compare") as Route;
 
   return (
-    <div className="page content-page">
+    <div className="page">
       <header className="page-heading">
         <div>
           <h1>서비스 비교</h1>

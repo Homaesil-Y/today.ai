@@ -22,7 +22,7 @@ export default async function ReportsPage() {
   const reports = await getPublishedReports();
 
   return (
-    <div className="page content-page">
+    <div className="page">
       <header className="page-heading">
         <div>
           <h1>AI 트렌드 리포트</h1>
