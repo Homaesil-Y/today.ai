@@ -2,6 +2,7 @@ import { GitCompareArrows, X } from "lucide-react";
 import type { Metadata } from "next";
 import type { Route } from "next";
 import Link from "next/link";
+import { CompareAddForm } from "@/components/compare-add-form";
 import { SourceBrandIcon } from "@/components/source-brand-icon";
 import { getPublishedTrends } from "@/data/live-trends";
 
@@ -50,21 +51,10 @@ export default async function ComparePage({ searchParams }: Props) {
       </header>
 
       {selected.length < MAX_COMPARE && available.length > 0 && (
-        <form className="compare-add" method="get" action="/compare">
-          <label>
-            <span className="sr-only">비교할 서비스 추가</span>
-            <select name="slugs" defaultValue="">
-              <option value="" disabled>비교할 서비스 추가…</option>
-              {available.map((trend) => (
-                <option key={trend.slug} value={[...selectedSlugs, trend.slug].join(",")}>
-                  {trend.name} · {trend.category}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button className="button button-secondary" type="submit">추가</button>
-          {selected.length > 0 && <Link className="button button-secondary" href="/compare"><X size={15} />전체 해제</Link>}
-        </form>
+        <CompareAddForm
+          options={available.map((trend) => ({ slug: trend.slug, name: trend.name, category: trend.category }))}
+          selectedSlugs={selectedSlugs}
+        />
       )}
 
       {selected.length === 0 ? (
