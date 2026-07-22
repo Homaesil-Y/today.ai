@@ -9,14 +9,14 @@ export function TopOneCard({ trend, initialSaved = false }: { trend: TrendEntity
   return (
     <article className="top-card top-one">
       <div className="rank-kicker"><span>{String(trend.rank).padStart(2, "0")}</span><StatusBadge status={trend.status} /></div>
-      <div className="top-one-main">
+      <div className="top-one-head">
         <div className="service-heading"><div><p className="eyebrow">{trend.category}</p><h3>{trend.name}</h3></div></div>
-        <p className="tagline">{trend.tagline}</p>
-        <ul className="reason-list">
-          {trend.whyTrending.slice(0, 2).map((reason) => <li key={reason}><TrendingUp size={15} aria-hidden="true" />{reason}</li>)}
-        </ul>
+        <div className="score-block"><span>Trend Score</span><strong>{trend.trendScore}</strong><small>신뢰도 {trend.trustScore}</small></div>
       </div>
-      <div className="score-block"><span>Trend Score</span><strong>{trend.trendScore}</strong><small>신뢰도 {trend.trustScore}</small></div>
+      <p className="tagline">{trend.tagline}</p>
+      <ul className="reason-list">
+        {trend.whyTrending.slice(0, 2).map((reason) => <li key={reason}><TrendingUp size={15} aria-hidden="true" />{reason}</li>)}
+      </ul>
       <div className="signal-strip">
         {trend.signals.slice(0, 2).map((signal) => <div key={signal.source}><span>{signal.label}</span><strong>{signal.delta24h === 0 ? "초기 집계" : `+${signal.delta24h.toLocaleString("ko-KR")}`}</strong></div>)}
       </div>
