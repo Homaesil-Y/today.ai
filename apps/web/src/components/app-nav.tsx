@@ -49,7 +49,6 @@ export function SidebarNavLinks({ isAdmin }: { isAdmin: boolean }) {
         {isAdmin && <Link className={`nav-link ${isActive("/admin/review") ? "active" : ""}`} href={"/admin/review" as Route}><ShieldCheck size={19} /><span>후보 검토</span></Link>}
         {isAdmin && <Link className={`nav-link ${isActive("/admin/ops") ? "active" : ""}`} href={"/admin/ops" as Route}><Gauge size={19} /><span>운영 현황</span></Link>}
         <Link className={`nav-link ${isActive("/settings") ? "active" : ""}`} href="/settings"><Settings size={19} /><span>설정</span></Link>
-        <div className="data-status"><span className="status-dot" />Supabase 연동 정상<small>GitHub · Hacker News · Product Hunt · Reddit</small></div>
       </div>
     </>
   );

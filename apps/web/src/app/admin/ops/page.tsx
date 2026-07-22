@@ -152,7 +152,7 @@ export default async function AdminOpsPage() {
                   <div><span>수집</span><b>{run?.fetched_count ?? "—"}</b></div>
                   <div><span>신규</span><b>{run?.inserted_count ?? "—"}</b></div>
                   <div><span>오류</span><b>{run?.error_count ?? "—"}</b></div>
-                  <div><span>남은 호출</span><b>{run?.rate_limit_remaining ?? "—"}</b></div>
+                  <div title="플랫폼이 응답 헤더로 알려준 남은 API 호출/쿼터입니다. 기간이 지나면 회복됩니다. '—'는 해당 플랫폼이 한도 정보를 제공하지 않음을 뜻합니다."><span>남은 호출</span><b>{run?.rate_limit_remaining ?? "—"}</b></div>
                 </div>
               </article>
             );
