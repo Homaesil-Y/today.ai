@@ -11,8 +11,8 @@
 | DATA-002 | 채널 | GitHub 저장소·메트릭·스냅샷 입력 수집 | DEV 3.2 | `packages/collectors/src/github.ts` | P0 | DONE | live/fixture, Zod 검증 |
 | DATA-003 | 채널 | Hacker News 글·점수·댓글 수집 | DEV 3.3 | `packages/collectors/src/hacker-news.ts` | P0 | DONE | live/fixture, Zod 검증 |
 | DATA-004 | 채널 | Reddit 대상 subreddit·게시물·댓글 수집 | DEV 3.4 | `packages/collectors/src/reddit.ts`, `packages/pipeline/src/candidate.ts` | P0 | ADAPTER_READY | client credentials OAuth·pagination·rate-limit·fixture·후보 변환 구현. 실 live 호출은 `REDDIT_CLIENT_ID/SECRET` 발급 후 활성화(미설정 시 blocked) |
-| DATA-005 | 채널 | Threads 키워드·후보명 재검색·독립 작성자 분석 | DEV 3.5 | collector adapter 예정 | P0 | BLOCKED | 앱 권한·검색 범위 확인 필요 |
-| DATA-006 | 채널 | Instagram은 보조 가산 신호로만 수집 | DEV 3.6 | collector adapter 예정 | P0 | BLOCKED | Graph API 권한 필요 |
+| DATA-005 | 채널 | Threads 키워드·후보명 재검색·독립 작성자 분석 | DEV 3.5 | collector adapter 예정 | P0 | BLOCKED | Meta App Review(`threads_keyword_search` advanced access, 2~4주) 승인 후 구현 결정(2026-07-22). 전제조건 /privacy·/terms 배포 완료 |
+| DATA-006 | 채널 | Instagram은 보조 가산 신호로만 수집 | DEV 3.6 | collector adapter 예정 | P0 | BLOCKED | Business 계정+FB 페이지+Public Content Access 검수(4~6주+) 승인 후 구현 결정(2026-07-22) |
 | DATA-007 | 정책 | X는 MVP에서 제외 | DEV 2.1, 36 | 아키텍처/문서 | P1 | DEFERRED | 의도적 제외 |
 | DATA-008 | 원본 | raw payload와 정규화 데이터를 분리 저장 | DEV 4, 29 | `raw_items`, 공통 `RawItem`, `SupabaseCollectorStore` | P0 | DONE | GitHub 30·HN 50건 저장, 재수집 upsert 멱등성 검증 |
 | PIPE-001 | 파이프라인 | Collector→Raw→정규화→분류→통합→스냅샷→점수→LLM→리포트 | DEV 4 | `packages/pipeline`, `docs/entity-pipeline.md` | P0 | IN_PROGRESS | 리포트 제외 저장 파이프라인 실적재 검증 완료 |
