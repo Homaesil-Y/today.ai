@@ -34,8 +34,8 @@
 | LLM-003 | 분석 | 출력 schema validation, 모델·prompt version 저장 | DEV 9, 39 | `ai_analyses`, `packages/llm`, `packages/pipeline` | P0 | DONE | Gemini JSON Schema+Zod·model/prompt metadata·DB 저장 검증 |
 | AUTH-001 | 인증 | Google OAuth만 제공, 비밀번호 인증 금지 | DEV 11 | Supabase SSR, `/login`, callback | P0 | DONE | 운영 OAuth·callback 연결 완료 |
 | AUTH-002 | 인증 | 최초 로그인 시 최소 프로필 자동 생성 | DEV 11.1~11.2 | `202607190002_auth_profile_trigger.sql` | P0 | DONE | 프로필·기본 설정·전체 관심목록 생성 |
-| AUTH-003 | 공개 | 비로그인 메인·랭킹·상세·검색·공개 리포트 제공 | DEV 10.1 | Next 공개 routes | P0 | IN_PROGRESS | 메인·상세·탐색 완료 |
-| AUTH-004 | 회원 | 관심목록·폴더·메모·구독·알림·비교 저장 | DEV 10.2, 18, 21 | `watchlist`, `settings`, RLS | P1 | IN_PROGRESS | 기본 관심 저장·삭제·환경설정 완료, 폴더·메모·비교 후속 |
+| AUTH-003 | 공개 | 비로그인 메인·랭킹·상세·검색·공개 리포트 제공 | DEV 10.1 | Next 공개 routes | P0 | IN_PROGRESS | 메인·상세·검색·탐색 완료, 공개 리포트 후속 |
+| AUTH-004 | 회원 | 관심목록·폴더·메모·구독·알림·비교 저장 | DEV 10.2, 18, 21 | `watchlist`, `settings`, RLS | P1 | IN_PROGRESS | 관심 폴더·이동·메모·점수 비교·환경설정 완료, 비교 저장 후속 |
 | AUTH-005 | 권한 | 관리자 권한을 API와 DB에서 검증 | DEV 11.4, 34 | `is_admin()`, RLS | P0 | DONE | 서버 API 추가 시 동일 검증 필요 |
 | AUTH-006 | RLS | 사용자 메모·설정은 본인만 접근 | DEV 34 | migration RLS | P0 | DONE | 초안 정책 |
 | DB-001 | DB | sources/raw_items/entities/aliases/mentions | DEV 29 | Supabase migration | P0 | DONE | 초안 |
@@ -54,10 +54,10 @@
 | UI-009 | 랭킹 | 8열 TOP10 table, mobile card 전환 | UI 9, 12.1, 13.4 | `ranking-table.tsx` | P0 | DONE | fixture 연결 |
 | UI-010 | 차트 | 축·단위·기간·대체 설명이 있는 trend chart | UI 10 | detail fixture chart | P1 | IN_PROGRESS | 구조 완료, 실제 chart lib 미사용 |
 | UI-011 | 레이더 | 4개 링과 list selection 연동 | UI 11 | Phase 3 예정 | P2 | DEFERRED | 최초 목표 후속 |
-| UI-012 | 메인 | 날짜→KPI→TOP3→랭킹→카테고리→신규→채널→관심 순서 | UI 12.1 | `app/page.tsx` | P0 | IN_PROGRESS | 최초 4개 섹션 완료 |
-| UI-013 | 탐색 | 필터·정렬·card/list/radar | UI 12.2 | `explore/page.tsx` | P1 | IN_PROGRESS | 정적 필터와 목록만 완료 |
+| UI-012 | 메인 | 날짜→KPI→TOP3→랭킹→카테고리→신규→채널→관심 순서 | UI 12.1 | `app/page.tsx`, `/categories` | P0 | IN_PROGRESS | 메인 핵심·카테고리 허브 완료, 신규·채널 섹션 후속 |
+| UI-013 | 탐색 | 필터·정렬·card/list/radar | UI 12.2 | `explore/page.tsx`, `trend-query.ts` | P1 | IN_PROGRESS | 검색·기간·카테고리·채널·신뢰도·정렬 완료, 뷰 전환·레이더 후속 |
 | UI-014 | 상세 | 헤더·AI 분석·그래프·지표·반응·출처·활용·국내 기회 | UI 12.3 | `services/[slug]/page.tsx` | P0 | DONE | fixture 데이터 |
-| UI-015 | 관심 | 폴더·점수 차이·메모·빈 상태 | UI 12.4 | `/watchlist`, server action, DB | P1 | IN_PROGRESS | 실제 저장·삭제·빈 상태 완료, 폴더·메모·점수 차이 후속 |
+| UI-015 | 관심 | 폴더·점수 차이·메모·빈 상태 | UI 12.4 | `/watchlist`, server actions, DB | P1 | DONE | 생성·이동·빈 폴더 삭제·메모·저장 점수 비교 완료 |
 | UI-016 | 비교 | 최대 4개 비교, 모바일 sticky first column | UI 12.5 | placeholder | P2 | DEFERRED | Phase 7 |
 | UI-017 | 리포트 | 카드 목록과 문서형 상세 | UI 12.6 | placeholder + DB | P1 | NOT_STARTED | 데일리 우선 |
 | UI-018 | 로그인 | Google 단일 CTA, 비밀번호 없음, 공개 탐색 링크 | UI 12.7 | `/login`, OAuth callback | P0 | DONE | 원래 경로 복귀 포함 |

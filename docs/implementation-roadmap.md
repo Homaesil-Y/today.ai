@@ -44,7 +44,7 @@
 
 ## Phase 4. 사용자 화면
 
-- 현재 상태(2026-07-22): 공개 TOP10·탐색·상세와 SEO/GEO/AEO 메타데이터, JSON-LD, 동적 OG, sitemap, robots, llms.txt, 방법론 페이지까지 구현. 검색·카테고리 인터랙션과 실제 다중 시계열 차트는 후속.
+- 현재 상태(2026-07-22): 공개 TOP10·탐색·상세, 실제 통합 검색, 기간·카테고리·채널·신뢰도 필터와 정렬, 카테고리 허브, SEO/GEO/AEO 메타데이터, JSON-LD, 동적 OG, sitemap, robots, llms.txt, 방법론 페이지까지 구현. 실제 다중 시계열 차트는 후속.
 
 - 작업: App Shell, 오늘의 레이더, TOP3/TOP10, 탐색/필터, 카테고리, 상세, 검색, 실제 chart, 모든 데이터 상태, SEO/OG.
 - 선행 조건: stable query/API contract, fixture와 live data의 동일 shape.
@@ -56,7 +56,7 @@
 
 ## Phase 5. 회원 기능
 
-- 현재 상태(2026-07-22): Google OAuth 운영 연결, 로그인 후 원래 경로 복귀, 한 화면 온보딩, 관심 카테고리·알림 설정, 기본 관심 목록 저장·삭제·목록 표시 구현. 회원 API 역할은 RLS와 별도로 최소 SQL grant를 명시. 폴더·메모·점수 차이·탈퇴는 후속.
+- 현재 상태(2026-07-22): Google OAuth 운영 연결, 로그인 후 원래 경로 복귀, 한 화면 온보딩, 관심 카테고리·알림 설정, 관심 목록 저장·삭제·폴더·이동·메모·저장 당시 점수 비교 구현. 회원 API 역할은 RLS와 별도로 최소 SQL grant를 명시. 탈퇴·데이터 삭제는 후속.
 
 - 작업: Google OAuth, profile trigger, 3단계 이내 onboarding, 관심 category, watchlist/folder/memo, alert preferences.
 - 선행 조건: OAuth/RLS 검증, privacy/terms content.
