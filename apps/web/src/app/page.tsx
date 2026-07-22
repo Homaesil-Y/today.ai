@@ -10,7 +10,7 @@ import { absoluteUrl, siteConfig } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
-  title: "오늘 뜨는 AI 서비스 트렌드",
+  title: { absolute: "오늘의 AI · 오늘 뜨는 AI 서비스 트렌드" },
   description: siteConfig.description,
   alternates: { canonical: "/" },
 };
