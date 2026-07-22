@@ -8,7 +8,9 @@ const secretKey = env.SUPABASE_SECRET_KEY ?? env.SUPABASE_SERVICE_ROLE_KEY;
 if (!url || !secretKey) throw new Error("NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SECRET_KEY are required");
 
 const emailFrom = env.EMAIL_FROM;
-const appUrl = (env.NEXT_PUBLIC_APP_URL ?? "https://oh-ai-news.vercel.app").replace(/\/$/, "");
+// GitHub Actions에서 secret 미설정 시 빈 문자열이 들어오므로 `??`가 아니라 `||`로 fallback 처리한다.
+// (빈 문자열이면 이메일의 링크가 호스트 없는 상대경로가 되어 오류가 난다.)
+const appUrl = (env.NEXT_PUBLIC_APP_URL || "https://oh-ai-news.vercel.app").replace(/\/$/, "");
 const timeZone = env.APP_TIMEZONE ?? "Asia/Seoul";
 
 // Gmail API(OAuth2) 우선, 없으면 Resend, 둘 다 없으면 blocked.
