@@ -125,10 +125,11 @@ button { color: inherit; }
 .content-section { margin-top: 16px; padding: 27px; border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--bg-surface); }
 .content-section ul { display: grid; gap: 8px; margin: 0; padding-left: 20px; }
 .content-actions { display: flex; gap: 9px; margin-top: 18px; }
-.explore-toolbar { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 9px; margin-bottom: 14px; padding: 14px; border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--bg-surface); }
-.explore-toolbar > label { flex: 0 1 142px; display: grid; gap: 4px; color: var(--text-secondary); font-size: 12px; }
+.explore-toolbar { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); align-items: end; gap: 10px; margin-bottom: 14px; padding: 14px; border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--bg-surface); }
+.explore-toolbar > label { display: grid; gap: 4px; color: var(--text-secondary); font-size: 12px; }
 .explore-toolbar > label > span { font-weight: 600; }
-.explore-toolbar .explore-search { flex: 1 1 280px; position: relative; display: flex; align-items: center; }
+.explore-toolbar .explore-search { grid-column: 1 / -1; position: relative; display: flex; align-items: center; }
+.explore-toolbar > button { min-height: 42px; align-self: end; }
 .explore-search svg { position: absolute; left: 12px; color: var(--text-tertiary); }
 .explore-toolbar input, .explore-toolbar select { width: 100%; height: 42px; padding: 0 11px; border: 1px solid var(--border-default); border-radius: 9px; outline: 0; color: var(--text-primary); background: var(--bg-surface-subtle); }
 .explore-toolbar .explore-search input { padding-left: 38px; }
@@ -465,7 +466,7 @@ button { color: inherit; }
   .method-steps { grid-template-columns: 1fr; }
   .content-lead, .content-section { padding: 20px; }
   .content-actions { flex-direction: column; }
-  .explore-toolbar > label, .explore-toolbar .explore-search { flex-basis: 100%; }
+  .explore-toolbar { grid-template-columns: 1fr 1fr; }.explore-toolbar > button { grid-column: 1 / -1; }
   .result-summary { align-items: flex-start; flex-wrap: wrap; }.result-summary span { width: 100%; margin-left: 0; }
   .category-grid { grid-template-columns: 1fr; }.category-card { grid-template-columns: 42px minmax(0, 1fr) 20px; }.category-metrics { grid-column: 2; align-items: flex-start; }.category-arrow { grid-column: 3; grid-row: 1 / 3; }
   .folder-list { grid-template-columns: 1fr 1fr; }
