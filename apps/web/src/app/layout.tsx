@@ -9,9 +9,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
   applicationName: siteConfig.name,
-  title: { default: "오늘의 AI", template: "%s | 오늘의 AI" },
+  title: { default: "오늘의AI", template: "%s | 오늘의AI" },
   description: siteConfig.description,
-  keywords: ["AI 트렌드", "AI 서비스", "AI 도구", "생성형 AI", "AI 에이전트", "오픈소스 AI", "GitHub 트렌드", "오늘의 AI"],
+  keywords: ["AI 트렌드", "AI 서비스", "AI 도구", "생성형 AI", "AI 에이전트", "오픈소스 AI", "GitHub 트렌드", "오늘의AI"],
   authors: [{ name: siteConfig.name, url: siteConfig.url }],
   creator: siteConfig.name,
   publisher: siteConfig.name,
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
     siteName: siteConfig.name,
     locale: siteConfig.locale,
     type: "website",
-    images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "오늘의 AI 트렌드 레이더" }],
+    images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "오늘의AI 트렌드 레이더" }],
   },
   twitter: {
     card: "summary_large_image",
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
     googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1, "max-video-preview": -1 },
   },
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, title: "오늘의 AI", statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: "오늘의AI", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {

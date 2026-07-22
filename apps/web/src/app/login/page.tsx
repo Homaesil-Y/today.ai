@@ -23,7 +23,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
     <div className="login-page">
       <section className="login-card">
         <span className="brand-mark login-brand"><Sparkles size={24} /></span>
-        <p className="login-service-name"><strong>오늘의 AI</strong></p>
+        <p className="login-service-name"><strong>오늘의AI</strong></p>
         <h1>오늘 뜨는 AI 서비스를<br />가장 먼저 확인하세요.</h1>
         <p className="login-copy">로그인하면 관심 목록, 개인 메모와 맞춤 알림을 사용할 수 있습니다.</p>
         <GoogleLoginButton configured={configured} nextPath={nextPath} />

@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   title: "AI 트렌드 리포트",
   description: "매일 공개되는 AI 서비스 트렌드 리포트. 그날 주목받은 AI 서비스와 신호를 한국어로 정리합니다.",
   alternates: { canonical: "/reports" },
-  openGraph: { title: "AI 트렌드 리포트 | 오늘의 AI", description: "매일의 AI 서비스 트렌드를 정리한 공개 리포트입니다.", url: "/reports", type: "website" },
+  openGraph: { title: "AI 트렌드 리포트 | 오늘의AI", description: "매일의 AI 서비스 트렌드를 정리한 공개 리포트입니다.", url: "/reports", type: "website" },
 };
 
 function formatDate(value: string) {

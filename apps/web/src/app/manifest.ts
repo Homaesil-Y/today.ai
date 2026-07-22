@@ -3,8 +3,8 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/",
-    name: "오늘의 AI",
-    short_name: "오늘의 AI",
+    name: "오늘의AI",
+    short_name: "오늘의AI",
     description: "오늘 뜨는 AI 서비스를 신호와 근거로 확인하세요.",
     start_url: "/",
     scope: "/",

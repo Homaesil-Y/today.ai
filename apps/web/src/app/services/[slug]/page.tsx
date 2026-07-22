@@ -22,7 +22,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description: trend.tagline,
     alternates: { canonical: path },
     openGraph: { title: `${trend.name} AI 서비스 분석`, description: trend.tagline, url: path, type: "article", modifiedTime: trend.updatedAt, images: [{ url: `${path}/opengraph-image`, width: 1200, height: 630, alt: `${trend.name} 트렌드 분석` }] },
-    twitter: { card: "summary_large_image", title: `${trend.name} 분석 | 오늘의 AI`, description: trend.tagline, images: [`${path}/opengraph-image`] },
+    twitter: { card: "summary_large_image", title: `${trend.name} 분석 | 오늘의AI`, description: trend.tagline, images: [`${path}/opengraph-image`] },
   };
 }
 

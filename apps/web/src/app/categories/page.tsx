@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   title: "AI 서비스 카테고리",
   description: "AI 에이전트, 개발·코딩, 이미지, 문서·RAG 등 분야별 최신 AI 서비스 트렌드를 확인하세요.",
   alternates: { canonical: "/categories" },
-  openGraph: { title: "AI 서비스 카테고리 | 오늘의 AI", description: "분야별 AI 서비스 수와 최고 트렌드 점수를 살펴보세요.", url: "/categories" },
+  openGraph: { title: "AI 서비스 카테고리 | 오늘의AI", description: "분야별 AI 서비스 수와 최고 트렌드 점수를 살펴보세요.", url: "/categories" },
 };
 
 export default async function CategoriesPage() {
