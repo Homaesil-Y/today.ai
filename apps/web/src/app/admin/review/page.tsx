@@ -1,8 +1,8 @@
-import { Check, ExternalLink, EyeOff, Pencil, RefreshCw, ShieldCheck } from "lucide-react";
+import { Check, ExternalLink, EyeOff, Pencil, RefreshCw, ShieldCheck, Trash2 } from "lucide-react";
 import { redirect } from "next/navigation";
 import { getCurrentUserRole } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { approveCandidate, rejectCandidate, requestReanalysis, updateCandidate } from "./actions";
+import { approveCandidate, dismissStaleCandidates, rejectCandidate, requestReanalysis, updateCandidate } from "./actions";
 import { SourcePreviewDialog } from "./source-preview-dialog";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +19,12 @@ function getCategoryName(value: unknown) {
     return typeof name === "string" ? name : "기타";
   }
   return "기타";
+}
+
+// 48시간 넘게 미분석 상태인 review 후보 수(자동 승인 불가능한 잔여 후보). Date.now()는 렌더 밖 헬퍼에서 호출.
+function countStaleCandidates(rows: Array<{ ai_analyses: unknown[] | null; last_detected_at: string }>) {
+  const cutoff = Date.now() - 48 * 3_600_000;
+  return rows.filter((row) => (row.ai_analyses ?? []).length === 0 && new Date(row.last_detected_at).getTime() < cutoff).length;
 }
 
 function getCategorySlug(value: unknown) {
@@ -73,7 +79,7 @@ export default async function AdminReviewPage({ searchParams }: Props) {
   const [{ data, error }, { data: categoryOptions }] = await Promise.all([
     supabase
       .from("entities")
-      .select("id, name, slug, description, canonical_url, github_url, is_open_source, first_detected_at, category_id, categories(name, slug), trend_scores(total_score, trust_score, status, calculated_at), ai_analyses(id, summary, generated_at), entity_mentions(confidence, raw_items(title, body, url, author_name, published_at))")
+      .select("id, name, slug, description, canonical_url, github_url, is_open_source, first_detected_at, last_detected_at, category_id, categories(name, slug), trend_scores(total_score, trust_score, status, calculated_at), ai_analyses(id, summary, generated_at), entity_mentions(confidence, raw_items(title, body, url, author_name, published_at))")
       .eq("visibility", "review")
       .order("first_detected_at", { ascending: false }),
     supabase.from("categories").select("name, slug").eq("enabled", true).order("sort_order"),
@@ -82,6 +88,7 @@ export default async function AdminReviewPage({ searchParams }: Props) {
   if (error) throw new Error(`검토 후보 조회 실패: ${error.message}`);
   const candidates = data ?? [];
   const categories = categoryOptions ?? [];
+  const staleCount = countStaleCandidates(candidates);
   const params = await searchParams;
   const query = params.q?.trim().toLocaleLowerCase("ko-KR") ?? "";
   const analysisOnly = params.analysis === "ready";
@@ -103,7 +110,16 @@ export default async function AdminReviewPage({ searchParams }: Props) {
     <div className="page admin-page">
       <section className="page-heading">
         <div><h1>AI 서비스 후보 검토</h1><p>수집·분석된 후보를 확인하고 공개 여부를 결정하세요.</p></div>
-        <div className="admin-summary"><ShieldCheck size={18} /><strong>{candidates.length}</strong><span>검토 대기</span></div>
+        <div className="admin-heading-actions">
+          <div className="admin-summary"><ShieldCheck size={18} /><strong>{candidates.length}</strong><span>검토 대기</span></div>
+          {staleCount > 0 && (
+            <form action={dismissStaleCandidates}>
+              <button className="button button-secondary" type="submit" title="48시간 넘게 분석되지 않아 자동 승인이 불가능한 잔여 후보를 보류 처리합니다. 재수집되면 다시 살아납니다.">
+                <Trash2 size={15} />오래된 후보 정리 ({staleCount})
+              </button>
+            </form>
+          )}
+        </div>
       </section>
 
       <form className="admin-toolbar" action="/admin/review" method="get">
