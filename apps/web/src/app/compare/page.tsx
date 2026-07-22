@@ -65,7 +65,7 @@ export default async function ComparePage({ searchParams }: Props) {
           <Link className="button button-primary" href="/explore">서비스 탐색하기</Link>
         </section>
       ) : (
-        <section className="compare-grid" style={{ gridTemplateColumns: `160px repeat(${selected.length}, minmax(0, 1fr))` }} aria-label="서비스 비교표">
+        <section className="compare-grid" style={{ gridTemplateColumns: `var(--compare-label-w) repeat(${selected.length}, minmax(var(--compare-col-w), 1fr))` }} aria-label="서비스 비교표">
           <div className="compare-row-head" />
           {selected.map((trend) => (
             <div className="compare-col-head" key={trend.slug}>
