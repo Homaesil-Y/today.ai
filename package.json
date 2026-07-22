@@ -17,6 +17,7 @@
     "collect:live": "pnpm --filter @ai-trend-radar/collectors collect:live",
     "collect:preview": "pnpm --filter @ai-trend-radar/collectors collect:preview",
     "process:live": "pnpm --filter @ai-trend-radar/pipeline process:live",
+    "report:daily": "pnpm --filter @ai-trend-radar/pipeline report:daily",
     "verify:live": "pnpm --filter @ai-trend-radar/pipeline verify:live",
     "preview:live": "pnpm --filter @ai-trend-radar/pipeline preview:live"
   }

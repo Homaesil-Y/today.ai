@@ -10,6 +10,7 @@
     "lint": "tsc --noEmit",
     "test": "vitest run",
     "process:live": "tsx src/cli/process.ts",
+    "report:daily": "tsx src/cli/report.ts",
     "verify:live": "tsx src/cli/verify.ts",
     "publish:reviewed": "tsx src/cli/publish-reviewed.ts",
     "bootstrap:owner": "tsx src/cli/bootstrap-owner.ts",
