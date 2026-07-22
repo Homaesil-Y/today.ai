@@ -84,7 +84,7 @@
 | SEC-001 | 보안 | API 키는 server env, 클라이언트 노출 금지 | DEV 34 | `.env.example`, adapter | P0 | DONE | service key 서버 전용 |
 | SEC-002 | 보안 | 외부 HTML/Markdown 및 사용자 입력 sanitize | DEV 34 | 렌더러/API 예정 | P0 | NOT_STARTED | 현재 raw HTML 미렌더링 |
 | SEC-003 | 개인정보 | 정책·약관·탈퇴·삭제·보관 정책 | DEV 34 | 문서/화면 예정 | P1 | NOT_STARTED | 법률 검토 필요 |
-| OPS-001 | 운영 | 정기 수집·처리, 시간별 AI 분석 재시도, 공개·메일 | DEV 30 | `.github/workflows/scheduled-pipeline.yml`, `.github/workflows/hourly-analysis.yml` | P1 | IN_PROGRESS | 6시간마다 수집·점수 계산, 매시간 남은 후보 분석·자동 승인(무료 한도 내 순차 처리). 메일·운영 worker 후속 |
+| OPS-001 | 운영 | 정기 수집·처리, 주기적 AI 분석 재시도, 공개·메일 | DEV 30 | `.github/workflows/scheduled-pipeline.yml`, `.github/workflows/hourly-analysis.yml` | P1 | IN_PROGRESS | 6시간마다 수집·점수 계산, 3시간마다 남은 후보 분석·자동 승인(무료 Actions 분·Gemini 한도 절약). 메일·운영 worker 후속 |
 | OPS-002 | 운영 | Vercel web, Supabase, 장기 worker 분리 | DEV 27 | Vercel·Supabase·GitHub Actions | P1 | IN_PROGRESS | 웹·DB 운영 연결 완료, 장기 worker 분리 후속 |
 | OPS-003 | 이메일 | Resend 데일리 리포트·기본 08:00 사용자 시간대 | DEV 20~21 | provider 예정 | P1 | BLOCKED | 도메인/API key 필요 |
 | QA-001 | 품질 | strict TypeScript, 외부·LLM Zod 검증, any 최소화 | 요청문, DEV 39 | tsconfig, collectors | P0 | DONE | exact optional 사용 |
