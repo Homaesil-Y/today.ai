@@ -62,7 +62,7 @@
 | UI-017 | 리포트 | 카드 목록과 문서형 상세 | UI 12.6 | placeholder + DB | P1 | NOT_STARTED | 데일리 우선 |
 | UI-018 | 로그인 | Google 단일 CTA, 비밀번호 없음, 공개 탐색 링크 | UI 12.7 | `/login`, OAuth callback | P0 | DONE | 원래 경로 복귀 포함 |
 | UI-019 | 온보딩 | 관심 카테고리·알림·완료 3단계 이하 | UI 12.8 | `/onboarding`, profile/preferences | P1 | DONE | 한 화면, 선택 없이 진행 허용 |
-| UI-020 | 설정 | 프로필·카테고리·알림·구독·Light·개인정보·탈퇴 | UI 12.9 | `/settings` | P1 | IN_PROGRESS | 카테고리·알림·시간 완료, 개인정보·탈퇴 후속 |
+| UI-020 | 설정 | 프로필·카테고리·알림·구독·Light·개인정보·탈퇴 | UI 12.9 | `/settings` | P1 | IN_PROGRESS | 카테고리·알림·시간·회원 탈퇴·법적 링크 완료, 구독 관리 후속 |
 | ADMIN-001 | 관리자 | 수집 KPI·채널 상태·실패·대기·호출량 | DEV 22, UI 12.10 | Phase 6 | P1 | NOT_STARTED | collector_runs schema 완료 |
 | ADMIN-002 | 관리자 | 후보 승인·스팸·수정·공개·분석 재생성 | DEV 22.2 | `/admin/review`, server actions | P1 | IN_PROGRESS | 원문 모달·검색·필터·분석 전 승인 차단 완료, 수정·재생성 후속 |
 | ADMIN-003 | 관리자 | 키워드·subreddit·hashtag·동적 서비스 검색 관리 | DEV 22.3 | Phase 6 | P1 | NOT_STARTED | 설정 테이블 필요 |
@@ -83,7 +83,7 @@
 | SEO-003 | GEO/AEO | AI 인용 안내·방법론·질문형 답변·엔티티 구조화 데이터 | 사용자 요청 | `/llms.txt`, `/methodology`, JSON-LD | P1 | DONE | 공개 정보와 실제 화면 문구 일치 |
 | SEC-001 | 보안 | API 키는 server env, 클라이언트 노출 금지 | DEV 34 | `.env.example`, adapter | P0 | DONE | service key 서버 전용 |
 | SEC-002 | 보안 | 외부 HTML/Markdown 및 사용자 입력 sanitize | DEV 34 | 렌더러/API 예정 | P0 | NOT_STARTED | 현재 raw HTML 미렌더링 |
-| SEC-003 | 개인정보 | 정책·약관·탈퇴·삭제·보관 정책 | DEV 34 | 문서/화면 예정 | P1 | NOT_STARTED | 법률 검토 필요 |
+| SEC-003 | 개인정보 | 정책·약관·탈퇴·삭제·보관 정책 | DEV 34 | `/privacy`, `/terms`, `/settings`(회원 탈퇴) | P1 | IN_PROGRESS | 개인정보처리방침·이용약관 페이지, 자체 회원 탈퇴(auth 삭제→cascade로 전 개인데이터 삭제) 구현·sitemap 등록. 세부 문구 법률 검토 후속 |
 | OPS-001 | 운영 | 정기 수집·처리, 주기적 AI 분석 재시도, 공개·메일 | DEV 30 | `.github/workflows/scheduled-pipeline.yml`, `.github/workflows/hourly-analysis.yml` | P1 | IN_PROGRESS | 6시간마다 수집·점수 계산, 3시간마다 남은 후보 분석·자동 승인(무료 Actions 분·Gemini 한도 절약). 메일·운영 worker 후속 |
 | OPS-002 | 운영 | Vercel web, Supabase, 장기 worker 분리 | DEV 27 | Vercel·Supabase·GitHub Actions | P1 | IN_PROGRESS | 웹·DB 운영 연결 완료, 장기 worker 분리 후속 |
 | OPS-003 | 이메일 | Resend 데일리 리포트·기본 08:00 사용자 시간대 | DEV 20~21 | provider 예정 | P1 | BLOCKED | 도메인/API key 필요 |

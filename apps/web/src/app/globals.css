@@ -185,6 +185,15 @@ button { color: inherit; }
 .toggle-row input { width: 20px; height: 20px; accent-color: var(--brand-primary); }
 .time-row input { min-height: 40px; padding: 0 10px; border: 1px solid var(--border-default); border-radius: 8px; background: var(--bg-surface-subtle); }
 .preference-save { justify-self: end; min-width: 150px; }
+.danger-section { margin-top: 22px; border-color: #f3c9c4; }
+.danger-section .preference-title svg { color: #b42318; }
+.danger-form { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; }
+.danger-confirm { display: flex; align-items: flex-start; gap: 9px; max-width: 560px; color: var(--text-secondary); font-size: 14px; line-height: 1.5; }
+.danger-confirm input { width: 17px; height: 17px; margin-top: 2px; accent-color: #b42318; }
+.button-danger { min-height: 42px; padding: 0 18px; border: 1px solid #f3c9c4; border-radius: 10px; background: var(--danger-bg); color: #b42318; font-weight: 650; cursor: pointer; }
+.button-danger:hover { background: #fee4e2; }
+.settings-legal { margin-top: 18px; color: var(--text-secondary); font-size: 13px; }
+.settings-legal a { color: var(--brand-primary); font-weight: 550; }
 .onboarding-page { min-height: calc(100vh - 64px); display: grid; place-items: center; padding: 38px 20px; background: radial-gradient(circle at 50% 12%, var(--brand-soft), transparent 42%); }
 .onboarding-card { width: min(100%, 720px); padding: 38px; border: 1px solid var(--border-default); border-radius: 20px; background: var(--bg-surface); box-shadow: var(--shadow-md); text-align: center; }
 .onboarding-brand { width: 48px; height: 48px; margin: 0 auto 17px; border-radius: 14px; }
