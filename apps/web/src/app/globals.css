@@ -164,6 +164,8 @@ button { color: inherit; }
 .folder-create { display: grid; gap: 7px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-default); }
 .folder-create input { width: 100%; height: 39px; padding: 0 10px; border: 1px solid var(--border-default); border-radius: 8px; outline: 0; background: var(--bg-surface-subtle); }
 .folder-create input:focus { border-color: var(--border-focus); background: white; }
+.folder-error { margin: 0; color: #b42318; font-size: 12px; line-height: 1.45; }
+.watchlist-editor .folder-error { grid-column: 1 / -1; }
 .folder-delete { display: flex; align-items: center; gap: 5px; margin: 12px auto 0; padding: 6px; border: 0; color: #b42318; background: transparent; font-size: 12px; cursor: pointer; }
 .watchlist-content { min-width: 0; padding: 15px 18px; border: 1px solid var(--border-default); border-radius: var(--radius-lg); background: var(--bg-surface); box-shadow: var(--shadow-xs); }
 .watchlist-content-heading { min-height: 44px; margin-bottom: 10px; }
