@@ -82,7 +82,7 @@ export default async function DashboardPage() {
       </section>
 
       <section className="section-block answer-section" aria-labelledby="answer-heading">
-        <div className="section-heading"><div><h2 id="answer-heading">오늘의AI, 이렇게 읽으세요</h2></div><Link href="/methodology">분석 방법론 전체 보기</Link></div>
+        <div className="section-heading"><div><h2 id="answer-heading">오늘의AI, 이렇게 활용해 보세요!</h2></div><Link href="/methodology">분석 방법론 전체 보기</Link></div>
         <div className="answer-grid">{faqItems.map(({ question, answer }) => <article className="panel" key={question}><h3>{question}</h3><p>{answer}</p></article>)}</div>
       </section>
     </div>
