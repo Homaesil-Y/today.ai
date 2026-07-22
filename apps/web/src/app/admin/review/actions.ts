@@ -44,3 +44,52 @@ export async function approveCandidate(formData: FormData) {
 export async function rejectCandidate(formData: FormData) {
   await setVisibility(formData, "private");
 }
+
+const updateSchema = z.object({
+  entityId: z.string().uuid(),
+  name: z.string().trim().min(2, "이름은 2자 이상이어야 합니다.").max(120),
+  description: z.string().trim().max(2000).nullable(),
+  categorySlug: z.string().trim().min(1).max(80).nullable(),
+});
+
+export async function updateCandidate(formData: FormData) {
+  const { role } = await getCurrentUserRole();
+  if (role !== "admin") throw new Error("관리자 권한이 필요합니다.");
+
+  const rawDescription = String(formData.get("description") ?? "").trim();
+  const rawCategory = String(formData.get("categorySlug") ?? "").trim();
+  const input = updateSchema.parse({
+    entityId: formData.get("entityId"),
+    name: String(formData.get("name") ?? ""),
+    description: rawDescription === "" ? null : rawDescription,
+    categorySlug: rawCategory === "" ? null : rawCategory,
+  });
+
+  const supabase = createAdminClient();
+
+  let categoryId: string | null = null;
+  if (input.categorySlug) {
+    const { data: category, error: categoryError } = await supabase
+      .from("categories")
+      .select("id")
+      .eq("slug", input.categorySlug)
+      .maybeSingle();
+    if (categoryError) throw new Error(`카테고리 조회 실패: ${categoryError.message}`);
+    if (!category) throw new Error("존재하지 않는 카테고리입니다.");
+    categoryId = category.id;
+  }
+
+  const { error } = await supabase
+    .from("entities")
+    .update({
+      name: input.name,
+      description: input.description,
+      ...(categoryId ? { category_id: categoryId } : {}),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", input.entityId)
+    .eq("visibility", "review");
+  if (error) throw new Error(`후보 수정 실패: ${error.message}`);
+
+  revalidatePath("/admin/review");
+}

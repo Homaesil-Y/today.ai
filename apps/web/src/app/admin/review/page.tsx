@@ -1,8 +1,8 @@
-import { Check, ExternalLink, EyeOff, ShieldCheck } from "lucide-react";
+import { Check, ExternalLink, EyeOff, Pencil, ShieldCheck } from "lucide-react";
 import { redirect } from "next/navigation";
 import { getCurrentUserRole } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { approveCandidate, rejectCandidate } from "./actions";
+import { approveCandidate, rejectCandidate, updateCandidate } from "./actions";
 import { SourcePreviewDialog } from "./source-preview-dialog";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +19,18 @@ function getCategoryName(value: unknown) {
     return typeof name === "string" ? name : "기타";
   }
   return "기타";
+}
+
+function getCategorySlug(value: unknown) {
+  if (Array.isArray(value)) {
+    const first = value[0] as { slug?: unknown } | undefined;
+    return typeof first?.slug === "string" ? first.slug : "";
+  }
+  if (value && typeof value === "object" && "slug" in value) {
+    const slug = (value as { slug?: unknown }).slug;
+    return typeof slug === "string" ? slug : "";
+  }
+  return "";
 }
 
 function plainTextPreview(value: string | null, maxLength = 240) {
@@ -58,14 +70,18 @@ export default async function AdminReviewPage({ searchParams }: Props) {
   if (role !== "admin") redirect("/");
 
   const supabase = createAdminClient();
-  const { data, error } = await supabase
-    .from("entities")
-    .select("id, name, slug, description, canonical_url, github_url, is_open_source, first_detected_at, categories(name), trend_scores(total_score, trust_score, status, calculated_at), ai_analyses(id, summary, generated_at), entity_mentions(confidence, raw_items(title, body, url, author_name, published_at))")
-    .eq("visibility", "review")
-    .order("first_detected_at", { ascending: false });
+  const [{ data, error }, { data: categoryOptions }] = await Promise.all([
+    supabase
+      .from("entities")
+      .select("id, name, slug, description, canonical_url, github_url, is_open_source, first_detected_at, category_id, categories(name, slug), trend_scores(total_score, trust_score, status, calculated_at), ai_analyses(id, summary, generated_at), entity_mentions(confidence, raw_items(title, body, url, author_name, published_at))")
+      .eq("visibility", "review")
+      .order("first_detected_at", { ascending: false }),
+    supabase.from("categories").select("name, slug").eq("enabled", true).order("sort_order"),
+  ]);
 
   if (error) throw new Error(`검토 후보 조회 실패: ${error.message}`);
   const candidates = data ?? [];
+  const categories = categoryOptions ?? [];
   const params = await searchParams;
   const query = params.q?.trim().toLocaleLowerCase("ko-KR") ?? "";
   const analysisOnly = params.analysis === "ready";
@@ -119,6 +135,21 @@ export default async function AdminReviewPage({ searchParams }: Props) {
                     />
                     {candidate.github_url && <a href={candidate.github_url} target="_blank" rel="noreferrer">GitHub <ExternalLink size={14} /></a>}
                   </div>
+                  <details className="review-edit">
+                    <summary><Pencil size={14} aria-hidden="true" />후보 정보 수정</summary>
+                    <form action={updateCandidate} className="review-edit-form">
+                      <input type="hidden" name="entityId" value={candidate.id} />
+                      <label><span>서비스명</span><input type="text" name="name" defaultValue={candidate.name} maxLength={120} required /></label>
+                      <label><span>카테고리</span>
+                        <select name="categorySlug" defaultValue={getCategorySlug(candidate.categories)}>
+                          <option value="">(미지정)</option>
+                          {categories.map((category) => <option key={category.slug} value={category.slug}>{category.name}</option>)}
+                        </select>
+                      </label>
+                      <label className="review-edit-desc"><span>설명</span><textarea name="description" rows={3} maxLength={2000} defaultValue={candidate.description ?? ""} placeholder="관리자용 설명(공개 상세에 사용될 수 있습니다)" /></label>
+                      <button className="button button-secondary" type="submit">수정 저장</button>
+                    </form>
+                  </details>
                 </div>
                 <div className="review-score"><span>Trend</span><strong>{Number(score?.total_score ?? 0).toFixed(1)}</strong><small>신뢰도 {Number(score?.trust_score ?? 0).toFixed(0)}</small></div>
                 <div className="review-actions">
