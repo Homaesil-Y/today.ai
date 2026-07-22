@@ -93,3 +93,25 @@ export async function updateCandidate(formData: FormData) {
 
   revalidatePath("/admin/review");
 }
+
+export async function requestReanalysis(formData: FormData) {
+  const entityId = entityIdSchema.parse(formData.get("entityId"));
+  const { role } = await getCurrentUserRole();
+  if (role !== "admin") throw new Error("관리자 권한이 필요합니다.");
+
+  const supabase = createAdminClient();
+  // 기존 분석을 제거하면 파이프라인이 해당 엔티티를 "미분석"으로 판단해
+  // 다음 실행에서 최우선으로 재분석한다. review 상태로 되돌려 재분석 전까지 공개에서 제외한다.
+  const { error: deleteError } = await supabase.from("ai_analyses").delete().eq("entity_id", entityId);
+  if (deleteError) throw new Error(`기존 분석 삭제 실패: ${deleteError.message}`);
+
+  const { error: visibilityError } = await supabase
+    .from("entities")
+    .update({ visibility: "review", updated_at: new Date().toISOString() })
+    .eq("id", entityId);
+  if (visibilityError) throw new Error(`재분석 대기 전환 실패: ${visibilityError.message}`);
+
+  revalidatePath("/");
+  revalidatePath("/explore");
+  revalidatePath("/admin/review");
+}
