@@ -127,14 +127,15 @@ export default async function AdminReviewPage({ searchParams }: Props) {
         <label><span className="sr-only">후보 검색</span><input type="search" name="q" defaultValue={params.q ?? ""} placeholder="서비스명, 도메인, 카테고리 검색" /></label>
         <label><span className="sr-only">AI 분석 상태</span><FormDropdown name="analysis" ariaLabel="AI 분석 상태" placeholder="전체 분석 상태" defaultValue={analysisOnly ? "ready" : "all"} options={[{ value: "all", label: "전체 분석 상태" }, { value: "ready", label: "AI 분석 완료만" }]} /></label>
         <button className="button button-secondary" type="submit">필터 적용</button>
-        <span>결과 {preparedCandidates.length}건</span>
       </form>
 
-      {preparedCandidates.length === 0 ? (
-        <section className="empty-state"><Check size={30} /><h2>{candidates.length ? "검색 결과가 없습니다" : "검토할 후보가 없습니다"}</h2><p>{candidates.length ? "검색어나 분석 필터를 변경해보세요." : "모든 후보의 처리가 완료됐습니다."}</p></section>
-      ) : (
-        <section className="review-list" aria-label="검토 대기 후보">
-          {preparedCandidates.map(({ candidate, score, analysisReady, analysisSummary, source }) => {
+      <div className="review-results">
+        <span className="review-results-count">결과 {preparedCandidates.length}건</span>
+        {preparedCandidates.length === 0 ? (
+          <section className="empty-state"><Check size={30} /><h2>{candidates.length ? "검색 결과가 없습니다" : "검토할 후보가 없습니다"}</h2><p>{candidates.length ? "검색어나 분석 필터를 변경해보세요." : "모든 후보의 처리가 완료됐습니다."}</p></section>
+        ) : (
+          <section className="review-list" aria-label="검토 대기 후보">
+            {preparedCandidates.map(({ candidate, score, analysisReady, analysisSummary, source }) => {
             return (
               <article className="review-card" key={candidate.id}>
                 <div className="review-main">
@@ -178,10 +179,11 @@ export default async function AdminReviewPage({ searchParams }: Props) {
                   {analysisReady && <form action={requestReanalysis}><input type="hidden" name="entityId" value={candidate.id} /><button className="button button-secondary" type="submit" title="기존 AI 분석을 지우고 다음 실행에서 재분석합니다"><RefreshCw size={15} />AI 재분석</button></form>}
                 </div>
               </article>
-            );
-          })}
-        </section>
-      )}
+              );
+            })}
+          </section>
+        )}
+      </div>
     </div>
   );
 }
