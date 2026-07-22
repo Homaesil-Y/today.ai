@@ -44,7 +44,7 @@
 
 ## Phase 4. 사용자 화면
 
-- 현재 상태(2026-07-22): 공개 TOP10·탐색·상세, 실제 통합 검색, 기간·카테고리·채널·신뢰도 필터와 정렬, 카테고리 허브, SEO/GEO/AEO 메타데이터, JSON-LD, 동적 OG, sitemap, robots, llms.txt, 방법론 페이지까지 구현. 실제 다중 시계열 차트는 후속.
+- 현재 상태(2026-07-22): 공개 TOP10·탐색·상세, 실제 통합 검색, 기간·카테고리·채널·신뢰도 필터와 정렬, 카테고리 허브, SEO/GEO/AEO 메타데이터, JSON-LD, 동적 OG, sitemap, robots, llms.txt, 방법론 페이지까지 구현. Gemini 분석은 실행당 최대 50건을 시도하고 무료 할당량 도달 시 안전하게 중단·재개한다. 실제 다중 시계열 차트는 후속.
 
 - 작업: App Shell, 오늘의 레이더, TOP3/TOP10, 탐색/필터, 카테고리, 상세, 검색, 실제 chart, 모든 데이터 상태, SEO/OG.
 - 선행 조건: stable query/API contract, fixture와 live data의 동일 shape.

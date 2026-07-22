@@ -1,4 +1,5 @@
 import {
+  LlmProviderError,
   TREND_ANALYSIS_PROMPT_VERSION,
   type TrendAnalysisProvider,
   type TrendEvidence,
@@ -74,6 +75,7 @@ export async function runEntityPipeline(options: {
 
   let analysesCreated = 0;
   let analysesSkipped = 0;
+  let analysisStoppedReason: "RATE_LIMIT" | "AUTH" | "CONFIG" | null = null;
   const analysisErrors: Array<{ entity: string; error: string }> = [];
   if (options.analysisProvider) {
     const limit = Math.max(0, options.analysisLimit ?? 3);
@@ -99,6 +101,12 @@ export async function runEntityPipeline(options: {
           entity: group.entity.slug,
           error: error instanceof Error ? error.message : "Unknown analysis failure",
         });
+        if (error instanceof LlmProviderError && (
+          error.code === "RATE_LIMIT" || error.code === "AUTH" || error.code === "CONFIG"
+        )) {
+          analysisStoppedReason = error.code;
+          break;
+        }
       }
     }
   }
@@ -116,6 +124,7 @@ export async function runEntityPipeline(options: {
     analysesCreated,
     analysesSkipped,
     analysisErrors,
+    analysisStoppedReason,
     autoApproved,
     leaders: processed.slice(0, 10).map((group) => ({
       id: group.entity.id,
