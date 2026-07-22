@@ -7,10 +7,17 @@ const url = env.NEXT_PUBLIC_SUPABASE_URL;
 const secretKey = env.SUPABASE_SECRET_KEY ?? env.SUPABASE_SERVICE_ROLE_KEY;
 if (!url || !secretKey) throw new Error("NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SECRET_KEY are required");
 
-const resendApiKey = env.RESEND_API_KEY;
 const emailFrom = env.EMAIL_FROM;
 const appUrl = (env.NEXT_PUBLIC_APP_URL ?? "https://oh-ai-news.vercel.app").replace(/\/$/, "");
 const timeZone = env.APP_TIMEZONE ?? "Asia/Seoul";
+
+// Gmail API(OAuth2) 우선, 없으면 Resend, 둘 다 없으면 blocked.
+const gmailClientId = env.GMAIL_CLIENT_ID;
+const gmailClientSecret = env.GMAIL_CLIENT_SECRET;
+const gmailRefreshToken = env.GMAIL_REFRESH_TOKEN;
+const resendApiKey = env.RESEND_API_KEY;
+const provider: "gmail" | "resend" | null =
+  gmailClientId && gmailClientSecret && gmailRefreshToken ? "gmail" : resendApiKey ? "resend" : null;
 
 const client = createClient(url, secretKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
@@ -18,10 +25,11 @@ const now = new Date();
 const reportDate = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
 
 // 발송 자격증명이 없으면 실패가 아니라 blocked로 안전하게 종료한다.
-if (!resendApiKey || !emailFrom) {
-  process.stdout.write(`${JSON.stringify({ status: "blocked", reason: "RESEND_API_KEY 또는 EMAIL_FROM 미설정", reportDate, sent: 0 }, null, 2)}\n`);
+if (!emailFrom || !provider) {
+  process.stdout.write(`${JSON.stringify({ status: "blocked", reason: "발송 자격증명(GMAIL_* 또는 RESEND_API_KEY) 및 EMAIL_FROM 미설정", reportDate, sent: 0 }, null, 2)}\n`);
   process.exit(0);
 }
+const senderFrom = emailFrom;
 
 const contentSchema = z.object({
   topServices: z.array(z.object({
@@ -79,7 +87,70 @@ const { data: alreadySent } = await client
   .gte("sent_at", startOfDay);
 const sentUserIds = new Set((alreadySent ?? []).map((row) => row.user_id));
 
-const resendResponseSchema = z.object({ id: z.string() });
+const idResponseSchema = z.object({ id: z.string() });
+
+async function fetchGmailAccessToken(): Promise<string> {
+  return withRetry(async () => {
+    const response = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: gmailClientId!,
+        client_secret: gmailClientSecret!,
+        refresh_token: gmailRefreshToken!,
+        grant_type: "refresh_token",
+      }),
+    });
+    if (response.status === 429 || response.status >= 500) throw new Error(`Google token HTTP ${response.status}`);
+    if (!response.ok) throw new Error(`Google token HTTP ${response.status}: ${await response.text()}`);
+    return z.object({ access_token: z.string() }).parse(await response.json()).access_token;
+  });
+}
+
+async function sendViaGmail(accessToken: string, to: string, subject: string, html: string) {
+  const encodedSubject = `=?UTF-8?B?${Buffer.from(subject, "utf-8").toString("base64")}?=`;
+  const mime = [
+    `From: ${senderFrom}`,
+    `To: ${to}`,
+    `Subject: ${encodedSubject}`,
+    "MIME-Version: 1.0",
+    'Content-Type: text/html; charset="UTF-8"',
+    "Content-Transfer-Encoding: base64",
+    "",
+    Buffer.from(html, "utf-8").toString("base64"),
+  ].join("\r\n");
+  const raw = Buffer.from(mime, "utf-8").toString("base64url");
+  await withRetry(async () => {
+    const response = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ raw }),
+    });
+    if (response.status === 429 || response.status >= 500) throw new Error(`Gmail HTTP ${response.status}`);
+    if (!response.ok) throw new Error(`Gmail HTTP ${response.status}: ${await response.text()}`);
+    idResponseSchema.parse(await response.json());
+  });
+}
+
+async function sendViaResend(to: string, subject: string, html: string) {
+  await withRetry(async () => {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${resendApiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from: senderFrom, to: [to], subject, html }),
+    });
+    if (response.status === 429 || response.status >= 500) throw new Error(`Resend HTTP ${response.status}`);
+    if (!response.ok) throw new Error(`Resend HTTP ${response.status}: ${await response.text()}`);
+    idResponseSchema.parse(await response.json());
+  });
+}
+
+const gmailAccessToken = provider === "gmail" ? await fetchGmailAccessToken() : "";
+
+async function sendEmail(to: string, subject: string, html: string) {
+  if (provider === "gmail") return sendViaGmail(gmailAccessToken, to, subject, html);
+  return sendViaResend(to, subject, html);
+}
 
 function buildHtml(email: string) {
   const rows = content.topServices.slice(0, 10).map((service) => `
@@ -113,16 +184,7 @@ const errors: string[] = [];
 for (const subscriber of subscribers) {
   if (sentUserIds.has(subscriber.userId)) { skipped += 1; continue; }
   try {
-    await withRetry(async () => {
-      const response = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${resendApiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ from: emailFrom, to: [subscriber.email], subject: activeReport.title, html: buildHtml(subscriber.email) }),
-      });
-      if (response.status === 429 || response.status >= 500) throw new Error(`Resend HTTP ${response.status}`);
-      if (!response.ok) throw new Error(`Resend HTTP ${response.status}: ${await response.text()}`);
-      resendResponseSchema.parse(await response.json());
-    });
+    await sendEmail(subscriber.email, activeReport.title, buildHtml(subscriber.email));
     await client.from("notifications").insert({
       user_id: subscriber.userId,
       type: "daily_report",
@@ -138,5 +200,5 @@ for (const subscriber of subscribers) {
   }
 }
 
-process.stdout.write(`${JSON.stringify({ status: "sent", reportDate, subscribers: subscribers.length, sent, skipped, errors }, null, 2)}\n`);
+process.stdout.write(`${JSON.stringify({ status: "sent", provider, reportDate, subscribers: subscribers.length, sent, skipped, errors }, null, 2)}\n`);
 if (errors.length && sent === 0) process.exitCode = 1;
