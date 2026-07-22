@@ -2,12 +2,12 @@ import { ArrowLeft, ArrowUpRight, CheckCircle2, Clock3, ExternalLink, GitBranch,
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Sparkline } from "@/components/sparkline";
 import { StructuredData } from "@/components/structured-data";
 import { getSourceLabel, SourceBrandIcon } from "@/components/source-brand-icon";
 import { StatusBadge } from "@/components/status-badge";
+import { TrendPeriodChart } from "@/components/trend-period-chart";
 import { WatchButton } from "@/components/watch-button";
-import { getPublishedTrend } from "@/data/live-trends";
+import { getPublishedTrend, getTrendScoreHistory } from "@/data/live-trends";
 import { getSavedEntityIds } from "@/data/watchlist";
 import { absoluteUrl, siteConfig } from "@/lib/site";
 
@@ -29,6 +29,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function ServiceDetailPage({ params }: Props) {
   const [trend, savedEntityIds] = await Promise.all([getPublishedTrend((await params).slug), getSavedEntityIds()]);
   if (!trend) notFound();
+  const scoreHistory = await getTrendScoreHistory(trend.id);
+  const nowIso = new Date().toISOString();
   const pageUrl = absoluteUrl(`/services/${trend.slug}`);
   const structuredData = {
     "@context": "https://schema.org",
@@ -69,7 +71,7 @@ export default async function ServiceDetailPage({ params }: Props) {
       </section>
 
       <section className="detail-grid">
-        <article className="panel trend-panel"><div className="panel-heading"><div><h2>트렌드 신호</h2></div><div className="period-tabs" aria-label="그래프 기간"><button>24H</button><button className="active">7D</button><button>30D</button><button>90D</button></div></div><div className="large-chart"><div className="chart-grid" aria-hidden="true" /><Sparkline values={trend.sparkline} label={`${trend.name} 현재 트렌드 점수 ${trend.trendScore}`} /></div><p className="chart-summary"><ArrowUpRight size={16} />현재 최신 트렌드 점수는 <strong>{trend.trendScore}</strong>입니다. 추세는 스냅샷이 쌓이면 표시됩니다.</p></article>
+        <article className="panel trend-panel"><div className="panel-heading"><div><h2>트렌드 신호</h2></div></div><TrendPeriodChart history={scoreHistory} name={trend.name} nowIso={nowIso} /></article>
         <article className="panel platform-panel"><div className="panel-heading"><div><h2>플랫폼별 지표</h2></div></div>{trend.signals.map((signal) => <div className="platform-row" key={signal.source}><SourceBrandIcon source={signal.source} size="medium" /><span><strong>{signal.label}</strong><small><Clock3 size={12} />5분 전 수집 · {signal.reliability === "verified" ? "검증됨" : "추정"}</small></span><span><strong>{signal.value.toLocaleString("ko-KR")}</strong><em>+{signal.delta24h.toLocaleString("ko-KR")}</em></span></div>)}</article>
       </section>
 
