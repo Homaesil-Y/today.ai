@@ -11,14 +11,20 @@ export async function GET(request: Request) {
 
   if (code) {
     const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
+      const { data: profile } = data.user
+        ? await supabase.from("user_profiles").select("onboarding_completed").eq("id", data.user.id).maybeSingle()
+        : { data: null };
+      const destination = profile?.onboarding_completed
+        ? next
+        : `/onboarding?next=${encodeURIComponent(next)}`;
       const forwardedHost = request.headers.get("x-forwarded-host");
       const forwardedProto = request.headers.get("x-forwarded-proto") ?? "https";
       if (process.env.NODE_ENV !== "development" && forwardedHost) {
-        return NextResponse.redirect(`${forwardedProto}://${forwardedHost}${next}`);
+        return NextResponse.redirect(`${forwardedProto}://${forwardedHost}${destination}`);
       }
-      return NextResponse.redirect(`${origin}${next}`);
+      return NextResponse.redirect(`${origin}${destination}`);
     }
   }
 

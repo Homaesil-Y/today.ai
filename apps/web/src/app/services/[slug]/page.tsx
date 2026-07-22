@@ -3,29 +3,61 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Sparkline } from "@/components/sparkline";
+import { StructuredData } from "@/components/structured-data";
 import { getSourceLabel, SourceBrandIcon } from "@/components/source-brand-icon";
 import { StatusBadge } from "@/components/status-badge";
 import { WatchButton } from "@/components/watch-button";
 import { getPublishedTrend } from "@/data/live-trends";
+import { getSavedEntityIds } from "@/data/watchlist";
+import { absoluteUrl, siteConfig } from "@/lib/site";
 
 type Props = { params: Promise<{ slug: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const trend = await getPublishedTrend((await params).slug);
   if (!trend) return {};
-  return { title: trend.name, description: trend.tagline, alternates: { canonical: `/services/${trend.slug}` } };
+  const path = `/services/${trend.slug}`;
+  return {
+    title: `${trend.name} 분석·트렌드 점수`,
+    description: trend.tagline,
+    alternates: { canonical: path },
+    openGraph: { title: `${trend.name} AI 서비스 분석`, description: trend.tagline, url: path, type: "article", modifiedTime: trend.updatedAt, images: [{ url: `${path}/opengraph-image`, width: 1200, height: 630, alt: `${trend.name} 트렌드 분석` }] },
+    twitter: { card: "summary_large_image", title: `${trend.name} 분석 | 오늘의 AI`, description: trend.tagline, images: [`${path}/opengraph-image`] },
+  };
 }
 
 export default async function ServiceDetailPage({ params }: Props) {
-  const trend = await getPublishedTrend((await params).slug);
+  const [trend, savedEntityIds] = await Promise.all([getPublishedTrend((await params).slug), getSavedEntityIds()]);
   if (!trend) notFound();
+  const pageUrl = absoluteUrl(`/services/${trend.slug}`);
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: trend.name,
+    description: trend.description,
+    url: trend.canonicalUrl,
+    mainEntityOfPage: pageUrl,
+    applicationCategory: trend.category,
+    operatingSystem: "Web",
+    isAccessibleForFree: ["free", "open_source"].includes(trend.pricingType),
+    dateModified: trend.updatedAt,
+    inLanguage: siteConfig.language,
+    ...(trend.githubUrl ? { sameAs: [trend.githubUrl] } : {}),
+    additionalProperty: [
+      { "@type": "PropertyValue", name: "Trend Score", value: trend.trendScore },
+      { "@type": "PropertyValue", name: "Trust Score", value: trend.trustScore },
+      { "@type": "PropertyValue", name: "Trend Status", value: trend.status },
+    ],
+    subjectOf: { "@type": "Article", headline: `${trend.name}이 지금 주목받는 이유`, url: pageUrl, dateModified: trend.updatedAt, author: { "@id": absoluteUrl("/#organization") } },
+  };
   return (
     <div className="page detail-page">
+      <StructuredData data={structuredData} />
       <Link href="/" className="back-link"><ArrowLeft size={17} />오늘의 레이더</Link>
       <section className="detail-hero">
         <div className="detail-identity"><div><div className="detail-badges"><StatusBadge status={trend.status} /><span className="category-chip">{trend.category}</span>{trend.isOpenSource && <span className="category-chip">오픈소스</span>}</div><h1>{trend.name}</h1><p>{trend.tagline}</p></div></div>
         <div className="detail-scores"><div><span>Trend Score</span><strong>{trend.trendScore}</strong><small>오늘 #{trend.rank}</small></div><div><span>Trust Score</span><strong>{trend.trustScore}</strong><small><ShieldCheck size={14} />신뢰도 높음</small></div></div>
-        <div className="detail-actions"><a className="button button-primary" href={trend.canonicalUrl} target="_blank" rel="noreferrer">공식 사이트 <ArrowUpRight size={17} /></a>{trend.githubUrl && <a className="button button-secondary" href={trend.githubUrl} target="_blank" rel="noreferrer"><GitBranch size={17} />GitHub</a>}<WatchButton /></div>
+        <div className="detail-actions"><a className="button button-primary" href={trend.canonicalUrl} target="_blank" rel="noreferrer">공식 사이트 <ArrowUpRight size={17} /></a>{trend.githubUrl && <a className="button button-secondary" href={trend.githubUrl} target="_blank" rel="noreferrer"><GitBranch size={17} />GitHub</a>}<WatchButton entityId={trend.id} initialSaved={savedEntityIds.has(trend.id)} /></div>
       </section>
 
       <section className="ai-analysis">
@@ -37,8 +69,8 @@ export default async function ServiceDetailPage({ params }: Props) {
       </section>
 
       <section className="detail-grid">
-        <article className="panel trend-panel"><div className="panel-heading"><div><p className="eyebrow">VELOCITY</p><h2>트렌드 신호</h2></div><div className="period-tabs" aria-label="그래프 기간"><button>24H</button><button className="active">7D</button><button>30D</button><button>90D</button></div></div><div className="large-chart"><div className="chart-grid" aria-hidden="true" /><Sparkline values={trend.sparkline} label={`${trend.name} 현재 트렌드 점수 ${trend.trendScore}`} /></div><p className="chart-summary"><ArrowUpRight size={16} />현재 최신 트렌드 점수는 <strong>{trend.trendScore}</strong>입니다. 추세는 스냅샷이 쌓이면 표시됩니다.</p></article>
-        <article className="panel platform-panel"><div className="panel-heading"><div><p className="eyebrow">SOURCE SIGNALS</p><h2>플랫폼별 지표</h2></div></div>{trend.signals.map((signal) => <div className="platform-row" key={signal.source}><SourceBrandIcon source={signal.source} size="medium" /><span><strong>{signal.label}</strong><small><Clock3 size={12} />5분 전 수집 · {signal.reliability === "verified" ? "검증됨" : "추정"}</small></span><span><strong>{signal.value.toLocaleString("ko-KR")}</strong><em>+{signal.delta24h.toLocaleString("ko-KR")}</em></span></div>)}</article>
+        <article className="panel trend-panel"><div className="panel-heading"><div><h2>트렌드 신호</h2></div><div className="period-tabs" aria-label="그래프 기간"><button>24H</button><button className="active">7D</button><button>30D</button><button>90D</button></div></div><div className="large-chart"><div className="chart-grid" aria-hidden="true" /><Sparkline values={trend.sparkline} label={`${trend.name} 현재 트렌드 점수 ${trend.trendScore}`} /></div><p className="chart-summary"><ArrowUpRight size={16} />현재 최신 트렌드 점수는 <strong>{trend.trendScore}</strong>입니다. 추세는 스냅샷이 쌓이면 표시됩니다.</p></article>
+        <article className="panel platform-panel"><div className="panel-heading"><div><h2>플랫폼별 지표</h2></div></div>{trend.signals.map((signal) => <div className="platform-row" key={signal.source}><SourceBrandIcon source={signal.source} size="medium" /><span><strong>{signal.label}</strong><small><Clock3 size={12} />5분 전 수집 · {signal.reliability === "verified" ? "검증됨" : "추정"}</small></span><span><strong>{signal.value.toLocaleString("ko-KR")}</strong><em>+{signal.delta24h.toLocaleString("ko-KR")}</em></span></div>)}</article>
       </section>
 
       <section className="reaction-grid">
@@ -46,7 +78,7 @@ export default async function ServiceDetailPage({ params }: Props) {
         <article className="panel reaction-negative"><div className="panel-heading"><h2><TriangleAlert size={19} />불만 및 우려</h2></div><ul>{trend.weaknesses.map((item) => <li key={item}>{item}</li>)}</ul></article>
       </section>
 
-      <section className="panel source-section"><div className="panel-heading"><div><p className="eyebrow">ORIGINAL SOURCES</p><h2>주요 출처</h2></div><span>독립 출처 {trend.sources.length}개</span></div>{trend.sources.map((source, index) => <a className="source-row" key={source} href={trend.githubUrl ?? trend.canonicalUrl} target="_blank" rel="noreferrer"><SourceBrandIcon source={source} size="medium" /><span><strong>{index === 0 ? `${trend.name}, 최근 업데이트와 커뮤니티 반응` : `${getSourceLabel(source)}에서 확산 중인 ${trend.name} 활용 사례`}</strong><small>{getSourceLabel(source)} · {index + 1}시간 전 · 광고 의심 낮음</small></span><ExternalLink size={17} /></a>)}</section>
+      <section className="panel source-section"><div className="panel-heading"><div><h2>주요 출처</h2></div><span>독립 출처 {trend.sources.length}개</span></div>{trend.sources.map((source, index) => <a className="source-row" key={source} href={trend.githubUrl ?? trend.canonicalUrl} target="_blank" rel="noreferrer"><SourceBrandIcon source={source} size="medium" /><span><strong>{index === 0 ? `${trend.name}, 최근 업데이트와 커뮤니티 반응` : `${getSourceLabel(source)}에서 확산 중인 ${trend.name} 활용 사례`}</strong><small>{getSourceLabel(source)} · {index + 1}시간 전 · 광고 의심 낮음</small></span><ExternalLink size={17} /></a>)}</section>
 
       <section className="insight-grid"><article className="panel"><Users size={20} /><h2>추천 대상</h2><ul>{trend.targetUsers.map((item) => <li key={item}>{item}</li>)}</ul></article><article className="panel"><GitBranch size={20} /><h2>활용 사례</h2><ul>{trend.useCases.map((item) => <li key={item}>{item}</li>)}</ul></article><article className="panel opportunity"><Sparkles size={20} /><h2>국내 적용 기회</h2><p>{trend.koreaOpportunity}</p></article></section>
     </div>

@@ -86,7 +86,7 @@ export default async function AdminReviewPage({ searchParams }: Props) {
   return (
     <div className="page admin-page">
       <section className="page-heading">
-        <div><p className="eyebrow">ADMIN · REVIEW QUEUE</p><h1>AI 서비스 후보 검토</h1><p>수집·분석된 후보를 확인하고 공개 여부를 결정하세요.</p></div>
+        <div><h1>AI 서비스 후보 검토</h1><p>수집·분석된 후보를 확인하고 공개 여부를 결정하세요.</p></div>
         <div className="admin-summary"><ShieldCheck size={18} /><strong>{candidates.length}</strong><span>검토 대기</span></div>
       </section>
 
