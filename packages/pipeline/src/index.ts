@@ -1,3 +1,4 @@
+export * from "./analysis-queue";
 export * from "./candidate";
 export * from "./initial-score";
 export * from "./repository";

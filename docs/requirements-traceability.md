@@ -29,7 +29,7 @@
 | SCORE-005 | 신뢰 | 독립 작성자·반복 문구·제휴·후기·이상 급증 기반 Trust Score | DEV 8.3 | scoring 예정 | P0 | NOT_STARTED | 원시 신호 필요 |
 | SCORE-006 | 상태 | NEW/RISING/SURGING/PEAK/STABLE/FALLING/REVIVAL/WATCH | DEV 7 | `packages/scoring`, UI badge | P0 | DONE | 결정 로직·UI 상태 정의 |
 | SCORE-007 | 재현성 | scoring version 저장 및 동일 입력 동일 결과 | DEV 8, 29, 38 | `SCORING_VERSION`, `trend_scores` | P0 | DONE | v1 테스트 |
-| LLM-001 | 분석 | 한국어 summary/why/target/strength/weakness/use case 등 생성 | DEV 9 | `packages/llm`, `packages/pipeline/src/runner.ts` | P1 | DONE | 완료 후보 제외 후 미분석 상위 3건씩 생성, 실데이터 저장 검증 |
+| LLM-001 | 분석 | 한국어 summary/why/target/strength/weakness/use case 등 생성 | DEV 9 | `packages/llm`, `packages/pipeline/src/runner.ts` | P1 | DONE | 실행당 최대 50건 순차 분석(무료 한도 도달 시 중단). 미분석 review 후보 → 오래된 public 재분석 순서로 우선 처리, 보류(private) 제외, 실데이터 저장 검증 |
 | LLM-002 | 분석 | 출처 없는 사실 금지·불확실 정보 표시 | DEV 9 | versioned prompt, evidence input schema | P0 | DONE | 제공 출처·공식 사실만 입력, 미확인 가격 unknown |
 | LLM-003 | 분석 | 출력 schema validation, 모델·prompt version 저장 | DEV 9, 39 | `ai_analyses`, `packages/llm`, `packages/pipeline` | P0 | DONE | Gemini JSON Schema+Zod·model/prompt metadata·DB 저장 검증 |
 | AUTH-001 | 인증 | Google OAuth만 제공, 비밀번호 인증 금지 | DEV 11 | Supabase SSR, `/login`, callback | P0 | DONE | 운영 OAuth·callback 연결 완료 |
@@ -84,7 +84,7 @@
 | SEC-001 | 보안 | API 키는 server env, 클라이언트 노출 금지 | DEV 34 | `.env.example`, adapter | P0 | DONE | service key 서버 전용 |
 | SEC-002 | 보안 | 외부 HTML/Markdown 및 사용자 입력 sanitize | DEV 34 | 렌더러/API 예정 | P0 | NOT_STARTED | 현재 raw HTML 미렌더링 |
 | SEC-003 | 개인정보 | 정책·약관·탈퇴·삭제·보관 정책 | DEV 34 | 문서/화면 예정 | P1 | NOT_STARTED | 법률 검토 필요 |
-| OPS-001 | 운영 | 30분 수집, 1시간 처리, 07:30 분석, 08:00 공개·메일 | DEV 30 | `.github/workflows/scheduled-pipeline.yml` | P1 | IN_PROGRESS | 무료 우선 6시간 수집·07:30 분석 준비, 메일·운영 worker 후속 |
+| OPS-001 | 운영 | 정기 수집·처리, 시간별 AI 분석 재시도, 공개·메일 | DEV 30 | `.github/workflows/scheduled-pipeline.yml`, `.github/workflows/hourly-analysis.yml` | P1 | IN_PROGRESS | 6시간마다 수집·점수 계산, 매시간 남은 후보 분석·자동 승인(무료 한도 내 순차 처리). 메일·운영 worker 후속 |
 | OPS-002 | 운영 | Vercel web, Supabase, 장기 worker 분리 | DEV 27 | Vercel·Supabase·GitHub Actions | P1 | IN_PROGRESS | 웹·DB 운영 연결 완료, 장기 worker 분리 후속 |
 | OPS-003 | 이메일 | Resend 데일리 리포트·기본 08:00 사용자 시간대 | DEV 20~21 | provider 예정 | P1 | BLOCKED | 도메인/API key 필요 |
 | QA-001 | 품질 | strict TypeScript, 외부·LLM Zod 검증, any 최소화 | 요청문, DEV 39 | tsconfig, collectors | P0 | DONE | exact optional 사용 |
