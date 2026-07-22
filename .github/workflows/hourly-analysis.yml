@@ -1,0 +1,41 @@
+name: hourly Gemini analysis retry
+
+on:
+  schedule:
+    # 매시간 남은 미분석 후보를 다시 시도합니다. (UTC)
+    - cron: "47 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scheduled-trend-pipeline
+  cancel-in-progress: false
+
+jobs:
+  analyze-pending:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      APP_TIMEZONE: Asia/Seoul
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GEMINI_MODEL: gemini-3.1-flash-lite
+      GEMINI_ANALYSIS_LIMIT: "50"
+      AUTO_APPROVE_ANALYZED: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: 남은 후보 Gemini 분석 및 자동 승인
+        run: pnpm process:live
+      - name: 저장 결과 검증
+        run: pnpm verify:live

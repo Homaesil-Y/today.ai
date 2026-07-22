@@ -4,8 +4,6 @@ on:
   schedule:
     # 무료 실행 시간을 아끼기 위해 수집·점수 계산은 6시간마다 수행합니다. (UTC)
     - cron: "17 */6 * * *"
-    # 한국 시간 오전 7시 30분에 무료 할당량 안에서 Gemini 분석을 최대 50건 처리합니다. (UTC 22:30)
-    - cron: "30 22 * * *"
   workflow_dispatch:
     inputs:
       run_ai:
@@ -46,10 +44,10 @@ jobs:
       - name: GitHub·Hacker News 수집
         run: pnpm collect:live
       - name: 점수 계산 (AI 분석 제외)
-        if: ${{ github.event_name == 'schedule' && github.event.schedule != '30 22 * * *' || github.event_name == 'workflow_dispatch' && !inputs.run_ai }}
+        if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' && !inputs.run_ai }}
         run: pnpm process:live -- --skip-analysis
       - name: 점수 계산 및 Gemini 분석
-        if: ${{ github.event.schedule == '30 22 * * *' || github.event_name == 'workflow_dispatch' && inputs.run_ai }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_ai }}
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: pnpm process:live
