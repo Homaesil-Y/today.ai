@@ -6,7 +6,7 @@ import { getSourceLabel, SourceBrandIcon } from "./source-brand-icon";
 import { StatusBadge } from "./status-badge";
 import { WatchButton } from "./watch-button";
 
-export function RankingTable({ trends }: { trends: TrendEntity[] }) {
+export function RankingTable({ trends, savedEntityIds = new Set<string>() }: { trends: TrendEntity[]; savedEntityIds?: Set<string> }) {
   return (
     <div className="ranking-wrap">
       <table className="ranking-table">
@@ -21,7 +21,7 @@ export function RankingTable({ trends }: { trends: TrendEntity[] }) {
               <td><Sparkline values={trend.sparkline} label={`${trend.name} 트렌드 변화`} /></td>
               <td><div className="source-pills" aria-label={`수집 채널 ${trend.sources.map(getSourceLabel).join(", ")}`}>{trend.sources.slice(0, 4).map((source) => <SourceBrandIcon key={source} source={source} />)}</div></td>
               <td className="numeric positive">{trend.signals[0]?.delta24h ? <><ArrowUp size={14} /> +{trend.signals[0].delta24h.toLocaleString("ko-KR")}</> : "초기 집계"}</td>
-              <td><div className="row-actions"><WatchButton compact /><Link className="icon-button" href={`/services/${trend.slug}`} aria-label={`${trend.name} 상세 보기`}><ChevronRight size={18} /></Link></div></td>
+              <td><div className="row-actions"><WatchButton entityId={trend.id} compact initialSaved={savedEntityIds.has(trend.id)} /><Link className="icon-button" href={`/services/${trend.slug}`} aria-label={`${trend.name} 상세 보기`}><ChevronRight size={18} /></Link></div></td>
             </tr>
           ))}
         </tbody>

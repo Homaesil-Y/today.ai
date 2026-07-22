@@ -32,10 +32,10 @@
 | LLM-001 | 분석 | 한국어 summary/why/target/strength/weakness/use case 등 생성 | DEV 9 | `packages/llm`, `packages/pipeline/src/runner.ts` | P1 | DONE | 완료 후보 제외 후 미분석 상위 3건씩 생성, 실데이터 저장 검증 |
 | LLM-002 | 분석 | 출처 없는 사실 금지·불확실 정보 표시 | DEV 9 | versioned prompt, evidence input schema | P0 | DONE | 제공 출처·공식 사실만 입력, 미확인 가격 unknown |
 | LLM-003 | 분석 | 출력 schema validation, 모델·prompt version 저장 | DEV 9, 39 | `ai_analyses`, `packages/llm`, `packages/pipeline` | P0 | DONE | Gemini JSON Schema+Zod·model/prompt metadata·DB 저장 검증 |
-| AUTH-001 | 인증 | Google OAuth만 제공, 비밀번호 인증 금지 | DEV 11 | Supabase SSR, `/login`, callback | P0 | IN_PROGRESS | Provider 완료, Publishable Key와 migration 적용 필요 |
+| AUTH-001 | 인증 | Google OAuth만 제공, 비밀번호 인증 금지 | DEV 11 | Supabase SSR, `/login`, callback | P0 | DONE | 운영 OAuth·callback 연결 완료 |
 | AUTH-002 | 인증 | 최초 로그인 시 최소 프로필 자동 생성 | DEV 11.1~11.2 | `202607190002_auth_profile_trigger.sql` | P0 | DONE | 프로필·기본 설정·전체 관심목록 생성 |
 | AUTH-003 | 공개 | 비로그인 메인·랭킹·상세·검색·공개 리포트 제공 | DEV 10.1 | Next 공개 routes | P0 | IN_PROGRESS | 메인·상세·탐색 완료 |
-| AUTH-004 | 회원 | 관심목록·폴더·메모·구독·알림·비교 저장 | DEV 10.2, 18, 21 | RLS 스키마/화면 예정 | P1 | IN_PROGRESS | DB/RLS 초안, 기능 미연결 |
+| AUTH-004 | 회원 | 관심목록·폴더·메모·구독·알림·비교 저장 | DEV 10.2, 18, 21 | `watchlist`, `settings`, RLS | P1 | IN_PROGRESS | 기본 관심 저장·삭제·환경설정 완료, 폴더·메모·비교 후속 |
 | AUTH-005 | 권한 | 관리자 권한을 API와 DB에서 검증 | DEV 11.4, 34 | `is_admin()`, RLS | P0 | DONE | 서버 API 추가 시 동일 검증 필요 |
 | AUTH-006 | RLS | 사용자 메모·설정은 본인만 접근 | DEV 34 | migration RLS | P0 | DONE | 초안 정책 |
 | DB-001 | DB | sources/raw_items/entities/aliases/mentions | DEV 29 | Supabase migration | P0 | DONE | 초안 |
@@ -57,12 +57,12 @@
 | UI-012 | 메인 | 날짜→KPI→TOP3→랭킹→카테고리→신규→채널→관심 순서 | UI 12.1 | `app/page.tsx` | P0 | IN_PROGRESS | 최초 4개 섹션 완료 |
 | UI-013 | 탐색 | 필터·정렬·card/list/radar | UI 12.2 | `explore/page.tsx` | P1 | IN_PROGRESS | 정적 필터와 목록만 완료 |
 | UI-014 | 상세 | 헤더·AI 분석·그래프·지표·반응·출처·활용·국내 기회 | UI 12.3 | `services/[slug]/page.tsx` | P0 | DONE | fixture 데이터 |
-| UI-015 | 관심 | 폴더·점수 차이·메모·빈 상태 | UI 12.4 | placeholder + DB | P1 | NOT_STARTED | 로그인 필요 |
+| UI-015 | 관심 | 폴더·점수 차이·메모·빈 상태 | UI 12.4 | `/watchlist`, server action, DB | P1 | IN_PROGRESS | 실제 저장·삭제·빈 상태 완료, 폴더·메모·점수 차이 후속 |
 | UI-016 | 비교 | 최대 4개 비교, 모바일 sticky first column | UI 12.5 | placeholder | P2 | DEFERRED | Phase 7 |
 | UI-017 | 리포트 | 카드 목록과 문서형 상세 | UI 12.6 | placeholder + DB | P1 | NOT_STARTED | 데일리 우선 |
-| UI-018 | 로그인 | Google 단일 CTA, 비밀번호 없음, 공개 탐색 링크 | UI 12.7 | auth 화면 예정 | P0 | BLOCKED | OAuth 설정 필요 |
-| UI-019 | 온보딩 | 관심 카테고리·알림·완료 3단계 이하 | UI 12.8 | Phase 5 | P1 | NOT_STARTED | 선택 없이 진행 허용 |
-| UI-020 | 설정 | 프로필·카테고리·알림·구독·Light·개인정보·탈퇴 | UI 12.9 | placeholder | P1 | NOT_STARTED | 미완성 Dark 미노출 |
+| UI-018 | 로그인 | Google 단일 CTA, 비밀번호 없음, 공개 탐색 링크 | UI 12.7 | `/login`, OAuth callback | P0 | DONE | 원래 경로 복귀 포함 |
+| UI-019 | 온보딩 | 관심 카테고리·알림·완료 3단계 이하 | UI 12.8 | `/onboarding`, profile/preferences | P1 | DONE | 한 화면, 선택 없이 진행 허용 |
+| UI-020 | 설정 | 프로필·카테고리·알림·구독·Light·개인정보·탈퇴 | UI 12.9 | `/settings` | P1 | IN_PROGRESS | 카테고리·알림·시간 완료, 개인정보·탈퇴 후속 |
 | ADMIN-001 | 관리자 | 수집 KPI·채널 상태·실패·대기·호출량 | DEV 22, UI 12.10 | Phase 6 | P1 | NOT_STARTED | collector_runs schema 완료 |
 | ADMIN-002 | 관리자 | 후보 승인·스팸·수정·공개·분석 재생성 | DEV 22.2 | `/admin/review`, server actions | P1 | IN_PROGRESS | 원문 모달·검색·필터·분석 전 승인 차단 완료, 수정·재생성 후속 |
 | ADMIN-003 | 관리자 | 키워드·subreddit·hashtag·동적 서비스 검색 관리 | DEV 22.3 | Phase 6 | P1 | NOT_STARTED | 설정 테이블 필요 |
@@ -78,13 +78,14 @@
 | RESP-001 | 반응형 | desktop 248px sidebar/1440 content/12-col | UI 5.1, 13 | CSS | P0 | DONE | 시각 QA 필요 |
 | RESP-002 | 반응형 | tablet 80px sidebar, TOP1 full, TOP2·3 2-col | UI 5.2, 13 | CSS | P0 | DONE | 시각 QA 필요 |
 | RESP-003 | 반응형 | mobile 56px header/64px nav/16px padding/card list | UI 5.3, 13 | CSS | P0 | DONE | 시각 QA 필요 |
-| SEO-001 | SEO | SSR/SSG metadata·canonical·OG·sitemap·robots·slug | DEV 32 | Next metadata routes | P1 | DONE | OG image 생성 후속 |
-| SEO-002 | 공유 | 서비스/일일 TOP10 동적 OG 이미지 | DEV 32 | Phase 4 후속 | P2 | NOT_STARTED | 디자인 템플릿 필요 |
+| SEO-001 | SEO | SSR/SSG metadata·canonical·OG·sitemap·robots·slug | DEV 32 | Next metadata routes | P1 | DONE | 공개/개인 색인 경계와 상세 metadata 포함 |
+| SEO-002 | 공유 | 서비스/일일 TOP10 동적 OG 이미지 | DEV 32 | `opengraph-image.tsx` | P2 | DONE | 홈·서비스별 1200×630 이미지 |
+| SEO-003 | GEO/AEO | AI 인용 안내·방법론·질문형 답변·엔티티 구조화 데이터 | 사용자 요청 | `/llms.txt`, `/methodology`, JSON-LD | P1 | DONE | 공개 정보와 실제 화면 문구 일치 |
 | SEC-001 | 보안 | API 키는 server env, 클라이언트 노출 금지 | DEV 34 | `.env.example`, adapter | P0 | DONE | service key 서버 전용 |
 | SEC-002 | 보안 | 외부 HTML/Markdown 및 사용자 입력 sanitize | DEV 34 | 렌더러/API 예정 | P0 | NOT_STARTED | 현재 raw HTML 미렌더링 |
 | SEC-003 | 개인정보 | 정책·약관·탈퇴·삭제·보관 정책 | DEV 34 | 문서/화면 예정 | P1 | NOT_STARTED | 법률 검토 필요 |
 | OPS-001 | 운영 | 30분 수집, 1시간 처리, 07:30 분석, 08:00 공개·메일 | DEV 30 | `.github/workflows/scheduled-pipeline.yml` | P1 | IN_PROGRESS | 무료 우선 6시간 수집·07:30 분석 준비, 메일·운영 worker 후속 |
-| OPS-002 | 운영 | Vercel web, Supabase, 장기 worker 분리 | DEV 27 | roadmap | P1 | IN_PROGRESS | 배포 연결 미완료 |
+| OPS-002 | 운영 | Vercel web, Supabase, 장기 worker 분리 | DEV 27 | Vercel·Supabase·GitHub Actions | P1 | IN_PROGRESS | 웹·DB 운영 연결 완료, 장기 worker 분리 후속 |
 | OPS-003 | 이메일 | Resend 데일리 리포트·기본 08:00 사용자 시간대 | DEV 20~21 | provider 예정 | P1 | BLOCKED | 도메인/API key 필요 |
 | QA-001 | 품질 | strict TypeScript, 외부·LLM Zod 검증, any 최소화 | 요청문, DEV 39 | tsconfig, collectors | P0 | DONE | exact optional 사용 |
 | QA-002 | 품질 | build·typecheck·lint·unit test 통과 | 요청문, UI 24 | root scripts/CI | P0 | DONE | production build 포함 통과 |

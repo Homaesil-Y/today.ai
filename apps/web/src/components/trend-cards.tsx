@@ -5,7 +5,7 @@ import { Sparkline } from "./sparkline";
 import { StatusBadge } from "./status-badge";
 import { WatchButton } from "./watch-button";
 
-export function TopOneCard({ trend }: { trend: TrendEntity }) {
+export function TopOneCard({ trend, initialSaved = false }: { trend: TrendEntity; initialSaved?: boolean }) {
   return (
     <article className="top-card top-one">
       <div className="rank-kicker"><span>{String(trend.rank).padStart(2, "0")}</span><StatusBadge status={trend.status} /></div>
@@ -20,7 +20,7 @@ export function TopOneCard({ trend }: { trend: TrendEntity }) {
       <div className="signal-strip">
         {trend.signals.slice(0, 2).map((signal) => <div key={signal.source}><span>{signal.label}</span><strong>{signal.delta24h === 0 ? "초기 집계" : `+${signal.delta24h.toLocaleString("ko-KR")}`}</strong></div>)}
       </div>
-      <div className="card-actions"><Link className="button button-primary" href={`/services/${trend.slug}`}>분석 보기 <ArrowUpRight size={17} /></Link><WatchButton /></div>
+      <div className="card-actions"><Link className="button button-primary" href={`/services/${trend.slug}`}>분석 보기 <ArrowUpRight size={17} /></Link><WatchButton entityId={trend.id} initialSaved={initialSaved} /></div>
     </article>
   );
 }

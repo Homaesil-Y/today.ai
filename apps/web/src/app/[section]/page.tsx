@@ -1,6 +1,12 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 
 const labels: Record<string, string> = { categories: "카테고리", compare: "서비스 비교", watchlist: "관심 목록", reports: "리포트", settings: "설정" };
+
+export async function generateMetadata({ params }: { params: Promise<{ section: string }> }): Promise<Metadata> {
+  const { section } = await params;
+  return { title: labels[section] ?? "준비 중", robots: { index: false, follow: false } };
+}
 
 export default async function SectionPage({ params }: { params: Promise<{ section: string }> }) {
   const { section } = await params;

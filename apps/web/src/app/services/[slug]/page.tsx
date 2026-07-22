@@ -3,29 +3,61 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Sparkline } from "@/components/sparkline";
+import { StructuredData } from "@/components/structured-data";
 import { getSourceLabel, SourceBrandIcon } from "@/components/source-brand-icon";
 import { StatusBadge } from "@/components/status-badge";
 import { WatchButton } from "@/components/watch-button";
 import { getPublishedTrend } from "@/data/live-trends";
+import { getSavedEntityIds } from "@/data/watchlist";
+import { absoluteUrl, siteConfig } from "@/lib/site";
 
 type Props = { params: Promise<{ slug: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const trend = await getPublishedTrend((await params).slug);
   if (!trend) return {};
-  return { title: trend.name, description: trend.tagline, alternates: { canonical: `/services/${trend.slug}` } };
+  const path = `/services/${trend.slug}`;
+  return {
+    title: `${trend.name} 분석·트렌드 점수`,
+    description: trend.tagline,
+    alternates: { canonical: path },
+    openGraph: { title: `${trend.name} AI 서비스 분석`, description: trend.tagline, url: path, type: "article", modifiedTime: trend.updatedAt, images: [{ url: `${path}/opengraph-image`, width: 1200, height: 630, alt: `${trend.name} 트렌드 분석` }] },
+    twitter: { card: "summary_large_image", title: `${trend.name} 분석 | 오늘의 AI`, description: trend.tagline, images: [`${path}/opengraph-image`] },
+  };
 }
 
 export default async function ServiceDetailPage({ params }: Props) {
-  const trend = await getPublishedTrend((await params).slug);
+  const [trend, savedEntityIds] = await Promise.all([getPublishedTrend((await params).slug), getSavedEntityIds()]);
   if (!trend) notFound();
+  const pageUrl = absoluteUrl(`/services/${trend.slug}`);
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: trend.name,
+    description: trend.description,
+    url: trend.canonicalUrl,
+    mainEntityOfPage: pageUrl,
+    applicationCategory: trend.category,
+    operatingSystem: "Web",
+    isAccessibleForFree: ["free", "open_source"].includes(trend.pricingType),
+    dateModified: trend.updatedAt,
+    inLanguage: siteConfig.language,
+    ...(trend.githubUrl ? { sameAs: [trend.githubUrl] } : {}),
+    additionalProperty: [
+      { "@type": "PropertyValue", name: "Trend Score", value: trend.trendScore },
+      { "@type": "PropertyValue", name: "Trust Score", value: trend.trustScore },
+      { "@type": "PropertyValue", name: "Trend Status", value: trend.status },
+    ],
+    subjectOf: { "@type": "Article", headline: `${trend.name}이 지금 주목받는 이유`, url: pageUrl, dateModified: trend.updatedAt, author: { "@id": absoluteUrl("/#organization") } },
+  };
   return (
     <div className="page detail-page">
+      <StructuredData data={structuredData} />
       <Link href="/" className="back-link"><ArrowLeft size={17} />오늘의 레이더</Link>
       <section className="detail-hero">
         <div className="detail-identity"><div><div className="detail-badges"><StatusBadge status={trend.status} /><span className="category-chip">{trend.category}</span>{trend.isOpenSource && <span className="category-chip">오픈소스</span>}</div><h1>{trend.name}</h1><p>{trend.tagline}</p></div></div>
         <div className="detail-scores"><div><span>Trend Score</span><strong>{trend.trendScore}</strong><small>오늘 #{trend.rank}</small></div><div><span>Trust Score</span><strong>{trend.trustScore}</strong><small><ShieldCheck size={14} />신뢰도 높음</small></div></div>
-        <div className="detail-actions"><a className="button button-primary" href={trend.canonicalUrl} target="_blank" rel="noreferrer">공식 사이트 <ArrowUpRight size={17} /></a>{trend.githubUrl && <a className="button button-secondary" href={trend.githubUrl} target="_blank" rel="noreferrer"><GitBranch size={17} />GitHub</a>}<WatchButton /></div>
+        <div className="detail-actions"><a className="button button-primary" href={trend.canonicalUrl} target="_blank" rel="noreferrer">공식 사이트 <ArrowUpRight size={17} /></a>{trend.githubUrl && <a className="button button-secondary" href={trend.githubUrl} target="_blank" rel="noreferrer"><GitBranch size={17} />GitHub</a>}<WatchButton entityId={trend.id} initialSaved={savedEntityIds.has(trend.id)} /></div>
       </section>
 
       <section className="ai-analysis">
