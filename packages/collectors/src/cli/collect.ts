@@ -3,6 +3,7 @@ import { loadWorkspaceEnvironment } from "../environment";
 import { GitHubCollector } from "../github";
 import { HackerNewsCollector } from "../hacker-news";
 import { ProductHuntCollector } from "../product-hunt";
+import { RedditCollector } from "../reddit";
 import { SupabaseCollectorStore } from "../supabase-store";
 
 const env = loadWorkspaceEnvironment();
@@ -37,6 +38,16 @@ const jobs: Array<{
       first: 20,
       maxPages: 3,
       postedAfterDays: 7,
+    }, { now: new Date(), mode }),
+  },
+  {
+    source: "reddit",
+    collect: () => new RedditCollector().collect({
+      ...(env.REDDIT_CLIENT_ID ? { clientId: env.REDDIT_CLIENT_ID } : {}),
+      ...(env.REDDIT_CLIENT_SECRET ? { clientSecret: env.REDDIT_CLIENT_SECRET } : {}),
+      ...(env.HN_SEARCH_QUERY ? { query: env.HN_SEARCH_QUERY } : {}),
+      limit: 50,
+      maxPages: 2,
     }, { now: new Date(), mode }),
   },
 ];

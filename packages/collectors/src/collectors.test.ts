@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { GitHubCollector } from "./github";
 import { HackerNewsCollector } from "./hacker-news";
 import { ProductHuntCollector } from "./product-hunt";
+import { RedditCollector } from "./reddit";
 import { toRawItemRows } from "./supabase-store";
 
 const context = { now: new Date("2026-07-19T12:00:00Z"), mode: "fixture" as const };
@@ -133,6 +134,74 @@ describe("ProductHuntCollector", () => {
         { ...context, mode: "live" },
       ),
     ).rejects.toThrow(/GraphQL error/);
+  });
+});
+
+describe("RedditCollector", () => {
+  it("maps fixture listing to the common raw item contract", async () => {
+    const result = await new RedditCollector().collect({}, context);
+    expect(result.source).toBe("reddit");
+    expect(result.items).toHaveLength(3);
+    const first = result.items[0];
+    expect(first?.title).toContain("Rundeck AI");
+    expect(first?.canonicalUrl).toBe("https://rundeck-ai.dev/");
+    expect(first?.metrics).toEqual({ score: 412, comments: 87 });
+    expect(first?.publishedAt).toBe("2025-07-22T06:00:00.000Z");
+  });
+
+  it("returns a blocked result with a warning when credentials are missing in live mode", async () => {
+    const result = await new RedditCollector().collect({}, { ...context, mode: "live" });
+    expect(result.items).toHaveLength(0);
+    expect(result.warnings[0]).toContain("REDDIT_CLIENT_ID");
+  });
+
+  it("authenticates, paginates via after, and captures rate-limit headers", async () => {
+    const listing = (after: string | null, id: string) => ({
+      kind: "Listing",
+      data: {
+        after,
+        children: [{
+          kind: "t3",
+          data: {
+            id, name: `t3_${id}`, title: `AI tool ${id}`, selftext: "", url: `https://${id}.ai`,
+            permalink: `/r/x/${id}`, author: "u", created_utc: 1753164000, score: 5,
+            num_comments: 1, subreddit: "x", is_self: false,
+          },
+        }],
+      },
+    });
+    const calls: string[] = [];
+    let apiCall = 0;
+    const fetcher = async (url: string | URL | Request, init?: RequestInit) => {
+      const href = String(url);
+      if (href.includes("access_token")) {
+        expect(init?.headers).toMatchObject({ Authorization: expect.stringContaining("Basic ") });
+        return new Response(
+          JSON.stringify({ access_token: "tok-123", token_type: "bearer", expires_in: 3600 }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+      calls.push(href);
+      const page = apiCall === 0 ? listing("t3_p1", "p1") : listing(null, "p2");
+      apiCall += 1;
+      return new Response(JSON.stringify(page), {
+        status: 200,
+        headers: {
+          "content-type": "application/json",
+          "x-ratelimit-remaining": "95",
+          "x-ratelimit-reset": "300",
+        },
+      });
+    };
+
+    const result = await new RedditCollector().collect(
+      { clientId: "id", clientSecret: "secret", fetcher: fetcher as unknown as typeof fetch, maxPages: 5 },
+      { ...context, mode: "live" },
+    );
+
+    expect(result.items.map((item) => item.title)).toEqual(["AI tool p1", "AI tool p2"]);
+    expect(calls[1]).toContain("after=t3_p1");
+    expect(result.rateLimit?.remaining).toBe(95);
   });
 });
 

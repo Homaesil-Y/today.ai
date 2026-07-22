@@ -10,7 +10,7 @@
 | DATA-001 | 채널 | Product Hunt 핵심 수집 | DEV 2, 3.1, 36 | `packages/collectors/src/product-hunt.ts`, `packages/pipeline/src/candidate.ts` | P0 | ADAPTER_READY | GraphQL v2 어댑터·pagination·rate-limit·fixture·후보 변환·파이프라인 수용까지 구현. 실 live 호출은 `PRODUCT_HUNT_TOKEN` 발급 후 활성화(미설정 시 blocked) |
 | DATA-002 | 채널 | GitHub 저장소·메트릭·스냅샷 입력 수집 | DEV 3.2 | `packages/collectors/src/github.ts` | P0 | DONE | live/fixture, Zod 검증 |
 | DATA-003 | 채널 | Hacker News 글·점수·댓글 수집 | DEV 3.3 | `packages/collectors/src/hacker-news.ts` | P0 | DONE | live/fixture, Zod 검증 |
-| DATA-004 | 채널 | Reddit 대상 subreddit·게시물·댓글 수집 | DEV 3.4 | collector adapter 예정 | P0 | NOT_STARTED | OAuth/정책 확인 필요 |
+| DATA-004 | 채널 | Reddit 대상 subreddit·게시물·댓글 수집 | DEV 3.4 | `packages/collectors/src/reddit.ts`, `packages/pipeline/src/candidate.ts` | P0 | ADAPTER_READY | client credentials OAuth·pagination·rate-limit·fixture·후보 변환 구현. 실 live 호출은 `REDDIT_CLIENT_ID/SECRET` 발급 후 활성화(미설정 시 blocked) |
 | DATA-005 | 채널 | Threads 키워드·후보명 재검색·독립 작성자 분석 | DEV 3.5 | collector adapter 예정 | P0 | BLOCKED | 앱 권한·검색 범위 확인 필요 |
 | DATA-006 | 채널 | Instagram은 보조 가산 신호로만 수집 | DEV 3.6 | collector adapter 예정 | P0 | BLOCKED | Graph API 권한 필요 |
 | DATA-007 | 정책 | X는 MVP에서 제외 | DEV 2.1, 36 | 아키텍처/문서 | P1 | DEFERRED | 의도적 제외 |
