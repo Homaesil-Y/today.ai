@@ -9,7 +9,7 @@ API 정책과 quota는 변동되므로 실제 연결 직전에 각 공식 문서
 | GitHub | `GITHUB_TOKEN` 선택 | fine-grained token 또는 무인증 public REST | read-only repository metadata | REST search/core rate limit header를 실행별 저장 | CONNECTED | 30건 DB 저장, 재수집 0 insert/30 update 확인 |
 | Hacker News | 없음 | Algolia HN Search 공개 API | read-only story search | 공식 SLA가 아니므로 보수적 retry/cache | CONNECTED | 50건 DB 저장, 누락 URL fallback·재수집 멱등성 확인 |
 | Product Hunt | `PRODUCT_HUNT_TOKEN` | Product Hunt developer token(무료·무기한), GraphQL v2 | server-only, `Authorization: Bearer` | 복잡도 기반 15분당 6250점, `X-Rate-Limit-*` 헤더 저장 | ADAPTER_READY (토큰 대기) | fixture·pagination·rate-limit·GraphQL 오류·토큰 미설정 blocked 단위 테스트 통과 |
-| Reddit | `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET` | OAuth app, 식별 가능한 User-Agent, subreddit read | server OAuth | 최신 Data API terms, quota, 보관/삭제 정책 확인 | NOT_STARTED | 승인된 test app + 429/삭제 fixture |
+| Reddit | `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET` | OAuth app(client credentials), 식별 가능한 User-Agent | server OAuth, app-only 토큰 | 인증 클라이언트 100 QPM, `X-Ratelimit-*` 헤더 저장 | ADAPTER_READY (자격증명 대기) | fixture·auth+pagination·rate-limit·자격증명 미설정 blocked 단위 테스트 통과 |
 | Threads | `THREADS_ACCESS_TOKEN` | Meta app, Threads API 권한과 검수 | Meta OAuth callback | 검색/keyword discovery의 실제 허용 범위와 quota 확인 | BLOCKED | 허용된 test account/endpoint만 사용 |
 | Instagram | `INSTAGRAM_ACCESS_TOKEN` | Meta app, Instagram Graph API, 허용 public/hashtag media scope | Meta OAuth callback | hashtag query/Business 계정/검수 제한 확인 | BLOCKED | approved business test account, no-signal case |
 | Gemini | `GEMINI_API_KEY`, `GEMINI_MODEL` | server-side 무료 등급 key, `gemini-3.1-flash-lite` | callback 없음 | 무료 등급 RPM/TPM/RPD와 데이터 개선 사용 정책 확인 | CONNECTED | 실연결 structured output + schema-invalid/rate-limit fixture |
@@ -37,3 +37,16 @@ API 정책과 quota는 변동되므로 실제 연결 직전에 각 공식 문서
    - 로컬 `.env.local`의 `PRODUCT_HUNT_TOKEN=`
    - GitHub 저장소 → **Settings → Secrets and variables → Actions → New repository secret** 에 이름 `PRODUCT_HUNT_TOKEN`, 값은 복사한 토큰.
 6. 토큰 등록 후 `scheduled trend pipeline` 워크플로가 다음 6시간 주기 또는 수동 실행에서 Product Hunt를 함께 수집한다. 토큰이 없으면 수집기는 실패가 아니라 경고와 함께 0건 blocked로 기록된다.
+
+## Reddit OAuth 자격증명 발급
+
+`RedditCollector`도 어댑터·fixture·테스트·후보 변환까지 완성되어 있고, client credentials(app-only) 흐름으로 read-only 수집을 한다.
+
+1. https://www.reddit.com 에 로그인한다.
+2. https://www.reddit.com/prefs/apps 로 이동해 **create another app...**(또는 **are you a developer? create an app...**)을 누른다.
+3. 앱 유형은 **script**를 선택한다. name은 임의, redirect uri는 `http://localhost:8080` 등 아무 값이나 넣는다.
+4. 생성 후 앱 카드에서 이름 아래의 문자열이 **client id**, `secret` 항목이 **client secret**이다.
+5. 이 값을 다음 두 곳에 넣는다.
+   - 로컬 `.env.local`의 `REDDIT_CLIENT_ID=`, `REDDIT_CLIENT_SECRET=`
+   - GitHub → **Settings → Secrets and variables → Actions** 에 `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET` 두 secret으로 등록.
+6. Reddit은 식별 가능한 User-Agent를 요구한다. 수집기는 기본 User-Agent를 사용하지만, 운영에서 문제가 생기면 `RedditCollectorConfig.userAgent`로 조직명을 포함한 값을 지정한다. 자격증명이 없으면 수집기는 실패가 아니라 경고와 함께 0건 blocked로 기록된다.

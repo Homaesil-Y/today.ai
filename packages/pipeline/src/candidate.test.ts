@@ -173,6 +173,43 @@ describe("candidate extraction", () => {
     expect(nonAi).toBeNull();
   });
 
+  it("extracts an AI product link from Reddit and rejects self/discussion posts", () => {
+    const base = {
+      ...githubItem,
+      source: "reddit" as const,
+      body: "Sharing my launch.",
+      raw_payload_json: {},
+      raw_metrics_json: { score: 412, comments: 87 },
+    };
+    const candidate = extractEntityCandidate({
+      ...base,
+      title: "I built Rundeck AI, an open-source AI agent that triages on-call alerts",
+      url: "https://rundeck-ai.dev",
+      canonical_url: "https://rundeck-ai.dev/",
+    });
+    expect(candidate).toMatchObject({
+      name: "Rundeck AI",
+      officialDomain: "rundeck-ai.dev",
+      source: "reddit",
+    });
+
+    // 자체 토론 글(reddit permalink)은 후보에서 제외한다.
+    expect(extractEntityCandidate({
+      ...base,
+      title: "What is your favorite AI agent framework?",
+      url: "https://www.reddit.com/r/MachineLearning/comments/x/what_is/",
+      canonical_url: "https://www.reddit.com/r/MachineLearning/comments/x/what_is/",
+    })).toBeNull();
+
+    // AI 관련성이 없는 링크는 제외한다.
+    expect(extractEntityCandidate({
+      ...base,
+      title: "Show: a smart planter for your desk",
+      url: "https://deskplant.co",
+      canonical_url: "https://deskplant.co/",
+    })).toBeNull();
+  });
+
   it("creates deterministic bootstrap scores with WATCH status", () => {
     const candidate = extractEntityCandidate(githubItem);
     expect(candidate).not.toBeNull();

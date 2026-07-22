@@ -85,6 +85,14 @@ function productNameFromHackerNewsTitle(title: string) {
   return (candidate ?? withoutPrefix).trim().slice(0, 120);
 }
 
+function productNameFromRedditTitle(title: string) {
+  const withoutPrefix = title
+    .replace(/^\s*(show(\s*hn)?|show reddit|introducing|launch(ing)?|i\s+(just\s+)?(built|made|created|launched|shipped))\s*[:\-–—]?\s*/iu, "")
+    .trim();
+  const [candidate] = withoutPrefix.split(/\s*[,–—:]\s+|\s+-\s+/u, 1);
+  return (candidate ?? withoutPrefix).trim().slice(0, 120);
+}
+
 export function classifyCategory(text: string) {
   if (/\b(image|photo|canvas|design)\b/iu.test(text)) return "image";
   if (/\b(video|film|animation)\b/iu.test(text)) return "video";
@@ -214,9 +222,51 @@ function extractProductHuntCandidate(item: DatabaseRawItem): EntityCandidate | n
   };
 }
 
+function extractRedditCandidate(item: DatabaseRawItem): EntityCandidate | null {
+  const canonicalUrl = safeCanonicalUrl(item.canonical_url, item.url);
+  const domain = hostname(canonicalUrl);
+  // 자체 토론 글(reddit permalink)·기사·에디토리얼은 제품 후보에서 제외한다.
+  if (domain === "reddit.com" || domain === "redd.it" || domain === "news.ycombinator.com") return null;
+  if (editorialHosts.has(domain)) return null;
+  const path = new URL(canonicalUrl).pathname.toLowerCase();
+  if (/\/(blog|news|article|posts?|p)\//u.test(path)) return null;
+
+  const evidenceText = `${item.title} ${item.body ?? ""}`;
+  if (!aiTerms.test(evidenceText) || !productIntentTerms.test(evidenceText)) return null;
+
+  const isGitHubRepository = domain === "github.com" && /^\/[^/]+\/[^/]+/u.test(path);
+  const name = productNameFromRedditTitle(item.title);
+  if (name.length < 2 || name.length > 120) return null;
+
+  const score = item.raw_metrics_json.score ?? 0;
+  return {
+    name,
+    slugBase: slugifyName(name, canonicalUrl),
+    canonicalUrl,
+    officialDomain: domain,
+    githubUrl: isGitHubRepository ? canonicalUrl : null,
+    description: item.body,
+    categorySlug: classifyCategory(evidenceText),
+    pricingType: isGitHubRepository ? "open_source" : "unknown",
+    isOpenSource: isGitHubRepository,
+    firstDetectedAt: item.published_at,
+    lastDetectedAt: item.collected_at,
+    confidence: score >= 300 ? 0.8 : score >= 100 ? 0.74 : 0.68,
+    matchMethod: isGitHubRepository ? "github_repository" : "official_domain",
+    alias: name,
+    rawItem: item,
+    source: "reddit",
+    metrics: item.raw_metrics_json,
+    officialFacts: [
+      `Reddit에서 추천 ${(item.raw_metrics_json.score ?? 0).toLocaleString("en-US")}점, 댓글 ${(item.raw_metrics_json.comments ?? 0).toLocaleString("en-US")}개로 수집되었습니다.`,
+    ],
+  };
+}
+
 export function extractEntityCandidate(item: DatabaseRawItem) {
   if (item.source === "github") return extractGitHubCandidate(item);
   if (item.source === "hacker_news") return extractHackerNewsCandidate(item);
   if (item.source === "product_hunt") return extractProductHuntCandidate(item);
+  if (item.source === "reddit") return extractRedditCandidate(item);
   return null;
 }

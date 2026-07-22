@@ -1,0 +1,60 @@
+{
+  "kind": "Listing",
+  "data": {
+    "after": "t3_ai0003",
+    "dist": 3,
+    "children": [
+      {
+        "kind": "t3",
+        "data": {
+          "id": "ai0001",
+          "name": "t3_ai0001",
+          "title": "I built Rundeck AI, an open-source AI agent that triages on-call alerts",
+          "selftext": "Sharing my launch: an AI agent that reads alerts and suggests fixes.",
+          "url": "https://rundeck-ai.dev",
+          "permalink": "/r/programming/comments/ai0001/i_built_rundeck_ai/",
+          "author": "devcaster",
+          "created_utc": 1753164000,
+          "score": 412,
+          "num_comments": 87,
+          "subreddit": "programming",
+          "is_self": false
+        }
+      },
+      {
+        "kind": "t3",
+        "data": {
+          "id": "ai0002",
+          "name": "t3_ai0002",
+          "title": "Show: Pixelforge, a generative AI image studio for product mockups",
+          "selftext": "",
+          "url": "https://pixelforge.studio",
+          "permalink": "/r/SideProject/comments/ai0002/pixelforge/",
+          "author": "makerjane",
+          "created_utc": 1753096800,
+          "score": 233,
+          "num_comments": 41,
+          "subreddit": "SideProject",
+          "is_self": false
+        }
+      },
+      {
+        "kind": "t3",
+        "data": {
+          "id": "ai0003",
+          "name": "t3_ai0003",
+          "title": "What is your favorite mechanical keyboard switch?",
+          "selftext": "Curious what everyone likes for typing all day.",
+          "url": "https://www.reddit.com/r/MechanicalKeyboards/comments/ai0003/what_is_your_favorite_switch/",
+          "permalink": "/r/MechanicalKeyboards/comments/ai0003/what_is_your_favorite_switch/",
+          "author": "clackfan",
+          "created_utc": 1753090000,
+          "score": 58,
+          "num_comments": 120,
+          "subreddit": "MechanicalKeyboards",
+          "is_self": true
+        }
+      }
+    ]
+  }
+}

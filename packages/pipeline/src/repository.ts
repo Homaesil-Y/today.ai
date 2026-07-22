@@ -6,7 +6,7 @@ import type { EntityCandidate } from "./schema";
 import { databaseRawItemSchema } from "./schema";
 
 /** 파이프라인이 실제로 후보를 추출하는 채널. 새 수집기를 붙이면 여기에 추가한다. */
-export const INGESTED_SOURCES = ["github", "hacker_news", "product_hunt"] as const;
+export const INGESTED_SOURCES = ["github", "hacker_news", "product_hunt", "reddit"] as const;
 export type IngestedSource = (typeof INGESTED_SOURCES)[number];
 
 const sourceSchema = z.object({ id: z.uuid(), code: z.string() });
