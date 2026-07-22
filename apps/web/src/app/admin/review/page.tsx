@@ -1,8 +1,8 @@
-import { Check, ExternalLink, EyeOff, Pencil, ShieldCheck } from "lucide-react";
+import { Check, ExternalLink, EyeOff, Pencil, RefreshCw, ShieldCheck } from "lucide-react";
 import { redirect } from "next/navigation";
 import { getCurrentUserRole } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { approveCandidate, rejectCandidate, updateCandidate } from "./actions";
+import { approveCandidate, rejectCandidate, requestReanalysis, updateCandidate } from "./actions";
 import { SourcePreviewDialog } from "./source-preview-dialog";
 
 export const dynamic = "force-dynamic";
@@ -155,6 +155,7 @@ export default async function AdminReviewPage({ searchParams }: Props) {
                 <div className="review-actions">
                   <form action={approveCandidate}><input type="hidden" name="entityId" value={candidate.id} /><button className="button button-primary" type="submit" disabled={!analysisReady} title={analysisReady ? "검토 후 공개" : "AI 분석 완료 후 공개할 수 있습니다"}><Check size={16} />{analysisReady ? "승인·공개" : "분석 후 승인"}</button></form>
                   <form action={rejectCandidate}><input type="hidden" name="entityId" value={candidate.id} /><button className="button button-secondary" type="submit"><EyeOff size={16} />보류</button></form>
+                  {analysisReady && <form action={requestReanalysis}><input type="hidden" name="entityId" value={candidate.id} /><button className="button button-secondary" type="submit" title="기존 AI 분석을 지우고 다음 실행에서 재분석합니다"><RefreshCw size={15} />AI 재분석</button></form>}
                 </div>
               </article>
             );
