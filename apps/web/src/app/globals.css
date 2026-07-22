@@ -106,7 +106,7 @@ button { color: inherit; }
 
 .page { width: min(100%, 1440px); margin: 0 auto; padding: 38px 32px 64px; }
 .page-heading { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 28px; }
-.page-heading h1 { margin: 2px 0 5px; font-family: 'PyeongtaekAnbo', "Pretendard Variable", Pretendard, sans-serif; font-weight: 400; font-size: clamp(28px, 3vw, 36px); line-height: 1.22; letter-spacing: -.02em; }
+.page-heading h1 { margin: 2px 0 5px; font-size: clamp(28px, 3vw, 36px); line-height: 1.22; letter-spacing: -.035em; }
 .page-heading p { margin: 0; color: var(--text-secondary); font-size: 15px; }
 .eyebrow { margin: 0 0 3px !important; color: var(--brand-primary); font-size: 10px !important; font-weight: 760; letter-spacing: .11em; text-transform: uppercase; }
 .freshness { display: grid; grid-template-columns: 8px auto; align-items: center; gap: 4px 8px; min-width: 152px; padding: 11px 14px; border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--bg-surface); color: var(--text-secondary); font-size: 13px; }
