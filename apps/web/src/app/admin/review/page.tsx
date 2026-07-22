@@ -2,6 +2,7 @@ import { Check, ExternalLink, EyeOff, Pencil, RefreshCw, ShieldCheck, Trash2 } f
 import { redirect } from "next/navigation";
 import { getCurrentUserRole } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { FormDropdown } from "@/components/form-dropdown";
 import { approveCandidate, dismissStaleCandidates, rejectCandidate, requestReanalysis, updateCandidate } from "./actions";
 import { SourcePreviewDialog } from "./source-preview-dialog";
 
@@ -124,7 +125,7 @@ export default async function AdminReviewPage({ searchParams }: Props) {
 
       <form className="admin-toolbar" action="/admin/review" method="get">
         <label><span className="sr-only">후보 검색</span><input type="search" name="q" defaultValue={params.q ?? ""} placeholder="서비스명, 도메인, 카테고리 검색" /></label>
-        <label><span className="sr-only">AI 분석 상태</span><select name="analysis" defaultValue={analysisOnly ? "ready" : "all"}><option value="all">전체 분석 상태</option><option value="ready">AI 분석 완료만</option></select></label>
+        <label><span className="sr-only">AI 분석 상태</span><FormDropdown name="analysis" ariaLabel="AI 분석 상태" placeholder="전체 분석 상태" defaultValue={analysisOnly ? "ready" : "all"} options={[{ value: "all", label: "전체 분석 상태" }, { value: "ready", label: "AI 분석 완료만" }]} /></label>
         <button className="button button-secondary" type="submit">필터 적용</button>
         <span>결과 {preparedCandidates.length}건</span>
       </form>
@@ -157,10 +158,13 @@ export default async function AdminReviewPage({ searchParams }: Props) {
                       <input type="hidden" name="entityId" value={candidate.id} />
                       <label><span>서비스명</span><input type="text" name="name" defaultValue={candidate.name} maxLength={120} required /></label>
                       <label><span>카테고리</span>
-                        <select name="categorySlug" defaultValue={getCategorySlug(candidate.categories)}>
-                          <option value="">(미지정)</option>
-                          {categories.map((category) => <option key={category.slug} value={category.slug}>{category.name}</option>)}
-                        </select>
+                        <FormDropdown
+                          name="categorySlug"
+                          ariaLabel="카테고리"
+                          placeholder="(미지정)"
+                          defaultValue={getCategorySlug(candidate.categories)}
+                          options={[{ value: "", label: "(미지정)" }, ...categories.map((category) => ({ value: category.slug, label: category.name }))]}
+                        />
                       </label>
                       <label className="review-edit-desc"><span>설명</span><textarea name="description" rows={3} maxLength={2000} defaultValue={candidate.description ?? ""} placeholder="관리자용 설명(공개 상세에 사용될 수 있습니다)" /></label>
                       <button className="button button-secondary" type="submit">수정 저장</button>

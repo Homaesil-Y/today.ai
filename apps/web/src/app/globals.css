@@ -273,9 +273,9 @@ button { color: inherit; }
 .ranking-wrap { overflow: hidden; border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--bg-surface); box-shadow: var(--shadow-xs); }
 .ranking-table { width: 100%; border-collapse: collapse; }
 .ranking-table th { position: static; height: 44px; padding: 0 13px; border-bottom: 1px solid var(--border-default); color: var(--text-secondary); background: var(--bg-surface-subtle); font-size: 12px; font-weight: 650; text-align: center; white-space: nowrap; letter-spacing: .02em; }
-.ranking-table td { height: 68px; padding: 0 13px; border-bottom: 1px solid var(--border-default); vertical-align: middle; text-align: center; }
-/* 서비스명 열은 좌측 정렬 유지(가독성). 나머지는 헤더와 데이터를 가운데로 통일. */
-.ranking-table th:nth-child(2), .ranking-table td:nth-child(2) { text-align: left; }
+.ranking-table td { height: 68px; padding: 0 13px; border-bottom: 1px solid var(--border-default); vertical-align: middle; text-align: center; white-space: nowrap; }
+/* 서비스명 열은 좌측 정렬 + 줄바꿈 허용(긴 이름). 나머지는 가운데 + 한 줄 유지. */
+.ranking-table th:nth-child(2), .ranking-table td:nth-child(2) { text-align: left; white-space: normal; }
 .ranking-table .source-pills, .ranking-table .row-actions { justify-content: center; }
 .ranking-table tr:last-child td { border-bottom: 0; }
 .ranking-table tbody tr:hover { background: var(--bg-surface-hover); }
@@ -409,8 +409,10 @@ button { color: inherit; }
 .compare-add { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
 
 /* 커스텀 드롭다운(네이티브 select 팝업의 다크 플래시 회피) */
-.dropdown { position: relative; flex: 1; min-width: 200px; max-width: 360px; }
-.dropdown-trigger { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; height: 42px; padding: 0 12px; border: 1px solid var(--border-default); border-radius: 9px; background: var(--bg-surface-subtle); color: var(--text-primary); font: inherit; cursor: pointer; }
+.dropdown { position: relative; width: 100%; }
+.compare-add .dropdown { flex: 1 1 200px; max-width: 360px; }
+.dropdown-trigger { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; height: 42px; padding: 0 12px; border: 1px solid var(--border-default); border-radius: 9px; background: var(--bg-surface-subtle); color: var(--text-primary); font-size: 14px; text-align: left; cursor: pointer; }
+.dropdown-trigger > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dropdown-trigger:hover { background: var(--bg-surface-hover); }
 .dropdown-trigger:focus-visible { border-color: var(--border-focus); }
 .dropdown-trigger svg { flex-shrink: 0; color: var(--text-tertiary); }
