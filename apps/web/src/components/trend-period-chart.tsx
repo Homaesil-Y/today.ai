@@ -66,10 +66,12 @@ export function TrendPeriodChart({ history, name, nowIso }: { history: Point[]; 
         )}
       </div>
       <p className="chart-summary">
-        <ArrowUpRight size={16} />
-        {latestScore === undefined
-          ? "아직 점수 스냅샷이 없습니다."
-          : <>현재 최신 트렌드 점수는 <strong>{latestScore}</strong>입니다. {active.label} 구간 스냅샷 {filtered.length}개 기준입니다.</>}
+        <ArrowUpRight size={16} aria-hidden="true" />
+        <span>
+          {latestScore === undefined
+            ? "아직 점수 스냅샷이 없습니다."
+            : <>현재 최신 트렌드 점수는 <strong>{latestScore}</strong>입니다. {active.label} 구간 스냅샷 {filtered.length}개 기준입니다.</>}
+        </span>
       </p>
     </>
   );
