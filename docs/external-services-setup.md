@@ -10,8 +10,8 @@ API 정책과 quota는 변동되므로 실제 연결 직전에 각 공식 문서
 | Hacker News | 없음 | Algolia HN Search 공개 API | read-only story search | 공식 SLA가 아니므로 보수적 retry/cache | CONNECTED | 50건 DB 저장, 누락 URL fallback·재수집 멱등성 확인 |
 | Product Hunt | `PRODUCT_HUNT_TOKEN` | Product Hunt developer token(무료·무기한), GraphQL v2 | server-only, `Authorization: Bearer` | 복잡도 기반 15분당 6250점, `X-Rate-Limit-*` 헤더 저장 | ADAPTER_READY (토큰 대기) | fixture·pagination·rate-limit·GraphQL 오류·토큰 미설정 blocked 단위 테스트 통과 |
 | Reddit | `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET` | OAuth app(client credentials), 식별 가능한 User-Agent | server OAuth, app-only 토큰 | 인증 클라이언트 100 QPM, `X-Ratelimit-*` 헤더 저장 | ADAPTER_READY (자격증명 대기) | fixture·auth+pagination·rate-limit·자격증명 미설정 blocked 단위 테스트 통과 |
-| Threads | `THREADS_ACCESS_TOKEN` | Meta app, Threads API 권한과 검수 | Meta OAuth callback | 검색/keyword discovery의 실제 허용 범위와 quota 확인 | BLOCKED | 허용된 test account/endpoint만 사용 |
-| Instagram | `INSTAGRAM_ACCESS_TOKEN` | Meta app, Instagram Graph API, 허용 public/hashtag media scope | Meta OAuth callback | hashtag query/Business 계정/검수 제한 확인 | BLOCKED | approved business test account, no-signal case |
+| Threads | `THREADS_ACCESS_TOKEN` | Meta app + `threads_keyword_search` **App Review**(advanced access) 필요. 타인 공개글 검색은 검수 승인 후 가능 | Meta OAuth callback | keyword_search는 무료·rate-limited, 검수 2~4주+비즈니스 인증 | BLOCKED (앱 검수 대기) | 검수 승인 후 어댑터 구현 예정. 전제조건 /privacy·/terms는 배포 완료 |
+| Instagram | `INSTAGRAM_ACCESS_TOKEN` | Meta app + Business/Creator 계정 + FB 페이지 + "Instagram Public Content Access" **App Review** | Meta OAuth callback | 해시태그 검색 주당 30개 제한, 검수 4~6주+ | BLOCKED (앱 검수 대기) | 보조 가산 신호. 검수 승인 후 어댑터 구현 예정 |
 | Gemini | `GEMINI_API_KEY`, `GEMINI_MODEL` | server-side 무료 등급 key, `gemini-3.1-flash-lite` | callback 없음 | 무료 등급 RPM/TPM/RPD와 데이터 개선 사용 정책 확인 | CONNECTED | 실연결 structured output + schema-invalid/rate-limit fixture |
 | Resend | `RESEND_API_KEY`, `EMAIL_FROM` | 발신 domain DNS 검증 | webhook은 추후 delivery status용 | 플랜별 email quota 확인 | BLOCKED | test recipient, idempotency, bounce |
 
