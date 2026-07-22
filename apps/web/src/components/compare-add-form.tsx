@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { useMemo, useState } from "react";
+import { Dropdown } from "@/components/dropdown";
 
 type Option = { slug: string; name: string; category: string };
 
@@ -14,12 +15,16 @@ export function CompareAddForm({ options, selectedSlugs }: { options: Option[]; 
   const [category, setCategory] = useState("");
   const [slug, setSlug] = useState("");
 
-  const categories = useMemo(
-    () => [...new Set(options.map((o) => o.category).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ko")),
+  const categoryOptions = useMemo(
+    () =>
+      [...new Set(options.map((o) => o.category).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, "ko"))
+        .map((name) => ({ value: name, label: name })),
     [options],
   );
-  const services = useMemo(
-    () => (category ? options.filter((o) => o.category === category) : []),
+  const serviceOptions = useMemo(
+    () =>
+      (category ? options.filter((o) => o.category === category) : []).map((o) => ({ value: o.slug, label: o.name })),
     [options, category],
   );
 
@@ -30,26 +35,24 @@ export function CompareAddForm({ options, selectedSlugs }: { options: Option[]; 
 
   return (
     <div className="compare-add">
-      <label className="compare-add-field">
-        <span className="sr-only">1단계: 카테고리 선택</span>
-        <select
-          value={category}
-          onChange={(event) => {
-            setCategory(event.target.value);
-            setSlug("");
-          }}
-        >
-          <option value="" disabled>1. 카테고리 선택…</option>
-          {categories.map((name) => <option key={name} value={name}>{name}</option>)}
-        </select>
-      </label>
-      <label className="compare-add-field">
-        <span className="sr-only">2단계: 서비스 선택</span>
-        <select value={slug} onChange={(event) => setSlug(event.target.value)} disabled={!category}>
-          <option value="" disabled>{category ? "2. 서비스 선택…" : "카테고리를 먼저 선택하세요"}</option>
-          {services.map((option) => <option key={option.slug} value={option.slug}>{option.name}</option>)}
-        </select>
-      </label>
+      <Dropdown
+        ariaLabel="카테고리 선택"
+        placeholder="카테고리 선택"
+        value={category}
+        options={categoryOptions}
+        onChange={(next) => {
+          setCategory(next);
+          setSlug("");
+        }}
+      />
+      <Dropdown
+        ariaLabel="서비스 선택"
+        placeholder={category ? "서비스 선택" : "카테고리를 먼저 선택하세요"}
+        value={slug}
+        options={serviceOptions}
+        disabled={!category}
+        onChange={setSlug}
+      />
       <button className="button button-secondary" type="button" onClick={add} disabled={!slug}>추가</button>
       {selectedSlugs.length > 0 && (
         <Link className="button button-secondary" href="/compare"><X size={15} />전체 해제</Link>

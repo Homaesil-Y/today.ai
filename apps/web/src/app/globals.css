@@ -407,9 +407,19 @@ button { color: inherit; }
 .report-rank-score small { color: var(--text-secondary); font-size: 12px; }
 
 .compare-add { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
-.compare-add label { flex: 1; min-width: 200px; max-width: 360px; }
-.compare-add select { width: 100%; height: 42px; border: 1px solid var(--border-default); border-radius: 9px; background-color: var(--bg-surface-subtle); padding-left: 12px; color: var(--text-primary); }
-.compare-add select:disabled { cursor: not-allowed; opacity: 0.55; }
+
+/* 커스텀 드롭다운(네이티브 select 팝업의 다크 플래시 회피) */
+.dropdown { position: relative; flex: 1; min-width: 200px; max-width: 360px; }
+.dropdown-trigger { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; height: 42px; padding: 0 12px; border: 1px solid var(--border-default); border-radius: 9px; background: var(--bg-surface-subtle); color: var(--text-primary); font: inherit; cursor: pointer; }
+.dropdown-trigger:hover { background: var(--bg-surface-hover); }
+.dropdown-trigger:focus-visible { border-color: var(--border-focus); }
+.dropdown-trigger svg { flex-shrink: 0; color: var(--text-tertiary); }
+.dropdown.is-disabled .dropdown-trigger { cursor: not-allowed; opacity: 0.55; }
+.dropdown-placeholder { color: var(--text-tertiary); }
+.dropdown-menu { position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; right: 0; max-height: 280px; margin: 0; padding: 6px; overflow-y: auto; list-style: none; border: 1px solid var(--border-default); border-radius: 10px; background: var(--bg-surface); box-shadow: var(--shadow-md); }
+.dropdown-option { padding: 9px 10px; border-radius: 7px; color: var(--text-primary); font-size: 14px; cursor: pointer; }
+.dropdown-option:hover { background: var(--bg-surface-hover); }
+.dropdown-option.is-selected { background: var(--bg-surface-selected); color: var(--brand-primary-active); font-weight: 600; }
 .compare-grid { display: grid; gap: 1px; border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--border-default); overflow-x: auto; }
 .compare-row-head, .compare-col-head, .compare-label, .compare-cell { background: var(--bg-surface); padding: 14px 16px; }
 .compare-col-head { position: relative; display: flex; flex-direction: column; gap: 6px; }
