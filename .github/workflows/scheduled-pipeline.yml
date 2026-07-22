@@ -2,8 +2,8 @@ name: scheduled trend pipeline
 
 on:
   schedule:
-    # 무료 실행 시간을 아끼기 위해 수집·점수 계산은 6시간마다 수행합니다. (UTC)
-    - cron: "17 */6 * * *"
+    # 수집·점수 계산은 3시간마다 수행합니다. (UTC)
+    - cron: "17 */3 * * *"
   workflow_dispatch:
     inputs:
       run_ai:
