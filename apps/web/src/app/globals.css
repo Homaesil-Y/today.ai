@@ -236,7 +236,7 @@ button { color: inherit; }
 .service-heading h3 { margin: 0; font-size: 19px; font-weight: 750; line-height: 1.25; letter-spacing: -.025em; }
 .top-one .service-heading h3 { font-size: 25px; }
 .tagline { margin: 14px 0 0; color: var(--text-secondary); line-height: 1.6; }
-.reason-list { display: grid; gap: 8px; margin: 15px 0 0; padding: 0; list-style: none; color: var(--text-secondary); font-size: 13px; line-height: 1.65; }
+.reason-list { display: grid; gap: 8px; margin: 15px 0 22px; padding: 0; list-style: none; color: var(--text-secondary); font-size: 13px; line-height: 1.65; }
 .reason-list li { display: flex; gap: 7px; align-items: flex-start; }
 .reason-list svg { flex: none; margin-top: 2px; color: var(--status-rising); }
 .score-block { flex: none; display: flex; flex-direction: column; align-items: flex-end; text-align: right; }
