@@ -21,7 +21,7 @@ export default function MethodologyPage() {
   const article = {
     "@context": "https://schema.org",
     "@type": "TechArticle",
-    headline: "오늘의AI 트렌드 분석 방법론",
+    headline: "오늘의 AI 트렌드 분석 방법론",
     description: "공개 신호 수집부터 점수 계산, AI 요약, 공개 검수까지의 방법론",
     url: absoluteUrl("/methodology"),
     inLanguage: siteConfig.language,

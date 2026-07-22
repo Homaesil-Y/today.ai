@@ -24,7 +24,7 @@ export const metadata: Metadata = {
     siteName: siteConfig.name,
     locale: siteConfig.locale,
     type: "website",
-    images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "오늘의AI 트렌드 레이더" }],
+    images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "오늘의 AI 트렌드 레이더" }],
   },
   twitter: {
     card: "summary_large_image",
