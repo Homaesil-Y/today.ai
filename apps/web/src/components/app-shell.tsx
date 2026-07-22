@@ -46,7 +46,7 @@ export async function AppShell({ children }: { children: ReactNode }) {
           <input id="global-search-input" name="q" type="search" placeholder="서비스, 카테고리 검색" />
         </form>
         <div className="header-actions">
-          <button className="icon-button" type="button" aria-label="알림 열기"><Bell size={19} /></button>
+          <Link className="icon-button" href="/settings" aria-label="알림 설정"><Bell size={19} /></Link>
           <AuthControl />
         </div>
       </header>
