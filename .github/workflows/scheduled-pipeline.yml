@@ -54,5 +54,7 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: pnpm process:live
+      - name: 일간 리포트 생성·공개
+        run: pnpm report:daily
       - name: 저장 결과 검증
         run: pnpm verify:live
