@@ -272,11 +272,14 @@ button { color: inherit; }
 .partial-notice { display: flex; align-items: center; gap: 9px; margin-bottom: 10px; padding: 10px 13px; color: var(--warning-text); border: 1px solid #fde7ad; border-radius: 9px; background: var(--warning-bg); font-size: 13px; }
 .ranking-wrap { overflow: hidden; border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--bg-surface); box-shadow: var(--shadow-xs); }
 .ranking-table { width: 100%; border-collapse: collapse; }
-.ranking-table th { position: static; height: 44px; padding: 0 13px; border-bottom: 1px solid var(--border-default); color: var(--text-secondary); background: var(--bg-surface-subtle); font-size: 12px; font-weight: 650; text-align: left; letter-spacing: .02em; }
-.ranking-table td { height: 68px; padding: 0 13px; border-bottom: 1px solid var(--border-default); vertical-align: middle; }
+.ranking-table th { position: static; height: 44px; padding: 0 13px; border-bottom: 1px solid var(--border-default); color: var(--text-secondary); background: var(--bg-surface-subtle); font-size: 12px; font-weight: 650; text-align: center; white-space: nowrap; letter-spacing: .02em; }
+.ranking-table td { height: 68px; padding: 0 13px; border-bottom: 1px solid var(--border-default); vertical-align: middle; text-align: center; }
+/* 서비스명 열은 좌측 정렬 유지(가독성). 나머지는 헤더와 데이터를 가운데로 통일. */
+.ranking-table th:nth-child(2), .ranking-table td:nth-child(2) { text-align: left; }
+.ranking-table .source-pills, .ranking-table .row-actions { justify-content: center; }
 .ranking-table tr:last-child td { border-bottom: 0; }
 .ranking-table tbody tr:hover { background: var(--bg-surface-hover); }
-.numeric { text-align: right !important; font-variant-numeric: tabular-nums; }
+.numeric { text-align: center !important; font-variant-numeric: tabular-nums; }
 .rank-cell strong { display: block; font-size: 16px; font-variant-numeric: tabular-nums; }.rank-cell span { font-size: 11px; }
 .positive { color: var(--status-rising); font-weight: 650; }.negative { color: var(--status-falling); }
 .table-service { display: flex; align-items: center; min-width: 155px; }
