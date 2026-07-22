@@ -94,6 +94,34 @@ export async function updateCandidate(formData: FormData) {
   revalidatePath("/admin/review");
 }
 
+export async function dismissStaleCandidates() {
+  const { role } = await getCurrentUserRole();
+  if (role !== "admin") throw new Error("관리자 권한이 필요합니다.");
+
+  const supabase = createAdminClient();
+  // 48시간 넘게 review 상태로 남아있고 한 번도 분석되지 않은 후보 = 현재 수집 근거가 없어
+  // 자동 분석·승인이 불가능한 잔여 후보. 이를 private로 정리한다(재수집되면 다시 살아난다).
+  const cutoff = new Date(Date.now() - 48 * 3_600_000).toISOString();
+  const [{ data: reviewRows, error: reviewError }, { data: analysisRows, error: analysisError }] = await Promise.all([
+    supabase.from("entities").select("id").eq("visibility", "review").lt("last_detected_at", cutoff),
+    supabase.from("ai_analyses").select("entity_id"),
+  ]);
+  if (reviewError) throw new Error(`후보 조회 실패: ${reviewError.message}`);
+  if (analysisError) throw new Error(`분석 조회 실패: ${analysisError.message}`);
+
+  const analyzed = new Set((analysisRows ?? []).map((row) => row.entity_id));
+  const staleIds = (reviewRows ?? []).map((row) => row.id).filter((id) => !analyzed.has(id));
+  if (staleIds.length > 0) {
+    const { error } = await supabase
+      .from("entities")
+      .update({ visibility: "private", updated_at: new Date().toISOString() })
+      .in("id", staleIds)
+      .eq("visibility", "review");
+    if (error) throw new Error(`정리 실패: ${error.message}`);
+  }
+  revalidatePath("/admin/review");
+}
+
 export async function requestReanalysis(formData: FormData) {
   const entityId = entityIdSchema.parse(formData.get("entityId"));
   const { role } = await getCurrentUserRole();
