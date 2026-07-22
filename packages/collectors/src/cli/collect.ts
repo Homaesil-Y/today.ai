@@ -2,6 +2,7 @@ import type { CollectorResult, SourceCode } from "@ai-trend-radar/types";
 import { loadWorkspaceEnvironment } from "../environment";
 import { GitHubCollector } from "../github";
 import { HackerNewsCollector } from "../hacker-news";
+import { ProductHuntCollector } from "../product-hunt";
 import { SupabaseCollectorStore } from "../supabase-store";
 
 const env = loadWorkspaceEnvironment();
@@ -27,6 +28,15 @@ const jobs: Array<{
     collect: () => new HackerNewsCollector().collect({
       ...(env.HN_SEARCH_QUERY ? { query: env.HN_SEARCH_QUERY } : {}),
       hitsPerPage: 50,
+    }, { now: new Date(), mode }),
+  },
+  {
+    source: "product_hunt",
+    collect: () => new ProductHuntCollector().collect({
+      ...(env.PRODUCT_HUNT_TOKEN ? { token: env.PRODUCT_HUNT_TOKEN } : {}),
+      first: 20,
+      maxPages: 3,
+      postedAfterDays: 7,
     }, { now: new Date(), mode }),
   },
 ];

@@ -7,7 +7,7 @@
 | PROD-001 | 목표 | 6개 채널에서 신규 AI 서비스를 탐지하고 한국어 트렌드 인텔리전스 제공 | DEV 1, 41 | 전 프로젝트 | P0 | IN_PROGRESS | 최초 동작 골격 완료 |
 | PROD-002 | 가치 | 발견·검증·설명·활용·추적 가치 제공 | DEV 1.2 | UI, 분석·리포트 파이프라인 | P0 | IN_PROGRESS | 설명 UI 우선 구현 |
 | PROD-003 | 사용자 | PM·개발자·마케터·창업자·리서처·일반 사용자 지원 | DEV 1.3 | 정보 구조 및 콘텐츠 | P1 | IN_PROGRESS | 공개 화면 기준 |
-| DATA-001 | 채널 | Product Hunt 핵심 수집 | DEV 2, 3.1, 36 | `packages/collectors` 예정 | P0 | NOT_STARTED | 토큰 필요 |
+| DATA-001 | 채널 | Product Hunt 핵심 수집 | DEV 2, 3.1, 36 | `packages/collectors/src/product-hunt.ts`, `packages/pipeline/src/candidate.ts` | P0 | ADAPTER_READY | GraphQL v2 어댑터·pagination·rate-limit·fixture·후보 변환·파이프라인 수용까지 구현. 실 live 호출은 `PRODUCT_HUNT_TOKEN` 발급 후 활성화(미설정 시 blocked) |
 | DATA-002 | 채널 | GitHub 저장소·메트릭·스냅샷 입력 수집 | DEV 3.2 | `packages/collectors/src/github.ts` | P0 | DONE | live/fixture, Zod 검증 |
 | DATA-003 | 채널 | Hacker News 글·점수·댓글 수집 | DEV 3.3 | `packages/collectors/src/hacker-news.ts` | P0 | DONE | live/fixture, Zod 검증 |
 | DATA-004 | 채널 | Reddit 대상 subreddit·게시물·댓글 수집 | DEV 3.4 | collector adapter 예정 | P0 | NOT_STARTED | OAuth/정책 확인 필요 |
