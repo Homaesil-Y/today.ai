@@ -39,13 +39,13 @@
 - 파일: `packages/scoring`, 향후 `packages/utils`, `packages/llm`, worker jobs, `docs/scoring.md`, `docs/prompts.md`.
 - 테스트: URL edge cases, 동일 entity fixture, false merge, score golden cases, same input reproducibility, LLM hallucination/schema rejection.
 - 완료 조건: 교차 채널 entity와 시간대별 변화가 재현 가능하게 계산되고 근거 없는 LLM 출력은 저장되지 않음.
-- AI 분석 대기열(2026-07-22): 매시간 실행당 최대 50건 순차 분석. 우선순위는 (1) 한 번도 분석되지 않은 후보 → (2) 24시간이 지난 재분석 대상 순이며, 관리자가 보류(private)한 후보는 제외한다. 결과 JSON에 `analysisQueue`(unanalyzed/stale/selected/remaining)와 `lastRateLimitAt`을 기록한다. 근거: 점수순 정렬만으로는 오래된 public 재분석이 미분석 review 후보를 밀어낼 수 있었다.
+- AI 분석 대기열(2026-07-22): 3시간마다 실행당 최대 50건 순차 분석(private 저장소 무료 Actions 분 절약). 우선순위는 (1) 한 번도 분석되지 않은 후보 → (2) 24시간이 지난 재분석 대상 순이며, 관리자가 보류(private)한 후보는 제외한다. 결과 JSON에 `analysisQueue`(unanalyzed/stale/selected/remaining)와 `lastRateLimitAt`을 기록한다. 근거: 점수순 정렬만으로는 오래된 public 재분석이 미분석 review 후보를 밀어낼 수 있었다.
 - 외부 의존성: Gemini API 또는 대체 provider.
 - 위험: 동명이인 오병합, 신규 서비스 cold start, 조작된 소셜 신호, 비용 급증.
 
 ## Phase 4. 사용자 화면
 
-- 현재 상태(2026-07-22): 공개 TOP10·탐색·상세, 실제 통합 검색, 기간·카테고리·채널·신뢰도 필터와 정렬, 카테고리 허브, SEO/GEO/AEO 메타데이터, JSON-LD, 동적 OG, sitemap, robots, llms.txt, 방법론 페이지까지 구현. Gemini 분석은 매시간 실행당 최대 50건을 시도하고 무료 할당량 도달 시 안전하게 중단한 뒤 다음 시간에 재개한다. 실제 다중 시계열 차트는 후속.
+- 현재 상태(2026-07-22): 공개 TOP10·탐색·상세, 실제 통합 검색, 기간·카테고리·채널·신뢰도 필터와 정렬, 카테고리 허브, SEO/GEO/AEO 메타데이터, JSON-LD, 동적 OG, sitemap, robots, llms.txt, 방법론 페이지까지 구현. Gemini 분석은 3시간마다 실행당 최대 50건을 시도하고 무료 할당량 도달 시 안전하게 중단한 뒤 다음 주기에 재개한다. 실제 다중 시계열 차트는 후속.
 
 - 작업: App Shell, 오늘의 레이더, TOP3/TOP10, 탐색/필터, 카테고리, 상세, 검색, 실제 chart, 모든 데이터 상태, SEO/OG.
 - 선행 조건: stable query/API contract, fixture와 live data의 동일 shape.

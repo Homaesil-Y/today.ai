@@ -1,9 +1,11 @@
-name: hourly Gemini analysis retry
+name: periodic Gemini analysis retry
 
 on:
   schedule:
-    # 매시간 남은 미분석 후보를 다시 시도합니다. (UTC)
-    - cron: "47 * * * *"
+    # 남은 미분석 후보를 3시간마다 다시 시도합니다. (UTC)
+    # private 저장소의 무료 GitHub Actions 분을 아끼기 위해 매시간 대신 3시간 주기로 실행합니다.
+    # 실행당 최대 50건(Gemini 무료 한도 도달 시 중단)을 처리하므로 하루 8회로도 대기열을 충분히 소진합니다.
+    - cron: "47 */3 * * *"
   workflow_dispatch:
 
 permissions:
