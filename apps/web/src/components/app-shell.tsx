@@ -1,36 +1,13 @@
-import {
-  Bell,
-  Bookmark,
-  ChartNoAxesCombined,
-  ChevronRight,
-  Compass,
-  FileText,
-  Gauge,
-  GitCompareArrows,
-  LayoutDashboard,
-  Search,
-  Settings,
-  Shapes,
-  ShieldCheck,
-  Sparkles,
-} from "lucide-react";
+import { Bell, Search, Sparkles } from "lucide-react";
 import Link from "next/link";
-import type { Route } from "next";
 import type { ReactNode } from "react";
 import { getCurrentUserRole } from "@/lib/auth";
+import { MobileNavLinks, SidebarNavLinks } from "./app-nav";
 import { AuthControl } from "./auth-control";
-
-const nav = [
-  { label: "오늘의 레이더", href: "/", icon: LayoutDashboard },
-  { label: "트렌드 탐색", href: "/explore", icon: Compass },
-  { label: "카테고리", href: "/categories", icon: Shapes },
-  { label: "서비스 비교", href: "/compare", icon: GitCompareArrows },
-  { label: "관심 목록", href: "/watchlist", icon: Bookmark },
-  { label: "리포트", href: "/reports", icon: FileText },
-] as const;
 
 export async function AppShell({ children }: { children: ReactNode }) {
   const { role } = await getCurrentUserRole();
+  const isAdmin = role === "admin";
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -52,31 +29,12 @@ export async function AppShell({ children }: { children: ReactNode }) {
       </header>
 
       <aside className="sidebar" aria-label="주요 탐색">
-        <nav>
-          {nav.map(({ label, href, icon: Icon }, index) => (
-            <Link key={href} className={`nav-link ${index === 0 ? "active" : ""}`} href={href}>
-              <Icon size={19} aria-hidden="true" /><span>{label}</span>{index === 0 && <ChevronRight className="nav-arrow" size={16} />}
-            </Link>
-          ))}
-        </nav>
-        <div className="sidebar-foot">
-          {role === "admin" && <Link className="nav-link" href={"/admin/review" as Route}><ShieldCheck size={19} /><span>후보 검토</span></Link>}
-          {role === "admin" && <Link className="nav-link" href={"/admin/ops" as Route}><Gauge size={19} /><span>운영 현황</span></Link>}
-          <Link className="nav-link" href="/settings"><Settings size={19} /><span>설정</span></Link>
-          <div className="data-status"><span className="status-dot" />Supabase 연동 정상<small>GitHub · Hacker News · Product Hunt · Reddit</small></div>
-        </div>
+        <SidebarNavLinks isAdmin={isAdmin} />
       </aside>
 
       <main className="main-content">{children}</main>
 
-      <nav className="mobile-nav" aria-label="모바일 주요 탐색">
-        {nav.slice(0, 4).map(({ label, href, icon: Icon }, index) => (
-          <Link key={href} href={href} className={index === 0 ? "active" : ""}><Icon size={20} /><span>{label.replace("오늘의 ", "")}</span></Link>
-        ))}
-        {role === "admin"
-          ? <Link href={"/admin/review" as Route}><ShieldCheck size={20} /><span>후보 검토</span></Link>
-          : <Link href="/settings"><ChartNoAxesCombined size={20} /><span>더보기</span></Link>}
-      </nav>
+      <MobileNavLinks isAdmin={isAdmin} />
     </div>
   );
 }
