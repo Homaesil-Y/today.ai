@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   title: "서비스 비교",
   description: "관심 있는 AI 서비스를 최대 4개까지 나란히 비교하세요. 트렌드 점수·신뢰도·강점·약점·국내 활용 기회를 한눈에 확인합니다.",
   alternates: { canonical: "/compare" },
-  openGraph: { title: "AI 서비스 비교 | 오늘의 AI", description: "AI 서비스를 최대 4개까지 나란히 비교합니다.", url: "/compare", type: "website" },
+  openGraph: { title: "AI 서비스 비교 | 오늘의AI", description: "AI 서비스를 최대 4개까지 나란히 비교합니다.", url: "/compare", type: "website" },
 };
 
 const MAX_COMPARE = 4;

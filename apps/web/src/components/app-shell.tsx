@@ -11,10 +11,10 @@ export async function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <Link className="brand" href="/" aria-label="오늘의 AI 홈">
+        <Link className="brand" href="/" aria-label="오늘의AI 홈">
           <span className="brand-mark"><Sparkles size={21} aria-hidden="true" /></span>
           <span className="brand-copy">
-            <strong>오늘의 AI</strong>
+            <strong>오늘의AI</strong>
           </span>
         </Link>
         <form className="global-search" action="/explore" role="search">

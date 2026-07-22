@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   title: "AI 서비스 트렌드 탐색",
   description: "검토를 통과한 최신 AI 서비스를 트렌드 점수, 신뢰도, 카테고리와 수집 채널 기준으로 탐색하세요.",
   alternates: { canonical: "/explore" },
-  openGraph: { title: "AI 서비스 트렌드 탐색 | 오늘의 AI", description: "최근 확산 속도가 빠른 AI 서비스를 한눈에 살펴보세요.", url: "/explore" },
+  openGraph: { title: "AI 서비스 트렌드 탐색 | 오늘의AI", description: "최근 확산 속도가 빠른 AI 서비스를 한눈에 살펴보세요.", url: "/explore" },
 };
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;

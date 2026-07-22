@@ -62,7 +62,7 @@ const contentJson = {
   topServices: ranked,
 };
 
-const title = `${reportDate} 오늘의 AI 트렌드 리포트`;
+const title = `${reportDate} 오늘의AI 트렌드 리포트`;
 const summary = totalPublic > 0
   ? `공개된 AI 서비스 ${totalPublic}개 중 트렌드 점수 상위 ${ranked.length}개를 정리했습니다.`
   : "아직 공개된 AI 서비스가 없습니다.";

@@ -3,10 +3,10 @@ import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "이용약관",
-  description: "오늘의 AI 서비스 이용 조건, 계정, 콘텐츠의 성격과 책임의 한계를 설명합니다.",
+  description: "오늘의AI 서비스 이용 조건, 계정, 콘텐츠의 성격과 책임의 한계를 설명합니다.",
   alternates: { canonical: "/terms" },
   openGraph: {
-    title: "이용약관 | 오늘의 AI",
+    title: "이용약관 | 오늘의AI",
     description: "서비스 이용 조건, 계정, 콘텐츠 성격과 책임의 한계를 안내합니다.",
     url: "/terms",
     type: "article",
@@ -27,7 +27,7 @@ export default function TermsPage() {
 
       <section className="content-lead">
         <p>
-          본 약관은 오늘의 AI(이하 &ldquo;서비스&rdquo;)의 이용 조건을 정합니다. 서비스에 로그인하거나 서비스를
+          본 약관은 오늘의AI(이하 &ldquo;서비스&rdquo;)의 이용 조건을 정합니다. 서비스에 로그인하거나 서비스를
           이용하면 본 약관에 동의한 것으로 봅니다.
         </p>
       </section>

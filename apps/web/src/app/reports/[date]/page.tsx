@@ -23,9 +23,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!report) return { title: "리포트를 찾을 수 없습니다", robots: { index: false, follow: false } };
   return {
     title: report.title,
-    description: report.summary ?? "오늘의 AI 트렌드 리포트",
+    description: report.summary ?? "오늘의AI 트렌드 리포트",
     alternates: { canonical: `/reports/${date}` },
-    openGraph: { title: `${report.title} | 오늘의 AI`, description: report.summary ?? "", url: `/reports/${date}`, type: "article" },
+    openGraph: { title: `${report.title} | 오늘의AI`, description: report.summary ?? "", url: `/reports/${date}`, type: "article" },
   };
 }
 

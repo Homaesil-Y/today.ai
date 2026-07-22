@@ -1,7 +1,7 @@
 import { siteConfig } from "@/lib/site";
 
 export function GET() {
-  const text = `# 오늘의 AI
+  const text = `# 오늘의AI
 
 > GitHub과 Hacker News에서 감지한 공개 신호를 분석해 지금 주목받는 AI 서비스를 한국어로 설명하는 트렌드 인텔리전스 서비스입니다.
 

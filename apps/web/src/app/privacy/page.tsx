@@ -3,10 +3,10 @@ import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "개인정보처리방침",
-  description: "오늘의 AI가 수집하는 개인정보 항목, 이용 목적, 보관 기간, 처리 위탁과 이용자의 권리를 설명합니다.",
+  description: "오늘의AI가 수집하는 개인정보 항목, 이용 목적, 보관 기간, 처리 위탁과 이용자의 권리를 설명합니다.",
   alternates: { canonical: "/privacy" },
   openGraph: {
-    title: "개인정보처리방침 | 오늘의 AI",
+    title: "개인정보처리방침 | 오늘의AI",
     description: "수집 항목, 이용 목적, 보관 기간, 위탁 업체와 이용자 권리를 투명하게 공개합니다.",
     url: "/privacy",
     type: "article",
@@ -27,7 +27,7 @@ export default function PrivacyPage() {
 
       <section className="content-lead">
         <p>
-          오늘의 AI(이하 &ldquo;서비스&rdquo;)는 이용자의 개인정보를 중요하게 생각하며, 서비스 제공에 필요한
+          오늘의AI(이하 &ldquo;서비스&rdquo;)는 이용자의 개인정보를 중요하게 생각하며, 서비스 제공에 필요한
           최소한의 정보만 수집합니다. 본 방침은 어떤 정보를 어떤 목적으로 처리하고 얼마나 보관하는지,
           그리고 이용자가 어떤 권리를 행사할 수 있는지 설명합니다.
         </p>

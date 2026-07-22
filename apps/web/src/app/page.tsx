@@ -10,13 +10,13 @@ import { absoluteUrl, siteConfig } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
-  title: { absolute: "오늘의 AI · 오늘 뜨는 AI 서비스 트렌드" },
+  title: { absolute: "오늘의AI · 오늘 뜨는 AI 서비스 트렌드" },
   description: siteConfig.description,
   alternates: { canonical: "/" },
 };
 
 const faqItems = [
-  { question: "오늘의 AI는 어떤 서비스인가요?", answer: "GitHub과 Hacker News의 공개 신호를 수집하고 최근 확산 속도를 분석해 주목할 AI 서비스를 한국어로 설명하는 트렌드 인텔리전스 서비스입니다." },
+  { question: "오늘의AI는 어떤 서비스인가요?", answer: "GitHub과 Hacker News의 공개 신호를 수집하고 최근 확산 속도를 분석해 주목할 AI 서비스를 한국어로 설명하는 트렌드 인텔리전스 서비스입니다." },
   { question: "AI 서비스 순위는 어떻게 정하나요?", answer: "단순 누적 인기보다 최근 반응 증가 속도, 신규성, 제품 성장, 교차 출처 신호를 코드 기반 Trend Score로 계산합니다." },
   { question: "AI가 작성한 분석을 그대로 믿어도 되나요?", answer: "AI 분석은 수집된 근거를 요약한 참고 정보입니다. 가격, 라이선스, 출시일 같은 사실은 연결된 공식 사이트와 원문에서 다시 확인해야 합니다." },
 ] as const;
@@ -45,7 +45,7 @@ export default async function DashboardPage() {
   const collectionData = {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
-    name: "오늘의 AI 트렌드",
+    name: "오늘의AI 트렌드",
     description: siteConfig.description,
     url: siteConfig.url,
     inLanguage: siteConfig.language,
@@ -62,7 +62,7 @@ export default async function DashboardPage() {
     <div className="page">
       <StructuredData data={[collectionData, faqData]} />
       <section className="page-heading">
-        <div><h1>오늘의 AI 트렌드</h1><p>GitHub·Hacker News·Product Hunt에서 감지하고 검토를 통과한 AI 서비스입니다.</p></div>
+        <div><h1>오늘의AI 트렌드</h1><p>GitHub·Hacker News·Product Hunt에서 감지하고 검토를 통과한 AI 서비스입니다.</p></div>
         <div className="freshness"><span className="status-dot" />데이터 업데이트 완료<small>{updatedLabel ? `${updatedLabel} 기준 · 연동 정상` : "공개 데이터 승인 대기"}</small></div>
       </section>
 
@@ -82,7 +82,7 @@ export default async function DashboardPage() {
       </section>
 
       <section className="section-block answer-section" aria-labelledby="answer-heading">
-        <div className="section-heading"><div><h2 id="answer-heading">오늘의 AI, 이렇게 읽으세요</h2></div><Link href="/methodology">분석 방법론 전체 보기</Link></div>
+        <div className="section-heading"><div><h2 id="answer-heading">오늘의AI, 이렇게 읽으세요</h2></div><Link href="/methodology">분석 방법론 전체 보기</Link></div>
         <div className="answer-grid">{faqItems.map(({ question, answer }) => <article className="panel" key={question}><h3>{question}</h3><p>{answer}</p></article>)}</div>
       </section>
     </div>

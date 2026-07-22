@@ -167,12 +167,12 @@ function buildHtml(email: string) {
     </tr>`).join("");
   return `<!doctype html><html lang="ko"><body style="margin:0;background:#f5f6f8;padding:24px;font-family:-apple-system,'Segoe UI',sans-serif;">
     <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:14px;padding:28px;">
-      <p style="margin:0 0 4px;color:#6d5dfb;font-weight:700;">오늘의 AI</p>
+      <p style="margin:0 0 4px;color:#6d5dfb;font-weight:700;">오늘의AI</p>
       <h1 style="margin:0 0 6px;font-size:20px;">${escapeHtml(activeReport.title)}</h1>
       <p style="margin:0 0 18px;color:#667085;font-size:14px;">${escapeHtml(activeReport.summary ?? "")}</p>
       <table style="width:100%;border-collapse:collapse;font-size:14px;">${rows}</table>
       <a href="${appUrl}/reports/${reportDate}" style="display:inline-block;margin-top:20px;padding:10px 16px;background:#6d5dfb;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;">전체 리포트 보기</a>
-      <p style="margin:22px 0 0;color:#98a2b3;font-size:12px;">이 메일은 오늘의 AI 알림 설정에서 수신 동의하신 분께 발송됩니다. 설정에서 언제든 변경할 수 있습니다.</p>
+      <p style="margin:22px 0 0;color:#98a2b3;font-size:12px;">이 메일은 오늘의AI 알림 설정에서 수신 동의하신 분께 발송됩니다. 설정에서 언제든 변경할 수 있습니다.</p>
     </div></body></html>`;
 }
 
