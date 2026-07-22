@@ -6,12 +6,13 @@ import { getPublishedTrends } from "@/data/live-trends";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const trends = (await getPublishedTrends()).slice(0, 10);
+  const allTrends = await getPublishedTrends();
+  const trends = allTrends.slice(0, 10);
   const kpis = [
-    { label: "공개된 AI 서비스", value: trends.length, delta: "실시간", icon: Radio, tone: "cyan" },
-    { label: "상승 중인 서비스", value: trends.filter(({ status }) => ["RISING", "SURGING", "PEAK"].includes(status)).length, delta: "승인 기준", icon: Activity, tone: "orange" },
-    { label: "교차 채널 확산", value: trends.filter(({ sources }) => sources.length > 1).length, delta: "2개+ 채널", icon: GitFork, tone: "violet" },
-    { label: "오픈소스", value: trends.filter(({ isOpenSource }) => isOpenSource).length, delta: "GitHub 기준", icon: Boxes, tone: "blue" },
+    { label: "공개된 AI 서비스", value: allTrends.length, delta: "실시간", icon: Radio, tone: "cyan" },
+    { label: "상승 중인 서비스", value: allTrends.filter(({ status }) => ["RISING", "SURGING", "PEAK"].includes(status)).length, delta: "승인 기준", icon: Activity, tone: "orange" },
+    { label: "교차 채널 확산", value: allTrends.filter(({ sources }) => sources.length > 1).length, delta: "2개+ 채널", icon: GitFork, tone: "violet" },
+    { label: "오픈소스", value: allTrends.filter(({ isOpenSource }) => isOpenSource).length, delta: "GitHub 기준", icon: Boxes, tone: "blue" },
   ] as const;
   const updatedAt = trends[0]?.updatedAt ? new Date(trends[0].updatedAt) : null;
   const updatedLabel = updatedAt
