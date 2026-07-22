@@ -62,8 +62,8 @@ export default async function DashboardPage() {
     <div className="page">
       <StructuredData data={[collectionData, faqData]} />
       <section className="page-heading">
-        <div><h1>오늘의 AI 트렌드</h1><p>GitHub과 Hacker News에서 감지하고 검토를 통과한 AI 서비스입니다.</p></div>
-        <div className="freshness"><span className="status-dot" />데이터 업데이트 완료<small>{updatedLabel ? `데이터 기준 · ${updatedLabel}` : "공개 데이터 승인 대기"}</small></div>
+        <div><h1>오늘의 AI 트렌드</h1><p>GitHub·Hacker News·Product Hunt에서 감지하고 검토를 통과한 AI 서비스입니다.</p></div>
+        <div className="freshness"><span className="status-dot" />데이터 업데이트 완료<small>{updatedLabel ? `${updatedLabel} 기준 · 연동 정상` : "공개 데이터 승인 대기"}</small></div>
       </section>
 
       <section className="kpi-grid" aria-label="오늘의 핵심 지표">
