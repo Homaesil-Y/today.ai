@@ -86,7 +86,7 @@
 | SEC-003 | 개인정보 | 정책·약관·탈퇴·삭제·보관 정책 | DEV 34 | `/privacy`, `/terms`, `/settings`(회원 탈퇴) | P1 | IN_PROGRESS | 개인정보처리방침·이용약관 페이지, 자체 회원 탈퇴(auth 삭제→cascade로 전 개인데이터 삭제) 구현·sitemap 등록. 세부 문구 법률 검토 후속 |
 | OPS-001 | 운영 | 정기 수집·처리, 주기적 AI 분석 재시도, 공개·메일 | DEV 30 | `.github/workflows/scheduled-pipeline.yml`, `.github/workflows/hourly-analysis.yml` | P1 | IN_PROGRESS | 6시간마다 수집·점수 계산, 3시간마다 남은 후보 분석·자동 승인(무료 Actions 분·Gemini 한도 절약). 메일·운영 worker 후속 |
 | OPS-002 | 운영 | Vercel web, Supabase, 장기 worker 분리 | DEV 27 | Vercel·Supabase·GitHub Actions | P1 | IN_PROGRESS | 웹·DB 운영 연결 완료, 장기 worker 분리 후속 |
-| OPS-003 | 이메일 | Resend 데일리 리포트·기본 08:00 사용자 시간대 | DEV 20~21 | `report.ts`(생성 완료), Resend provider 예정 | P1 | BLOCKED | 일간 리포트 생성·공개는 완료. 실제 이메일 발송만 `RESEND_API_KEY`·발신 도메인 필요 |
+| OPS-003 | 이메일 | Resend 데일리 리포트·기본 08:00 사용자 시간대 | DEV 20~21 | `report.ts`, `notify.ts`, `daily-email.yml` | P1 | ADAPTER_READY | 리포트 생성·공개·Resend 발송 코드 완료(구독자 조회·중복 방지·retry·notifications 기록). 매일 08:00 KST 워크플로. `RESEND_API_KEY`·발신 도메인 미설정 시 실패 없이 blocked 처리 |
 | QA-001 | 품질 | strict TypeScript, 외부·LLM Zod 검증, any 최소화 | 요청문, DEV 39 | tsconfig, collectors | P0 | DONE | exact optional 사용 |
 | QA-002 | 품질 | build·typecheck·lint·unit test 통과 | 요청문, UI 24 | root scripts/CI | P0 | DONE | production build 포함 통과 |
 | QA-003 | 테스트 | 점수·URL·통합·권한 우선 테스트 | 요청문 | scoring/collector/pipeline tests, `navigation.test.ts` | P0 | IN_PROGRESS | 점수·수집기·대기열·오픈 리다이렉트 방지 단위 테스트, RLS 권한 매트릭스 실검증(anon: 공개/리포트만, review·프로필·관심목록 차단 7/7). 통합 테스트 후속 |
