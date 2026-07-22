@@ -1,0 +1,40 @@
+name: daily report email
+
+on:
+  schedule:
+    # 매일 한국 시간 08:00(UTC 23:00)에 일간 리포트를 갱신하고 구독자에게 발송합니다.
+    - cron: "0 23 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scheduled-trend-pipeline
+  cancel-in-progress: false
+
+jobs:
+  send-daily-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      APP_TIMEZONE: Asia/Seoul
+      NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: 일간 리포트 갱신
+        run: pnpm report:daily
+      - name: 구독자 이메일 발송 (자격증명 없으면 blocked)
+        run: pnpm report:send
