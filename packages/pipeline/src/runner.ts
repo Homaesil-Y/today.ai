@@ -21,7 +21,9 @@ export function toEvidenceExcerpt(body: string | null, fallback: string) {
 }
 
 function toEvidence(group: ProcessedGroup, now: Date): TrendEvidence {
-  const officialFacts = [...new Set(group.candidates.flatMap((candidate) => candidate.officialFacts))];
+  // 스키마 상한(<=20)에 맞춰 자른다. mention이 많은 엔티티는 dedup 후에도 20개를 넘을 수 있어
+  // 자르지 않으면 분석 입력 검증이 매번 실패해 해당 후보가 영영 분석되지 않는다.
+  const officialFacts = [...new Set(group.candidates.flatMap((candidate) => candidate.officialFacts))].slice(0, 20);
   return {
     name: group.entity.name,
     category: group.candidates[0]?.categorySlug ?? "other",
