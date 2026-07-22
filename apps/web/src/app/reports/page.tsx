@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 function formatDate(value: string) {
   const date = new Date(`${value}T00:00:00+09:00`);
   if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("ko-KR", { year: "numeric", month: "long", day: "numeric", weekday: "short" }).format(date);
+  return new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", year: "numeric", month: "long", day: "numeric", weekday: "short" }).format(date);
 }
 
 export default async function ReportsPage() {

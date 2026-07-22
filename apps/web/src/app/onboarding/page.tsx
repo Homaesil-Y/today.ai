@@ -1,14 +1,14 @@
 import { ArrowRight, Bell, Sparkles } from "lucide-react";
 import type { Metadata, Route } from "next";
 import { redirect } from "next/navigation";
+import { safeNextPath } from "@/lib/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { completeOnboarding } from "@/app/settings/actions";
 
 export const metadata: Metadata = { title: "관심 분야 설정", robots: { index: false, follow: false } };
 
 export default async function OnboardingPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
-  const requestedNext = (await searchParams).next ?? "/";
-  const nextPath = requestedNext.startsWith("/") && !requestedNext.startsWith("//") ? requestedNext : "/";
+  const nextPath = safeNextPath((await searchParams).next);
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect(`/login?next=${encodeURIComponent(`/onboarding?next=${nextPath}`)}` as Route);
