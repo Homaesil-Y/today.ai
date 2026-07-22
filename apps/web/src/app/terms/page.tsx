@@ -3,7 +3,7 @@ import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "이용약관",
-  description: "오늘의AI 서비스 이용 조건, 계정, 콘텐츠의 성격과 책임의 한계를 설명합니다.",
+  description: "오늘의 AI 서비스 이용 조건, 계정, 콘텐츠의 성격과 책임의 한계를 설명합니다.",
   alternates: { canonical: "/terms" },
   openGraph: {
     title: "이용약관 | 오늘의AI",

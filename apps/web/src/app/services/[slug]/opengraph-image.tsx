@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 import { getPublishedTrend } from "@/data/live-trends";
 
-export const alt = "오늘의AI 서비스 트렌드 분석";
+export const alt = "오늘의 AI 서비스 트렌드 분석";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
