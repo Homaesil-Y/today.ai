@@ -39,11 +39,11 @@ export async function AppShell({ children }: { children: ReactNode }) {
             <strong>오늘의 AI</strong>
           </span>
         </Link>
-        <label className="global-search">
-          <Search size={18} aria-hidden="true" />
-          <span className="sr-only">서비스 통합 검색</span>
-          <input type="search" placeholder="서비스, 카테고리, 리포트 검색" />
-        </label>
+        <form className="global-search" action="/explore" role="search">
+          <button type="submit" aria-label="검색"><Search size={18} aria-hidden="true" /></button>
+          <label className="sr-only" htmlFor="global-search-input">서비스 통합 검색</label>
+          <input id="global-search-input" name="q" type="search" placeholder="서비스, 카테고리 검색" />
+        </form>
         <div className="header-actions">
           <button className="icon-button" type="button" aria-label="알림 열기"><Bell size={19} /></button>
           <AuthControl />

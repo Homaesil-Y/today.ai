@@ -2,7 +2,7 @@
 
 Product Hunt, GitHub, Hacker News, Reddit, Threads의 신규 AI 서비스를 통합하고 Instagram의 대중 확산 신호를 보조적으로 확인해 “오늘 뜨는 AI 서비스”를 설명하는 트렌드 인텔리전스 플랫폼입니다.
 
-현재 GitHub·Hacker News 실데이터 수집, Trend Score 계산, Gemini 한국어 분석, Supabase 저장, Google 로그인, 관리자 승인·공개, 공개 TOP 10과 서비스 상세 화면이 연결되어 있습니다. SEO·GEO·AEO 구조화 데이터와 공유 이미지, 실제 관심 목록·온보딩·개인 설정도 연결되어 있습니다. 공개 화면은 관리자가 승인한 실제 데이터만 표시합니다.
+현재 GitHub·Hacker News 실데이터 수집, Trend Score 계산, Gemini 한국어 분석, Supabase 저장, Google 로그인, 관리자 승인·공개, 공개 TOP 10과 서비스 상세 화면이 연결되어 있습니다. SEO·GEO·AEO 구조화 데이터와 공유 이미지, 실제 통합 검색·탐색 필터·카테고리, 관심 목록 폴더·메모·점수 비교·온보딩·개인 설정도 연결되어 있습니다. 공개 화면은 관리자가 승인한 실제 데이터만 표시합니다.
 
 ## 요구 환경
 
@@ -59,7 +59,7 @@ supabase/migrations      PostgreSQL/RLS 초안
 docs                     요구사항 추적·분석·로드맵·운영 설정
 ```
 
-다음 단계는 독립 worker 배포, Product Hunt/Reddit/Threads/Instagram adapter, 관심 목록 폴더·메모 고도화, 데일리 이메일입니다. 사용 불가능한 외부 연동은 fixture로 감추지 않고 추적표에서 `BLOCKED` 또는 `NOT_STARTED`로 표시합니다.
+다음 단계는 독립 worker 배포, Product Hunt/Reddit/Threads/Instagram adapter, 데일리 리포트·이메일, 계정 탈퇴와 개인정보 화면입니다. 사용 불가능한 외부 연동은 fixture로 감추지 않고 추적표에서 `BLOCKED` 또는 `NOT_STARTED`로 표시합니다.
 
 ## Supabase와 Google OAuth
 
