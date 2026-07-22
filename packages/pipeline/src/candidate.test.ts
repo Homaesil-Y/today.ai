@@ -123,6 +123,56 @@ describe("candidate extraction", () => {
     expect(candidate).toMatchObject({ officialDomain: "github.com", isOpenSource: true });
   });
 
+  it("extracts an AI Product Hunt launch and rejects non-AI launches", () => {
+    const base = {
+      ...githubItem,
+      source: "product_hunt" as const,
+      title: "Agentflow",
+      raw_metrics_json: { votes: 842, comments: 96 },
+    };
+    const aiCandidate = extractEntityCandidate({
+      ...base,
+      url: "https://agentflow.ai",
+      canonical_url: "https://agentflow.ai/",
+      raw_payload_json: {
+        name: "Agentflow",
+        tagline: "Build and ship autonomous AI agents without code",
+        description: "A no-code platform to deploy autonomous AI agents.",
+        website: "https://agentflow.ai",
+        url: "https://www.producthunt.com/posts/agentflow",
+        votesCount: 842,
+        commentsCount: 96,
+        topics: { edges: [{ node: { name: "Artificial Intelligence" } }] },
+      },
+    });
+    expect(aiCandidate).toMatchObject({
+      name: "Agentflow",
+      officialDomain: "agentflow.ai",
+      source: "product_hunt",
+      matchMethod: "official_domain",
+    });
+    expect(aiCandidate?.confidence).toBe(0.9);
+
+    const nonAi = extractEntityCandidate({
+      ...base,
+      title: "DeskPlant",
+      url: "https://deskplant.co",
+      canonical_url: "https://deskplant.co/",
+      raw_metrics_json: { votes: 233, comments: 18 },
+      raw_payload_json: {
+        name: "DeskPlant",
+        tagline: "A smart planter that waters your office plants",
+        description: "Keeps your desk plants alive automatically.",
+        website: "https://deskplant.co",
+        url: "https://www.producthunt.com/posts/deskplant",
+        votesCount: 233,
+        commentsCount: 18,
+        topics: { edges: [{ node: { name: "Home" } }] },
+      },
+    });
+    expect(nonAi).toBeNull();
+  });
+
   it("creates deterministic bootstrap scores with WATCH status", () => {
     const candidate = extractEntityCandidate(githubItem);
     expect(candidate).not.toBeNull();

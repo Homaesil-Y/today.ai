@@ -5,6 +5,10 @@ import { z } from "zod";
 import type { EntityCandidate } from "./schema";
 import { databaseRawItemSchema } from "./schema";
 
+/** 파이프라인이 실제로 후보를 추출하는 채널. 새 수집기를 붙이면 여기에 추가한다. */
+export const INGESTED_SOURCES = ["github", "hacker_news", "product_hunt"] as const;
+export type IngestedSource = (typeof INGESTED_SOURCES)[number];
+
 const sourceSchema = z.object({ id: z.uuid(), code: z.string() });
 const categorySchema = z.object({ id: z.uuid(), slug: z.string() });
 const entitySchema = z.object({
@@ -84,7 +88,9 @@ export class SupabasePipelineRepository {
     if (entitiesResult.error) throw new PipelineRepositoryError(entitiesResult.error.message, "load_entities");
 
     for (const source of z.array(sourceSchema).parse(sourcesResult.data ?? [])) {
-      if (source.code === "github" || source.code === "hacker_news") this.sourceIds.set(source.code, source.id);
+      if (INGESTED_SOURCES.includes(source.code as IngestedSource)) {
+        this.sourceIds.set(source.code as SourceCode, source.id);
+      }
     }
     for (const category of z.array(categorySchema).parse(categoriesResult.data ?? [])) {
       this.categoryIds.set(category.slug, category.id);
@@ -94,7 +100,7 @@ export class SupabasePipelineRepository {
 
   async loadRawItems() {
     const output = [];
-    for (const source of ["github", "hacker_news"] as const) {
+    for (const source of INGESTED_SOURCES) {
       const sourceId = this.sourceIds.get(source);
       if (!sourceId) throw new PipelineRepositoryError(`source seed가 없습니다: ${source}`, "load_raw_items");
       const { data, error } = await this.client

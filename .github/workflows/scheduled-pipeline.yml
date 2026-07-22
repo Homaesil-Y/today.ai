@@ -28,6 +28,7 @@ jobs:
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
       SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
       GITHUB_TOKEN: ${{ github.token }}
+      PRODUCT_HUNT_TOKEN: ${{ secrets.PRODUCT_HUNT_TOKEN }}
       GEMINI_MODEL: gemini-3.1-flash-lite
       GEMINI_ANALYSIS_LIMIT: "50"
       AUTO_APPROVE_ANALYZED: "true"
@@ -41,7 +42,7 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: GitHub·Hacker News 수집
+      - name: GitHub·Hacker News·Product Hunt 수집
         run: pnpm collect:live
       - name: 점수 계산 (AI 분석 제외)
         if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' && !inputs.run_ai }}

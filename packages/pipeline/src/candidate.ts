@@ -18,6 +18,20 @@ const githubPayloadSchema = z.object({
   license: z.object({ spdx_id: z.string().nullable() }).nullable(),
 });
 
+const productHuntPayloadSchema = z.object({
+  name: z.string(),
+  tagline: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  website: z.string().nullable().optional(),
+  url: z.string(),
+  votesCount: z.number().nonnegative(),
+  commentsCount: z.number().nonnegative(),
+  topics: z
+    .object({ edges: z.array(z.object({ node: z.object({ name: z.string() }) })) })
+    .nullable()
+    .optional(),
+});
+
 const aiTerms = /\b(ai|artificial intelligence|agentic|agent|llm|gpt|machine learning|deep learning|generative|rag|embedding|vision model|language model|claude|gemini)\b/iu;
 const nonProductTerms = /\b(awesome|course|certification|certified|practitioner|tutorial|roadmap|interview|papers?|resources?|learning notes?|study guide|cheatsheet|curated list|dataset|compendium|from scratch|solution template|taxonomy|skill cards?|benchmark|eccv|cvpr|neurips|lecture|syllabus)\b/iu;
 const productIntentTerms = /\b(show hn|launch|introducing|built|tool|platform|app|studio|agent|assistant|automation|open[ -]?source)\b/iu;
@@ -158,8 +172,51 @@ function extractHackerNewsCandidate(item: DatabaseRawItem): EntityCandidate | nu
   };
 }
 
+function extractProductHuntCandidate(item: DatabaseRawItem): EntityCandidate | null {
+  const parsed = productHuntPayloadSchema.safeParse(item.raw_payload_json);
+  if (!parsed.success) return null;
+  const post = parsed.data;
+
+  const topicNames = (post.topics?.edges ?? []).map((edge) => edge.node.name);
+  const evidenceText = [post.name, post.tagline, post.description, ...topicNames].filter(Boolean).join(" ");
+  // Product Hunt 게시물은 이미 출시된 제품이므로 제품 의도는 전제하되, AI 관련성만 필터링한다.
+  if (!aiTerms.test(evidenceText)) return null;
+
+  const canonicalUrl = safeCanonicalUrl(item.canonical_url, item.url);
+  const domain = hostname(canonicalUrl);
+  if (editorialHosts.has(domain)) return null;
+
+  const name = post.name.trim().slice(0, 120);
+  if (name.length < 2) return null;
+
+  const votes = post.votesCount;
+  return {
+    name,
+    slugBase: slugifyName(name, canonicalUrl),
+    canonicalUrl,
+    officialDomain: domain,
+    githubUrl: domain === "github.com" ? canonicalUrl : null,
+    description: post.description?.trim() || post.tagline?.trim() || null,
+    categorySlug: classifyCategory(evidenceText),
+    pricingType: "unknown",
+    isOpenSource: false,
+    firstDetectedAt: item.published_at,
+    lastDetectedAt: item.collected_at,
+    confidence: votes >= 500 ? 0.9 : votes >= 150 ? 0.82 : 0.74,
+    matchMethod: "official_domain",
+    alias: name,
+    rawItem: item,
+    source: "product_hunt",
+    metrics: item.raw_metrics_json,
+    officialFacts: [
+      `Product Hunt에 출시되어 추천 ${votes.toLocaleString("en-US")}표, 댓글 ${post.commentsCount.toLocaleString("en-US")}개를 받았습니다.`,
+    ],
+  };
+}
+
 export function extractEntityCandidate(item: DatabaseRawItem) {
   if (item.source === "github") return extractGitHubCandidate(item);
   if (item.source === "hacker_news") return extractHackerNewsCandidate(item);
+  if (item.source === "product_hunt") return extractProductHuntCandidate(item);
   return null;
 }

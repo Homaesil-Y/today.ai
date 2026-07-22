@@ -1,0 +1,79 @@
+{
+  "data": {
+    "posts": {
+      "edges": [
+        {
+          "node": {
+            "id": "612001",
+            "name": "Agentflow",
+            "tagline": "Build and ship autonomous AI agents without code",
+            "description": "Agentflow is a no-code platform to design, test, and deploy autonomous AI agents that connect to your tools and run multi-step workflows.",
+            "slug": "agentflow",
+            "url": "https://www.producthunt.com/posts/agentflow",
+            "website": "https://agentflow.ai",
+            "votesCount": 842,
+            "commentsCount": 96,
+            "createdAt": "2026-07-21T07:01:00Z",
+            "featuredAt": "2026-07-21T07:05:00Z",
+            "user": { "name": "Dana Lee" },
+            "topics": {
+              "edges": [
+                { "node": { "name": "Artificial Intelligence" } },
+                { "node": { "name": "Developer Tools" } },
+                { "node": { "name": "No-Code" } }
+              ]
+            }
+          }
+        },
+        {
+          "node": {
+            "id": "612044",
+            "name": "LumaVoice",
+            "tagline": "Real-time voice cloning API for AI assistants",
+            "description": "LumaVoice offers a low-latency speech synthesis API with expressive voice cloning for building AI voice assistants.",
+            "slug": "lumavoice",
+            "url": "https://www.producthunt.com/posts/lumavoice",
+            "website": "https://lumavoice.com",
+            "votesCount": 517,
+            "commentsCount": 54,
+            "createdAt": "2026-07-20T08:12:00Z",
+            "featuredAt": "2026-07-20T08:20:00Z",
+            "user": { "name": "Marco Reyes" },
+            "topics": {
+              "edges": [
+                { "node": { "name": "Artificial Intelligence" } },
+                { "node": { "name": "Voice" } }
+              ]
+            }
+          }
+        },
+        {
+          "node": {
+            "id": "612099",
+            "name": "DeskPlant",
+            "tagline": "A smart planter that waters your office plants",
+            "description": "DeskPlant keeps your desk plants alive with an automatic watering reservoir and a companion app.",
+            "slug": "deskplant",
+            "url": "https://www.producthunt.com/posts/deskplant",
+            "website": "https://deskplant.co",
+            "votesCount": 233,
+            "commentsCount": 18,
+            "createdAt": "2026-07-20T05:00:00Z",
+            "featuredAt": "2026-07-20T05:10:00Z",
+            "user": { "name": "Priya Nair" },
+            "topics": {
+              "edges": [
+                { "node": { "name": "Home" } },
+                { "node": { "name": "Hardware" } }
+              ]
+            }
+          }
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false,
+        "endCursor": "cursor-612099"
+      }
+    }
+  }
+}
