@@ -1,5 +1,5 @@
 import type { TrendEntity } from "@ai-trend-radar/types";
-import { ArrowUpRight, ExternalLink, TrendingUp } from "lucide-react";
+import { ArrowUpRight, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { Sparkline } from "./sparkline";
 import { StatusBadge } from "./status-badge";
@@ -31,8 +31,8 @@ export function TopSmallCard({ trend }: { trend: TrendEntity }) {
       <div className="rank-kicker"><span>{String(trend.rank).padStart(2, "0")}</span><StatusBadge status={trend.status} /></div>
       <div className="service-heading"><div><p className="eyebrow">{trend.category}</p><h3>{trend.name}</h3></div></div>
       <p className="tagline">{trend.tagline}</p>
-      <div className="mini-score"><div><span>Trend</span><strong>{trend.trendScore}</strong></div><Sparkline values={trend.sparkline} label={`${trend.name} 현재 트렌드 점수 ${trend.trendScore}`} /></div>
-      <div className="small-card-footer"><span>{trend.rankChange === 0 ? "초기 집계" : `${trend.rankChange > 0 ? "▲" : "▼"} ${Math.abs(trend.rankChange)}위`}</span><Link href={`/services/${trend.slug}`} aria-label={`${trend.name} 상세 보기`}><ExternalLink size={17} /></Link></div>
+      <div className="mini-score"><div><span>Trend Score</span><strong>{trend.trendScore}</strong><small>신뢰도 {trend.trustScore}</small></div><Sparkline values={trend.sparkline} label={`${trend.name} 현재 트렌드 점수 ${trend.trendScore}`} /></div>
+      <div className="small-card-footer"><span>{trend.rankChange === 0 ? "초기 집계" : `${trend.rankChange > 0 ? "▲" : "▼"} ${Math.abs(trend.rankChange)}위`}</span><Link className="card-detail-link" href={`/services/${trend.slug}`}>분석 보기 <ArrowUpRight size={15} aria-hidden="true" /></Link></div>
     </article>
   );
 }
