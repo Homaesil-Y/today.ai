@@ -1,3 +1,4 @@
+export * from "./category";
 export * from "./gemini";
 export * from "./news";
 export * from "./prompt";

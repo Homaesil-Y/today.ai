@@ -1,4 +1,5 @@
 import {
+  type GeminiCategoryClassifier,
   LlmProviderError,
   TREND_ANALYSIS_PROMPT_VERSION,
   type TrendAnalysisProvider,
@@ -44,6 +45,7 @@ export async function runEntityPipeline(options: {
   repository: SupabasePipelineRepository;
   now?: Date;
   analysisProvider?: TrendAnalysisProvider;
+  categoryClassifier?: GeminiCategoryClassifier;
   analysisLimit?: number;
   autoApproveAnalyzed?: boolean;
 }) {
@@ -81,6 +83,8 @@ export async function runEntityPipeline(options: {
   let lastRateLimitAt: string | null = null;
   const analysisErrors: Array<{ entity: string; error: string }> = [];
   const analysisQueue = { unanalyzed: 0, stale: 0, selected: 0, remaining: 0 };
+  // 이번 실행에서 분석에 성공한 엔티티 목록. 분석 후 한 번의 배치 호출로 카테고리를 재분류한다.
+  const analyzedForCategory: { entityId: string; name: string; description: string }[] = [];
   if (options.analysisProvider) {
     const limit = Math.max(0, options.analysisLimit ?? 50);
     const staleThreshold = now.getTime() - 24 * 3_600_000;
@@ -106,6 +110,8 @@ export async function runEntityPipeline(options: {
         const result = await options.analysisProvider.analyze(toEvidence(group, now));
         await options.repository.saveAnalysis(group.entity.id, result);
         analysesCreated += 1;
+        // 한국어 요약은 카테고리 분류에 좋은 신호라 분류 입력으로 쓴다.
+        analyzedForCategory.push({ entityId: group.entity.id, name: group.entity.name, description: result.analysis.summary });
       } catch (error) {
         analysisErrors.push({
           entity: group.entity.slug,
@@ -124,6 +130,23 @@ export async function runEntityPipeline(options: {
     analysisQueue.remaining += queue.pending.length - analysesCreated;
   }
 
+  // 분석된 엔티티들의 카테고리를 LLM으로 재분류(배치 1콜 위주). 실패해도 파이프라인은 계속 진행한다.
+  let categoriesUpdated = 0;
+  if (options.categoryClassifier && analyzedForCategory.length > 0) {
+    try {
+      const classified = await options.categoryClassifier.classify(
+        analyzedForCategory.map((item, index) => ({ index, name: item.name, description: item.description })),
+      );
+      for (const { index, categorySlug } of classified) {
+        const target = analyzedForCategory[index];
+        if (!target) continue;
+        if (await options.repository.assignCategoryBySlug(target.entityId, categorySlug)) categoriesUpdated += 1;
+      }
+    } catch (error) {
+      analysisErrors.push({ entity: "category-classify", error: error instanceof Error ? error.message : "Unknown classify failure" });
+    }
+  }
+
   const autoApproved = options.autoApproveAnalyzed === false
     ? 0
     : await options.repository.autoApproveAnalyzedCandidates();
@@ -136,6 +159,7 @@ export async function runEntityPipeline(options: {
     scoresCreated: processed.length,
     analysesCreated,
     analysesSkipped,
+    categoriesUpdated,
     analysisErrors,
     analysisStoppedReason,
     lastRateLimitAt,
