@@ -94,14 +94,21 @@ function productNameFromRedditTitle(title: string) {
 }
 
 export function classifyCategory(text: string) {
-  if (/\b(image|photo|canvas|design)\b/iu.test(text)) return "image";
+  // no-code는 "code"를 포함하므로 coding보다 먼저 검사한다(기존엔 no-code가 coding으로 오분류됐음).
+  if (/\b(no[ -]?code|low[ -]?code|website builder|app builder)\b/iu.test(text)) return "no-code";
+  if (/\b(image|photo|canvas|avatar|diffusion)\b/iu.test(text)) return "image";
   if (/\b(video|film|animation)\b/iu.test(text)) return "video";
-  if (/\b(audio|voice|music|speech)\b/iu.test(text)) return "audio-music";
-  if (/\b(rag|document|pdf|knowledge base)\b/iu.test(text)) return "document-rag";
-  if (/\b(code|coding|developer|github|mcp|cli|sdk)\b/iu.test(text)) return "coding";
-  if (/\b(no[ -]?code|website builder|app builder)\b/iu.test(text)) return "no-code";
-  if (/\b(data|analytics|sql)\b/iu.test(text)) return "data";
+  if (/\b(audio|voice|music|speech|tts|podcast)\b/iu.test(text)) return "audio-music";
+  if (/\b(rag|retrieval|embedding|document|pdf|knowledge base)\b/iu.test(text)) return "document-rag";
+  if (/\b(code|coding|developer|github|mcp|cli|sdk|ide)\b/iu.test(text)) return "coding";
+  if (/\b(data|analytics|sql|dashboard|dataset)\b/iu.test(text)) return "data";
   if (/\b(agent|agentic|assistant|automation)\b/iu.test(text)) return "ai-agents";
+  // 이하 신규 범주: 위에서 걸리지 않아 예전엔 "기타"로 떨어지던 항목만 구제하므로 기존 분류를 바꾸지 않는다.
+  if (/\b(design|figma|prototyp)\b/iu.test(text)) return "design";
+  if (/\b(marketing|seo|advertis|campaign|ad copy)\b/iu.test(text)) return "marketing";
+  if (/\b(education|learning|tutor|course|quiz)\b/iu.test(text)) return "education";
+  if (/\b(api|inference|serving|gpu|endpoint|infrastructure|gateway|self[- ]?host)\b/iu.test(text)) return "infrastructure-api";
+  if (/\b(productivity|calendar|meeting|scheduling|note[- ]?taking|email)\b/iu.test(text)) return "productivity";
   return "other";
 }
 
