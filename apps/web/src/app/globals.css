@@ -426,6 +426,18 @@ button { color: inherit; }
 .report-rank-score strong { font-size: 20px; font-weight: 760; font-variant-numeric: tabular-nums; }
 .report-rank-score small { color: var(--text-secondary); font-size: 12px; }
 
+.news-list { border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--bg-surface); box-shadow: var(--shadow-xs); overflow: hidden; }
+.news-item { display: block; padding: 18px 20px; border-bottom: 1px solid var(--border-default); }
+.news-item:last-child { border-bottom: 0; }
+.news-item:hover { background: var(--bg-surface-hover); }
+.news-title { display: inline-block; font-size: 16px; font-weight: 720; line-height: 1.4; letter-spacing: -.015em; color: var(--text-primary); }
+.news-title:hover { color: var(--brand-primary); }
+.news-summary { margin: 6px 0 9px; color: var(--text-secondary); font-size: 14px; line-height: 1.62; }
+.news-meta { display: flex; align-items: center; gap: 8px; color: var(--text-tertiary); font-size: 12.5px; }
+.news-source { font-weight: 650; color: var(--text-secondary); }
+.news-external { display: inline-flex; align-items: center; gap: 3px; margin-left: auto; color: var(--brand-primary); font-weight: 600; }
+.news-external:hover { color: var(--brand-primary-active); }
+
 .compare-add { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
 
 /* 커스텀 드롭다운(네이티브 select 팝업의 다크 플래시 회피) */
