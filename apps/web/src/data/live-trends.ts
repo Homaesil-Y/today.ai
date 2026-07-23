@@ -51,6 +51,13 @@ function inferSources(githubUrl: string | null): SourceCode[] {
   return githubUrl ? ["github"] : ["hacker_news"];
 }
 
+// 점수 이력(최신→과거)을 과거→최신 순의 스파크라인으로 만든다.
+// 스냅샷이 2개 미만이면 아직 추세가 없으므로 평평한 선(같은 값 2개)을 그린다.
+function buildSparkline(history: number[] | undefined, fallback: number): number[] {
+  if (history && history.length >= 2) return [...history].reverse().slice(-12);
+  return [fallback, fallback];
+}
+
 function latestByEntity<T extends { entity_id: string }>(rows: T[]) {
   const map = new Map<string, T>();
   for (const row of rows) if (!map.has(row.entity_id)) map.set(row.entity_id, row);
@@ -78,8 +85,17 @@ export const getPublishedTrends = cache(async (): Promise<TrendEntity[]> => {
   if (scoreError) throw new Error(`트렌드 점수 조회 실패: ${scoreError.message}`);
   if (analysisError) throw new Error(`AI 분석 조회 실패: ${analysisError.message}`);
 
-  const scores = latestByEntity(z.array(scoreSchema).parse(scoreData ?? []));
+  const parsedScores = z.array(scoreSchema).parse(scoreData ?? []);
+  const scores = latestByEntity(parsedScores);
   const analyses = latestByEntity(z.array(analysisSchema).parse(analysisData ?? []));
+
+  // 이미 조회한 점수 행(최신→과거 정렬)으로 엔티티별 이력을 만든다. 추가 쿼리 없음.
+  const scoreHistoryByEntity = new Map<string, number[]>();
+  for (const row of parsedScores) {
+    const list = scoreHistoryByEntity.get(row.entity_id) ?? [];
+    list.push(Math.round(row.total_score * 10) / 10);
+    scoreHistoryByEntity.set(row.entity_id, list);
+  }
 
   return entities
     .map((entity) => {
@@ -138,7 +154,7 @@ export const getPublishedTrends = cache(async (): Promise<TrendEntity[]> => {
         koreaOpportunity: analysis?.korea_opportunity ?? "국내 적용 가능성은 추가 분석이 필요합니다.",
         updatedAt: score?.calculated_at ?? entity.last_detected_at,
         firstDetectedAt: entity.first_detected_at,
-        sparkline: [totalScore, totalScore],
+        sparkline: buildSparkline(scoreHistoryByEntity.get(entity.id), totalScore),
       } satisfies TrendEntity;
     })
     .sort((a, b) => b.trendScore - a.trendScore)
