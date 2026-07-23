@@ -66,13 +66,13 @@ export function MobileNavLinks({ isAdmin }: { isAdmin: boolean }) {
   const moreItems: MoreItem[] = [
     { label: "관심 목록", href: "/watchlist" as Route, icon: Bookmark },
     { label: "리포트", href: "/reports" as Route, icon: FileText },
-    { label: "설정", href: "/settings" as Route, icon: Settings },
     ...(isAdmin
       ? ([
           { label: "후보 검토", href: "/admin/review" as Route, icon: ShieldCheck },
           { label: "운영 현황", href: "/admin/ops" as Route, icon: Gauge },
         ] satisfies MoreItem[])
       : []),
+    { label: "설정", href: "/settings" as Route, icon: Settings },
   ];
   const moreActive = moreItems.some(({ href }) => isActive(href));
 
