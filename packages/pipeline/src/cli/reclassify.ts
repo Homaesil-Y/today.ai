@@ -19,11 +19,12 @@ if (!url || !key) {
 
 const supabase = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 
-const catRows = z.array(z.object({ id: z.string(), slug: z.string() })).parse(
-  (await supabase.from("categories").select("id,slug").eq("enabled", true)).data ?? [],
+const catRows = z.array(z.object({ id: z.string(), slug: z.string(), name: z.string() })).parse(
+  (await supabase.from("categories").select("id,slug,name").eq("enabled", true).order("sort_order")).data ?? [],
 );
 const slugToId = new Map(catRows.map((c) => [c.slug, c.id]));
 const idToSlug = new Map(catRows.map((c) => [c.id, c.slug]));
+const taxonomy = catRows.map((c) => ({ slug: c.slug, label: c.name }));
 
 const entRows = z.array(z.object({
   id: z.string(),
@@ -40,6 +41,7 @@ if (entRows.length === 0) {
 const classifier = createCategoryClassifierFromEnv(env);
 const results = await classifier.classify(
   entRows.map((entity, index) => ({ index, name: entity.name, description: (entity.description ?? "").slice(0, 500) })),
+  { taxonomy },
 );
 const slugByIndex = new Map(results.map((r) => [r.index, r.categorySlug]));
 

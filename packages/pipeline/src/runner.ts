@@ -136,6 +136,7 @@ export async function runEntityPipeline(options: {
     try {
       const classified = await options.categoryClassifier.classify(
         analyzedForCategory.map((item, index) => ({ index, name: item.name, description: item.description })),
+        { taxonomy: options.repository.getCategoryTaxonomy() },
       );
       for (const { index, categorySlug } of classified) {
         const target = analyzedForCategory[index];

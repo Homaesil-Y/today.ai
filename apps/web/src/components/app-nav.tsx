@@ -59,6 +59,7 @@ export function SidebarNavLinks({ isAdmin }: { isAdmin: boolean }) {
       </nav>
       <div className="sidebar-foot">
         {isAdmin && <Link className={`nav-link ${isActive("/admin/review") ? "active" : ""}`} href={"/admin/review" as Route}><ShieldCheck size={19} /><span>후보 검토</span></Link>}
+        {isAdmin && <Link className={`nav-link ${isActive("/admin/categories") ? "active" : ""}`} href={"/admin/categories" as Route}><Shapes size={19} /><span>카테고리 제안</span></Link>}
         {isAdmin && <Link className={`nav-link ${isActive("/admin/ops") ? "active" : ""}`} href={"/admin/ops" as Route}><Gauge size={19} /><span>운영 현황</span></Link>}
         <Link className={`nav-link ${isActive("/settings") ? "active" : ""}`} href="/settings"><Settings size={19} /><span>설정</span></Link>
       </div>
@@ -81,6 +82,7 @@ export function MobileNavLinks({ isAdmin }: { isAdmin: boolean }) {
     ...(isAdmin
       ? ([
           { label: "후보 검토", href: "/admin/review" as Route, icon: ShieldCheck },
+          { label: "카테고리 제안", href: "/admin/categories" as Route, icon: Shapes },
           { label: "운영 현황", href: "/admin/ops" as Route, icon: Gauge },
         ] satisfies MoreItem[])
       : []),

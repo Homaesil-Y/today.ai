@@ -22,6 +22,8 @@ jobs:
       NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL }}
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
       SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
       EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
       GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
       GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
@@ -39,5 +41,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: 일간 리포트 갱신
         run: pnpm report:daily
+      - name: 신규 카테고리 후보 제안 (하루 1회, Gemini 배치 1콜)
+        run: pnpm suggest:categories
+        continue-on-error: true
       - name: 구독자 이메일 발송 (자격증명 없으면 blocked)
         run: pnpm report:send
