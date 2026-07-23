@@ -2,13 +2,13 @@
 
 import {
   Bookmark,
-  ChartNoAxesCombined,
   ChevronRight,
   Compass,
   FileText,
   Gauge,
   GitCompareArrows,
   LayoutDashboard,
+  Menu,
   Settings,
   Shapes,
   ShieldCheck,
@@ -16,6 +16,7 @@ import {
 import Link from "next/link";
 import type { Route } from "next";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 
 const nav = [
   { label: "오늘의 레이더", href: "/", icon: LayoutDashboard },
@@ -54,16 +55,53 @@ export function SidebarNavLinks({ isAdmin }: { isAdmin: boolean }) {
   );
 }
 
+type MoreItem = { label: string; href: Route; icon: typeof Bookmark };
+
 export function MobileNavLinks({ isAdmin }: { isAdmin: boolean }) {
   const isActive = useIsActive();
+  const [moreOpen, setMoreOpen] = useState(false);
+
+  // 하단 바에는 상단 4개만 노출하고, 나머지는 "더보기" 시트로 모은다.
+  // (시트는 항목 탭·배경 탭 시 닫힌다.)
+  const moreItems: MoreItem[] = [
+    { label: "관심 목록", href: "/watchlist" as Route, icon: Bookmark },
+    { label: "리포트", href: "/reports" as Route, icon: FileText },
+    { label: "설정", href: "/settings" as Route, icon: Settings },
+    ...(isAdmin
+      ? ([
+          { label: "후보 검토", href: "/admin/review" as Route, icon: ShieldCheck },
+          { label: "운영 현황", href: "/admin/ops" as Route, icon: Gauge },
+        ] satisfies MoreItem[])
+      : []),
+  ];
+  const moreActive = moreItems.some(({ href }) => isActive(href));
+
   return (
-    <nav className="mobile-nav" aria-label="모바일 주요 탐색">
-      {nav.slice(0, 4).map(({ label, href, icon: Icon }) => (
-        <Link key={href} href={href} className={isActive(href) ? "active" : ""}><Icon size={20} /><span>{label.replace("오늘의 ", "")}</span></Link>
-      ))}
-      {isAdmin
-        ? <Link href={"/admin/review" as Route} className={isActive("/admin/review") ? "active" : ""}><ShieldCheck size={20} /><span>후보 검토</span></Link>
-        : <Link href="/settings" className={isActive("/settings") ? "active" : ""}><ChartNoAxesCombined size={20} /><span>더보기</span></Link>}
-    </nav>
+    <>
+      {moreOpen && <div className="mobile-more-backdrop" onClick={() => setMoreOpen(false)} aria-hidden="true" />}
+      {moreOpen && (
+        <div className="mobile-more-sheet" role="menu" aria-label="더보기 메뉴">
+          {moreItems.map(({ label, href, icon: Icon }) => (
+            <Link key={href} href={href} role="menuitem" className={`mobile-more-item ${isActive(href) ? "active" : ""}`} onClick={() => setMoreOpen(false)}>
+              <Icon size={19} aria-hidden="true" /><span>{label}</span><ChevronRight size={16} className="mobile-more-arrow" />
+            </Link>
+          ))}
+        </div>
+      )}
+      <nav className="mobile-nav" aria-label="모바일 주요 탐색">
+        {nav.slice(0, 4).map(({ label, href, icon: Icon }) => (
+          <Link key={href} href={href} className={isActive(href) ? "active" : ""}><Icon size={20} /><span>{label.replace("오늘의 ", "")}</span></Link>
+        ))}
+        <button
+          type="button"
+          className={`mobile-more-trigger ${moreOpen || moreActive ? "active" : ""}`}
+          aria-haspopup="menu"
+          aria-expanded={moreOpen}
+          onClick={() => setMoreOpen((prev) => !prev)}
+        >
+          <Menu size={20} /><span>더보기</span>
+        </button>
+      </nav>
+    </>
   );
 }
