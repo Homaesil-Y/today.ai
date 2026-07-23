@@ -139,5 +139,30 @@ export async function fetchNewsFromFeeds(options: FetchNewsOptions = {}): Promis
     seen.add(item.canonicalUrl);
     deduped.push(item);
   }
-  return { items: deduped, warnings };
+  // 소스 편중(자주 발행하는 매체가 상단을 독식) 방지: 소스별 최신순 목록을 라운드로빈으로 섞는다.
+  // 각 소스 내부 순서(최신순)는 유지하면서 앞쪽에 여러 매체가 고르게 등장하게 한다.
+  return { items: interleaveBySource(deduped), warnings };
+}
+
+function interleaveBySource(items: RawNewsItem[]): RawNewsItem[] {
+  const bySource = new Map<string, RawNewsItem[]>();
+  for (const item of items) {
+    const list = bySource.get(item.source) ?? [];
+    list.push(item);
+    bySource.set(item.source, list);
+  }
+  const queues = [...bySource.values()];
+  const merged: RawNewsItem[] = [];
+  let added = true;
+  while (added) {
+    added = false;
+    for (const queue of queues) {
+      const next = queue.shift();
+      if (next) {
+        merged.push(next);
+        added = true;
+      }
+    }
+  }
+  return merged;
 }

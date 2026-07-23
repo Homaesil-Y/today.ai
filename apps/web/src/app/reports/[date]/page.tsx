@@ -2,7 +2,9 @@ import { ArrowLeft, CalendarDays } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { StructuredData } from "@/components/structured-data";
 import { getDailyReport } from "@/data/reports";
+import { absoluteUrl, siteConfig } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 
@@ -36,9 +38,22 @@ export default async function ReportDetailPage({ params }: Props) {
   if (!report) notFound();
 
   const { topServices, totalPublic } = report.content;
+  const articleData = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: report.title,
+    description: report.summary ?? undefined,
+    url: absoluteUrl(`/reports/${date}`),
+    inLanguage: siteConfig.language,
+    datePublished: report.publishedAt ?? undefined,
+    dateModified: report.publishedAt ?? undefined,
+    author: { "@id": absoluteUrl("/#organization") },
+    publisher: { "@id": absoluteUrl("/#organization") },
+  };
 
   return (
     <div className="page">
+      <StructuredData data={articleData} />
       <header className="page-heading">
         <div>
           <Link className="report-back" href="/reports"><ArrowLeft size={15} aria-hidden="true" />리포트 목록</Link>
