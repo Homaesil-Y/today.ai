@@ -93,14 +93,16 @@ export async function updateWatchlistEntry(_prev: WatchlistFormState, formData: 
   return { error: "" };
 }
 
-export async function deleteEmptyWatchlist(formData: FormData) {
-  const watchlistId = uuidSchema.parse(String(formData.get("watchlistId") ?? ""));
+export async function deleteEmptyWatchlist(_prev: WatchlistFormState, formData: FormData): Promise<WatchlistFormState> {
+  const watchlistId = uuidSchema.safeParse(String(formData.get("watchlistId") ?? ""));
+  if (!watchlistId.success) return { error: "요청이 올바르지 않습니다." };
   const { supabase, user } = await authenticatedClient();
-  const { data: folder } = await supabase.from("watchlists").select("id,name,sort_order").eq("id", watchlistId).eq("user_id", user.id).maybeSingle();
-  if (!folder || folder.sort_order === 0 || folder.name === "전체") throw new Error("기본 폴더는 삭제할 수 없습니다.");
-  const { count } = await supabase.from("watchlist_items").select("id", { count: "exact", head: true }).eq("watchlist_id", watchlistId);
-  if ((count ?? 0) > 0) throw new Error("서비스를 다른 폴더로 이동한 뒤 삭제해주세요.");
-  const { error } = await supabase.from("watchlists").delete().eq("id", watchlistId).eq("user_id", user.id);
-  if (error) throw new Error("폴더를 삭제하지 못했습니다.");
+  const { data: folder } = await supabase.from("watchlists").select("id,name,sort_order").eq("id", watchlistId.data).eq("user_id", user.id).maybeSingle();
+  if (!folder || folder.sort_order === 0 || folder.name === "전체") return { error: "기본 폴더는 삭제할 수 없습니다." };
+  const { count } = await supabase.from("watchlist_items").select("id", { count: "exact", head: true }).eq("watchlist_id", watchlistId.data);
+  if ((count ?? 0) > 0) return { error: "서비스를 다른 폴더로 이동한 뒤 삭제해주세요." };
+  const { error } = await supabase.from("watchlists").delete().eq("id", watchlistId.data).eq("user_id", user.id);
+  if (error) return { error: "폴더를 삭제하지 못했습니다." };
   refreshWatchlist();
+  return { error: "" };
 }

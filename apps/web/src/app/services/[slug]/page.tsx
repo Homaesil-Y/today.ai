@@ -13,6 +13,11 @@ import { absoluteUrl, siteConfig } from "@/lib/site";
 
 type Props = { params: Promise<{ slug: string }> };
 
+// 수집 시각을 KST 기준 실제 값으로 표기한다(고정 "5분 전" 같은 가짜 문구 금지).
+function formatCollectedAt(iso: string) {
+  return new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const trend = await getPublishedTrend((await params).slug);
   if (!trend) return {};
@@ -72,7 +77,7 @@ export default async function ServiceDetailPage({ params }: Props) {
 
       <section className="detail-grid">
         <article className="panel trend-panel"><div className="panel-heading"><div><h2>트렌드 신호</h2></div></div><TrendPeriodChart history={scoreHistory} name={trend.name} nowIso={nowIso} /></article>
-        <article className="panel platform-panel"><div className="panel-heading"><div><h2>플랫폼별 지표</h2></div></div>{trend.signals.map((signal) => <div className="platform-row" key={signal.source}><SourceBrandIcon source={signal.source} size="medium" /><span><strong>{signal.label}</strong><small><Clock3 size={12} />5분 전 수집 · {signal.reliability === "verified" ? "검증됨" : "추정"}</small></span><span><strong>{signal.value.toLocaleString("ko-KR")}</strong><em>+{signal.delta24h.toLocaleString("ko-KR")}</em></span></div>)}</article>
+        <article className="panel platform-panel"><div className="panel-heading"><div><h2>플랫폼별 지표</h2></div></div>{trend.signals.map((signal) => <div className="platform-row" key={signal.source}><SourceBrandIcon source={signal.source} size="medium" /><span><strong>{signal.label}</strong><small><Clock3 size={12} />{formatCollectedAt(signal.measuredAt)} 수집 · {signal.reliability === "verified" ? "검증됨" : "추정"}</small></span><span><strong>{signal.value.toLocaleString("ko-KR")}</strong><em>+{signal.delta24h.toLocaleString("ko-KR")}</em></span></div>)}</article>
       </section>
 
       <section className="reaction-grid">
@@ -80,7 +85,7 @@ export default async function ServiceDetailPage({ params }: Props) {
         <article className="panel reaction-negative"><div className="panel-heading"><h2><TriangleAlert size={19} />불만 및 우려</h2></div><ul>{trend.weaknesses.map((item) => <li key={item}>{item}</li>)}</ul></article>
       </section>
 
-      <section className="panel source-section"><div className="panel-heading"><div><h2>주요 출처</h2></div><span>독립 출처 {trend.sources.length}개</span></div>{trend.sources.map((source, index) => <a className="source-row" key={source} href={trend.githubUrl ?? trend.canonicalUrl} target="_blank" rel="noreferrer"><SourceBrandIcon source={source} size="medium" /><span><strong>{index === 0 ? `${trend.name}, 최근 업데이트와 커뮤니티 반응` : `${getSourceLabel(source)}에서 확산 중인 ${trend.name} 활용 사례`}</strong><small>{getSourceLabel(source)} · {index + 1}시간 전 · 광고 의심 낮음</small></span><ExternalLink size={17} /></a>)}</section>
+      <section className="panel source-section"><div className="panel-heading"><div><h2>주요 출처</h2></div><span>독립 출처 {trend.sources.length}개</span></div>{trend.sources.map((source) => { const href = source === "github" && trend.githubUrl ? trend.githubUrl : trend.canonicalUrl; return <a className="source-row" key={source} href={href} target="_blank" rel="noreferrer"><SourceBrandIcon source={source} size="medium" /><span><strong>{getSourceLabel(source)}</strong><small>{source === "github" ? "공개 GitHub 저장소에서 감지된 신호" : "공개 커뮤니티 토론에서 감지된 신호"}</small></span><ExternalLink size={17} /></a>; })}</section>
 
       <section className="insight-grid"><article className="panel"><Users size={20} /><h2>추천 대상</h2><ul>{trend.targetUsers.map((item) => <li key={item}>{item}</li>)}</ul></article><article className="panel"><GitBranch size={20} /><h2>활용 사례</h2><ul>{trend.useCases.map((item) => <li key={item}>{item}</li>)}</ul></article><article className="panel opportunity"><Sparkles size={20} /><h2>국내 적용 기회</h2><p>{trend.koreaOpportunity}</p></article></section>
     </div>
