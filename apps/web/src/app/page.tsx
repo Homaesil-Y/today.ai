@@ -24,12 +24,14 @@ const faqItems = [
 export default async function DashboardPage() {
   const [allTrends, savedEntityIds] = await Promise.all([getPublishedTrends(), getSavedEntityIds()]);
   const trends = allTrends.slice(0, 10);
+  // 값이 0인 지표는 서비스의 가치 제안("확산 속도·교차 신호")을 스스로 부정하므로 숨긴다.
+  // 데이터가 쌓여 0을 벗어나면 카드가 자동으로 다시 나타난다.
   const kpis = [
     { label: "공개된 AI 서비스", value: allTrends.length, delta: "실시간", icon: Radio, tone: "cyan" },
     { label: "상승 중인 서비스", value: allTrends.filter(({ status }) => ["RISING", "SURGING", "PEAK"].includes(status)).length, delta: "승인 기준", icon: Activity, tone: "orange" },
     { label: "교차 채널 확산", value: allTrends.filter(({ sources }) => sources.length > 1).length, delta: "2개+ 채널", icon: GitFork, tone: "violet" },
     { label: "오픈소스", value: allTrends.filter(({ isOpenSource }) => isOpenSource).length, delta: "GitHub 기준", icon: Boxes, tone: "blue" },
-  ] as const;
+  ].filter(({ value }) => value > 0);
   const updatedAt = trends[0]?.updatedAt ? new Date(trends[0].updatedAt) : null;
   const updatedLabel = updatedAt
     ? new Intl.DateTimeFormat("ko-KR", {
@@ -76,7 +78,7 @@ export default async function DashboardPage() {
       </section>
 
       <section className="section-block">
-        <div className="section-heading ranking-heading"><div><h2>전체 트렌드 랭킹</h2></div><div className="filter-actions"><button className="button button-secondary"><SlidersHorizontal size={17} />전체 카테고리</button><button className="button button-secondary">트렌드 점수순</button></div></div>
+        <div className="section-heading ranking-heading"><div><h2>전체 트렌드 랭킹</h2></div><Link className="button button-secondary" href="/explore"><SlidersHorizontal size={17} />필터·정렬로 전체 탐색</Link></div>
         <div className="partial-notice" role="status"><Radio size={16} /><span><strong>MVP 데이터 안내</strong> 현재 순위는 GitHub·Hacker News 수집 신호를 기준으로 계산합니다.</span></div>
         {trends.length ? <RankingTable trends={trends} savedEntityIds={savedEntityIds} /> : null}
       </section>

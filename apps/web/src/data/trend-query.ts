@@ -16,6 +16,12 @@ function normalize(value: string) {
   return value.trim().toLocaleLowerCase("ko-KR");
 }
 
+// 순위 부여(live-trends)와 탐색 기본 정렬이 동일한 순서를 내도록 쓰는 공유 비교자.
+// 점수 → 신뢰도 → 이름 순의 완전 결정적 tiebreak라 순위 번호가 목록 순서와 항상 일치한다.
+export function compareByScore(a: TrendEntity, b: TrendEntity) {
+  return b.trendScore - a.trendScore || b.trustScore - a.trustScore || a.name.localeCompare(b.name, "ko-KR");
+}
+
 export function filterAndSortTrends(trends: TrendEntity[], query: TrendQuery, now = new Date()) {
   const keyword = normalize(query.q ?? "");
   const category = normalize(query.category ?? "");
@@ -39,7 +45,7 @@ export function filterAndSortTrends(trends: TrendEntity[], query: TrendQuery, no
     if (sort === "trust") return b.trustScore - a.trustScore || b.trendScore - a.trendScore;
     if (sort === "recent") return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime() || b.trendScore - a.trendScore;
     if (sort === "name") return a.name.localeCompare(b.name, "ko-KR");
-    return b.trendScore - a.trendScore || b.trustScore - a.trustScore;
+    return compareByScore(a, b);
   });
 }
 

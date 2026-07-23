@@ -11,6 +11,7 @@ export async function AppShell({ children }: { children: ReactNode }) {
   const isAdmin = role === "admin";
   return (
     <div className="app-shell">
+      <a className="skip-link" href="#main-content">본문으로 건너뛰기</a>
       <header className="app-header">
         <Link className="brand" href="/" aria-label="오늘의AI 홈">
           <span className="brand-mark"><Sparkles size={21} aria-hidden="true" /></span>
@@ -33,7 +34,7 @@ export async function AppShell({ children }: { children: ReactNode }) {
         <SidebarNavLinks isAdmin={isAdmin} />
       </aside>
 
-      <main className="main-content">{children}</main>
+      <main className="main-content" id="main-content" tabIndex={-1}>{children}</main>
 
       <BackToTop />
       <MobileNavLinks isAdmin={isAdmin} />

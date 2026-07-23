@@ -2,6 +2,7 @@ import type { SourceCode, TrendEntity, TrendStatus } from "@ai-trend-radar/types
 import { cache } from "react";
 import { z } from "zod";
 import { createPublicClient } from "@/lib/supabase/server";
+import { compareByScore } from "./trend-query";
 
 const entitySchema = z.object({
   id: z.string(),
@@ -157,7 +158,7 @@ export const getPublishedTrends = cache(async (): Promise<TrendEntity[]> => {
         sparkline: buildSparkline(scoreHistoryByEntity.get(entity.id), totalScore),
       } satisfies TrendEntity;
     })
-    .sort((a, b) => b.trendScore - a.trendScore)
+    .sort(compareByScore)
     .map((trend, index) => ({ ...trend, rank: index + 1 }));
 });
 
