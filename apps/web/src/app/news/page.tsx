@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import type { Route } from "next";
 import Link from "next/link";
 import { ArrowUpRight, ChevronLeft, ChevronRight, Newspaper, Search, X } from "lucide-react";
-import { FormDropdown } from "@/components/form-dropdown";
-import { getNewsPage, type NewsField } from "@/data/news";
+import { getNewsPage } from "@/data/news";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +15,7 @@ export const metadata: Metadata = {
 
 const PAGE_SIZE = 10;
 
-type SearchParams = Promise<{ field?: string; q?: string; page?: string }>;
+type SearchParams = Promise<{ q?: string; page?: string }>;
 
 function formatDate(iso: string) {
   return new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", year: "numeric", month: "long", day: "numeric" }).format(new Date(iso));
@@ -49,20 +48,16 @@ function pageWindow(current: number, total: number): (number | "ellipsis")[] {
 
 export default async function NewsPage({ searchParams }: { searchParams: SearchParams }) {
   const raw = await searchParams;
-  const field: NewsField = raw.field === "source" ? "source" : "content";
   const q = (raw.q ?? "").trim();
   const page = Math.max(1, Number.parseInt(raw.page ?? "1", 10) || 1);
 
-  const { items, total } = await getNewsPage({ field, q, page, pageSize: PAGE_SIZE });
+  const { items, total } = await getNewsPage({ q, page, pageSize: PAGE_SIZE });
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const today = currentKstDate();
 
   const hrefFor = (targetPage: number) => {
     const params = new URLSearchParams();
-    if (q) {
-      if (field === "source") params.set("field", "source");
-      params.set("q", q);
-    }
+    if (q) params.set("q", q);
     if (targetPage > 1) params.set("page", String(targetPage));
     const query = params.toString();
     return (query ? `/news?${query}` : "/news") as Route;
@@ -79,17 +74,10 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
       </section>
 
       <form className="news-toolbar" action="/news" method="get">
-        <FormDropdown
-          name="field"
-          ariaLabel="검색 대상"
-          placeholder="제목/내용"
-          defaultValue={field}
-          options={[{ value: "content", label: "제목/내용" }, { value: "source", label: "출처" }]}
-        />
         <label className="news-search">
           <Search size={17} aria-hidden="true" />
           <span className="sr-only">뉴스 검색</span>
-          <input type="search" name="q" defaultValue={q} placeholder="검색어를 입력하세요" />
+          <input type="search" name="q" defaultValue={q} placeholder="제목·내용·출처 검색" />
         </label>
         <button className="button button-primary" type="submit">검색</button>
         {q && <Link className="button button-secondary" href="/news"><X size={16} />초기화</Link>}
