@@ -90,7 +90,7 @@ export function MobileNavLinks({ isAdmin }: { isAdmin: boolean }) {
       )}
       <nav className="mobile-nav" aria-label="모바일 주요 탐색">
         {nav.slice(0, 4).map(({ label, href, icon: Icon }) => (
-          <Link key={href} href={href} className={isActive(href) ? "active" : ""}><Icon size={20} /><span>{label.replace("오늘의 ", "")}</span></Link>
+          <Link key={href} href={href} className={isActive(href) ? "active" : ""} onClick={() => setMoreOpen(false)}><Icon size={20} /><span>{label.replace("오늘의 ", "")}</span></Link>
         ))}
         <button
           type="button"
