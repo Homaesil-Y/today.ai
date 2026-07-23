@@ -3,6 +3,7 @@ import type { Route } from "next";
 import Link from "next/link";
 import { ArrowUpRight, Newspaper, Search, X } from "lucide-react";
 import { Pagination } from "@/components/pagination";
+import { StructuredData } from "@/components/structured-data";
 import { getNewsPage } from "@/data/news";
 
 export const dynamic = "force-dynamic";
@@ -47,8 +48,22 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
     return (query ? `/news?${query}` : "/news") as Route;
   };
 
+  const itemListData = items.length
+    ? {
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        name: "AI 뉴스 브리핑",
+        itemListElement: items.map((item, index) => ({
+          "@type": "ListItem",
+          position: (page - 1) * PAGE_SIZE + index + 1,
+          item: { "@type": "NewsArticle", headline: item.title, datePublished: item.publishedAt, url: item.url, inLanguage: "ko-KR", publisher: { "@type": "Organization", name: item.source } },
+        })),
+      }
+    : null;
+
   return (
     <div className="page">
+      {itemListData && <StructuredData data={itemListData} />}
       <section className="page-heading">
         <div>
           <h1>AI 뉴스 브리핑</h1>
