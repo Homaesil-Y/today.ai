@@ -1,5 +1,5 @@
-import { ArrowLeft, ArrowUpRight, CheckCircle2, Clock3, ExternalLink, GitBranch, ShieldCheck, Sparkles, TriangleAlert, Users } from "lucide-react";
-import type { Metadata } from "next";
+import { ArrowLeft, ArrowUpRight, CheckCircle2, Clock3, ExternalLink, GitBranch, GitCompareArrows, ShieldCheck, Sparkles, TriangleAlert, Users } from "lucide-react";
+import type { Metadata, Route } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { StructuredData } from "@/components/structured-data";
@@ -64,7 +64,7 @@ export default async function ServiceDetailPage({ params }: Props) {
       <section className="detail-hero">
         <div className="detail-identity"><div><div className="detail-badges"><StatusBadge status={trend.status} /><span className="category-chip">{trend.category}</span>{trend.isOpenSource && <span className="category-chip">오픈소스</span>}</div><h1>{trend.name}</h1><p>{trend.tagline}</p></div></div>
         <div className="detail-scores"><div><span>Trend Score</span><strong>{trend.trendScore}</strong><small>오늘 #{trend.rank}</small></div><div><span>Trust Score</span><strong>{trend.trustScore}</strong><small><ShieldCheck size={14} />신뢰도 높음</small></div></div>
-        <div className="detail-actions"><a className="button button-primary" href={trend.canonicalUrl} target="_blank" rel="noreferrer">공식 사이트 <ArrowUpRight size={17} /></a>{trend.githubUrl && <a className="button button-secondary" href={trend.githubUrl} target="_blank" rel="noreferrer"><GitBranch size={17} />GitHub</a>}<WatchButton entityId={trend.id} initialSaved={savedEntityIds.has(trend.id)} /></div>
+        <div className="detail-actions"><a className="button button-primary" href={trend.canonicalUrl} target="_blank" rel="noreferrer">공식 사이트 <ArrowUpRight size={17} /></a>{trend.githubUrl && <a className="button button-secondary" href={trend.githubUrl} target="_blank" rel="noreferrer"><GitBranch size={17} />GitHub</a>}<Link className="button button-secondary" href={`/compare?slugs=${trend.slug}` as Route}><GitCompareArrows size={17} />비교하기</Link><WatchButton entityId={trend.id} initialSaved={savedEntityIds.has(trend.id)} /></div>
       </section>
 
       <section className="ai-analysis">
