@@ -10,7 +10,7 @@ export const INGESTED_SOURCES = ["github", "hacker_news", "product_hunt", "reddi
 export type IngestedSource = (typeof INGESTED_SOURCES)[number];
 
 const sourceSchema = z.object({ id: z.uuid(), code: z.string() });
-const categorySchema = z.object({ id: z.uuid(), slug: z.string() });
+const categorySchema = z.object({ id: z.uuid(), slug: z.string(), name: z.string() });
 const entitySchema = z.object({
   id: z.uuid(),
   name: z.string(),
@@ -57,6 +57,7 @@ export class SupabasePipelineRepository {
   private readonly client: SupabaseClient;
   private readonly sourceIds = new Map<SourceCode, string>();
   private readonly categoryIds = new Map<string, string>();
+  private readonly categoryTaxonomy: { slug: string; label: string }[] = [];
   private readonly entitiesByCanonical = new Map<string, EntityRow>();
   private readonly entitiesByGithub = new Map<string, EntityRow>();
   private readonly entitiesByDomain = new Map<string, EntityRow>();
@@ -80,7 +81,7 @@ export class SupabasePipelineRepository {
   async initialize() {
     const [sourcesResult, categoriesResult, entitiesResult] = await Promise.all([
       this.client.from("sources").select("id,code"),
-      this.client.from("categories").select("id,slug").eq("enabled", true),
+      this.client.from("categories").select("id,slug,name").eq("enabled", true).order("sort_order"),
       this.client.from("entities").select("id,name,slug,canonical_url,official_domain,github_url,description,category_id,pricing_type,is_open_source,visibility,first_detected_at,last_detected_at"),
     ]);
     if (sourcesResult.error) throw new PipelineRepositoryError(sourcesResult.error.message, "load_sources");
@@ -94,6 +95,7 @@ export class SupabasePipelineRepository {
     }
     for (const category of z.array(categorySchema).parse(categoriesResult.data ?? [])) {
       this.categoryIds.set(category.slug, category.id);
+      this.categoryTaxonomy.push({ slug: category.slug, label: category.name });
     }
     for (const entity of z.array(entitySchema).parse(entitiesResult.data ?? [])) this.indexEntity(entity);
   }
@@ -233,6 +235,11 @@ export class SupabasePipelineRepository {
       generated_at: result.generatedAt,
     });
     if (error) throw new PipelineRepositoryError(error.message, "insert_analysis");
+  }
+
+  // 분류기에 넘길 현재 활성 카테고리 목록(slug+라벨). DB 기반이라 승인된 신규 카테고리도 포함된다.
+  getCategoryTaxonomy(): { slug: string; label: string }[] {
+    return this.categoryTaxonomy;
   }
 
   // LLM 분류 결과(slug)를 엔티티 category_id에 반영한다. 알 수 없는 slug는 무시(false 반환).

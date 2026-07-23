@@ -22,6 +22,7 @@
     "verify:live": "pnpm --filter @ai-trend-radar/pipeline verify:live",
     "news:collect": "pnpm --filter @ai-trend-radar/pipeline news:collect",
     "reclassify": "pnpm --filter @ai-trend-radar/pipeline reclassify",
+    "suggest:categories": "pnpm --filter @ai-trend-radar/pipeline suggest:categories",
     "preview:live": "pnpm --filter @ai-trend-radar/pipeline preview:live"
   }
 }

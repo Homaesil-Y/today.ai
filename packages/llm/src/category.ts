@@ -32,35 +32,39 @@ export const categoryInputSchema = z.object({
 });
 export type CategoryInput = z.infer<typeof categoryInputSchema>;
 
+export type CategoryOption = { slug: string; label: string };
+
 export const categoryItemSchema = z.object({
   index: z.number().int().nonnegative(),
-  categorySlug: z.enum(CATEGORY_SLUGS),
+  categorySlug: z.string().min(1),
 });
 export type CategoryItem = z.infer<typeof categoryItemSchema>;
 
 const categoryOutputSchema = z.object({ items: z.array(categoryItemSchema) });
 
-// Gemini responseJsonSchema. categorySlug는 고정 enum으로 제약해 임의 문자열을 막는다.
-const categoryJsonSchema = {
-  type: "object",
-  properties: {
-    items: {
-      type: "array",
+// 허용 slug 집합으로 responseJsonSchema enum을 런타임에 만든다.
+// taxonomy를 DB에서 주입할 수 있어(관리자가 승인한 신규 카테고리) 재배포 없이 확장된다.
+function buildCategoryJsonSchema(taxonomy: CategoryOption[]) {
+  return {
+    type: "object",
+    properties: {
       items: {
-        type: "object",
-        properties: {
-          index: { type: "integer" },
-          categorySlug: { type: "string", enum: [...CATEGORY_SLUGS] },
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            index: { type: "integer" },
+            categorySlug: { type: "string", enum: taxonomy.map((c) => c.slug) },
+          },
+          required: ["index", "categorySlug"],
         },
-        required: ["index", "categorySlug"],
       },
     },
-  },
-  required: ["items"],
-} as const;
+    required: ["items"],
+  } as const;
+}
 
-function buildCategoryPrompt(items: CategoryInput[]): string {
-  const taxonomy = CATEGORY_TAXONOMY.map((c) => `- ${c.slug}: ${c.label}`).join("\n");
+function buildCategoryPrompt(items: CategoryInput[], taxonomy: CategoryOption[]): string {
   const list = items.map((item) => `[${item.index}] ${item.name}\n설명: ${item.description}`).join("\n\n");
   return [
     "다음 AI 서비스 각각을 아래 고정 분류 중 정확히 하나로 분류하세요.",
@@ -68,7 +72,7 @@ function buildCategoryPrompt(items: CategoryInput[]): string {
     "명확히 들어맞는 분류가 없을 때만 other(기타)를 사용하세요. 반드시 아래 slug 값 그대로 반환하세요.",
     "",
     "분류 목록:",
-    taxonomy,
+    taxonomy.map((c) => `- ${c.slug}: ${c.label}`).join("\n"),
     "",
     "서비스 목록:",
     list,
@@ -114,18 +118,23 @@ export class GeminiCategoryClassifier {
   }
 
   // 여러 서비스를 batchSize 단위로 묶어 최소 호출 수로 분류한다(엔티티당 1콜 금지).
-  async classify(rawItems: CategoryInput[], options?: { signal?: AbortSignal }): Promise<CategoryItem[]> {
+  // taxonomy 미지정 시 기본 16개를 쓰고, DB에서 주입하면 승인된 신규 카테고리까지 포함해 분류한다.
+  async classify(rawItems: CategoryInput[], options?: { signal?: AbortSignal; taxonomy?: CategoryOption[] }): Promise<CategoryItem[]> {
     const items = z.array(categoryInputSchema).parse(rawItems);
     if (items.length === 0) return [];
+    const taxonomy = options?.taxonomy?.length ? options.taxonomy : CATEGORY_TAXONOMY;
+    const allowed = new Set(taxonomy.map((c) => c.slug));
     const results: CategoryItem[] = [];
     for (let start = 0; start < items.length; start += this.batchSize) {
       const batch = items.slice(start, start + this.batchSize);
-      results.push(...(await this.classifyBatch(batch, options)));
+      const batchResults = await this.classifyBatch(batch, taxonomy, options);
+      // 허용 목록에 없는 slug(모델 일탈)는 버린다. 호출부는 category_id 해석 실패로 무시하지만 여기서 선제 방어.
+      results.push(...batchResults.filter((item) => allowed.has(item.categorySlug)));
     }
     return results;
   }
 
-  private async classifyBatch(items: CategoryInput[], options?: { signal?: AbortSignal }): Promise<CategoryItem[]> {
+  private async classifyBatch(items: CategoryInput[], taxonomy: CategoryOption[], options?: { signal?: AbortSignal }): Promise<CategoryItem[]> {
     const timeoutController = new AbortController();
     const timeoutId = setTimeout(() => timeoutController.abort(), this.timeoutMs);
     const signal = options?.signal ? AbortSignal.any([options.signal, timeoutController.signal]) : timeoutController.signal;
@@ -137,8 +146,8 @@ export class GeminiCategoryClassifier {
           headers: { "content-type": "application/json", "x-goog-api-key": this.apiKey },
           body: JSON.stringify({
             systemInstruction: { parts: [{ text: "당신은 AI 서비스를 정해진 분류 체계로 정확히 분류하는 분류기입니다." }] },
-            contents: [{ role: "user", parts: [{ text: buildCategoryPrompt(items) }] }],
-            generationConfig: { temperature: 0, maxOutputTokens: 8_192, responseMimeType: "application/json", responseJsonSchema: categoryJsonSchema },
+            contents: [{ role: "user", parts: [{ text: buildCategoryPrompt(items, taxonomy) }] }],
+            generationConfig: { temperature: 0, maxOutputTokens: 8_192, responseMimeType: "application/json", responseJsonSchema: buildCategoryJsonSchema(taxonomy) },
           }),
           signal,
         },

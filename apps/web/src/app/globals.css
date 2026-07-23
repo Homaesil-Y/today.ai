@@ -520,6 +520,21 @@ button { color: inherit; }
 .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 420px; padding: 40px 20px; border: 1px dashed var(--border-strong); border-radius: var(--radius-lg); background: var(--bg-surface); text-align: center; }.empty-state h2 { margin: 16px 0 5px; }.empty-state p { max-width: 560px; margin: 0 0 20px; color: var(--text-secondary); }
 .error-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
 
+/* 관리자 카테고리 제안 */
+.admin-count { color: var(--text-tertiary); font-size: 13px; font-weight: 600; }
+.category-chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.suggestion-list { display: flex; flex-direction: column; gap: 12px; }
+.suggestion-card { display: flex; flex-direction: column; gap: 10px; }
+.suggestion-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.suggestion-head strong { font-size: 16px; font-weight: 700; }
+.suggestion-head code { margin-left: 8px; padding: 2px 6px; border-radius: 6px; background: var(--bg-surface-subtle); color: var(--text-secondary); font-size: 12px; }
+.suggestion-count { flex: none; color: var(--text-secondary); font-size: 13px; font-weight: 600; }
+.suggestion-rationale { color: var(--text-secondary); font-size: 14px; }
+.suggestion-examples { display: flex; flex-wrap: wrap; gap: 6px; }
+.suggestion-examples span { padding: 3px 9px; border: 1px solid var(--border-default); border-radius: var(--radius-pill); font-size: 12px; color: var(--text-secondary); }
+.suggestion-actions { display: flex; flex-direction: column; gap: 8px; }
+.suggestion-buttons { display: flex; gap: 8px; }
+
 /* 로딩 스켈레톤: shimmer로 로딩 중임을 알리고 자리를 잡아 CLS를 막는다. */
 .skeleton { display: block; position: relative; overflow: hidden; background: var(--bg-surface-subtle); border-radius: var(--radius-sm); }
 .skeleton::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgb(255 255 255 / 65%), transparent); animation: skeleton-shimmer 1.4s ease-in-out infinite; }
