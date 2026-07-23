@@ -3,6 +3,7 @@ import { unstable_cache } from "next/cache";
 import { cache } from "react";
 import { z } from "zod";
 import { createPublicClient } from "@/lib/supabase/server";
+import { cleanDisplayName, logoTextFrom } from "./display-name";
 import { compareByScore } from "./trend-query";
 
 // 공개 데이터는 3시간 주기 파이프라인으로만 바뀌므로 요청마다 Supabase를 다시 치지 않는다.
@@ -113,12 +114,14 @@ export const getPublishedTrends = cache(unstable_cache(async (): Promise<TrendEn
       const status: TrendStatus = score?.status ?? entity.status;
       const description = analysis?.summary ?? entity.description ?? "수집 신호를 기반으로 검토·승인된 AI 서비스입니다.";
       const fallbackReason = "초기 수집 신호가 확인되어 관리자의 검토를 통과했습니다.";
+      // 수집기가 저장한 문장형 원본 이름을 공개 화면용으로 다듬는다(원본 데이터는 불변).
+      const displayName = cleanDisplayName(entity.name);
 
       return {
         id: entity.id,
         slug: entity.slug,
-        name: entity.name,
-        logoText: entity.name.slice(0, 2).toUpperCase(),
+        name: displayName,
+        logoText: logoTextFrom(displayName),
         // 공개 화면에는 원문(대부분 영어)보다 검증된 한국어 AI 요약을 우선 노출한다.
         tagline: description,
         description,

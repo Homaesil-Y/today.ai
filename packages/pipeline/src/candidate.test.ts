@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractEntityCandidate, slugifyName } from "./candidate";
+import { classifyCategory, extractEntityCandidate, slugifyName } from "./candidate";
 import { calculateInitialTrendScore } from "./initial-score";
 import type { DatabaseRawItem } from "./schema";
 
@@ -221,5 +221,30 @@ describe("candidate extraction", () => {
 
   it("uses a stable hash slug when a name has no latin characters", () => {
     expect(slugifyName("오늘의 도구", "https://example.com")).toMatch(/^ai-service-[a-f0-9]{10}$/u);
+  });
+});
+
+describe("classifyCategory", () => {
+  it("preserves existing mappings", () => {
+    expect(classifyCategory("An AI browser automation agent")).toBe("ai-agents");
+    expect(classifyCategory("developer CLI for GitHub")).toBe("coding");
+    expect(classifyCategory("AI photo editing")).toBe("image");
+    expect(classifyCategory("analytics dashboard with SQL")).toBe("data");
+  });
+
+  it("routes no-code before coding (previously misclassified)", () => {
+    expect(classifyCategory("a no-code app builder")).toBe("no-code");
+  });
+
+  it("rescues categories that used to fall through to other", () => {
+    expect(classifyCategory("a Figma design prototyping tool")).toBe("design");
+    expect(classifyCategory("SEO and marketing campaign copy")).toBe("marketing");
+    expect(classifyCategory("an online tutor for course learning")).toBe("education");
+    expect(classifyCategory("GPU inference serving API gateway")).toBe("infrastructure-api");
+    expect(classifyCategory("meeting scheduling and calendar productivity")).toBe("productivity");
+  });
+
+  it("still falls back to other for unmatched text", () => {
+    expect(classifyCategory("a smart planter for your desk")).toBe("other");
   });
 });
