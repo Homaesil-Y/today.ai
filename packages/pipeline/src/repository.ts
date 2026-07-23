@@ -235,6 +235,18 @@ export class SupabasePipelineRepository {
     if (error) throw new PipelineRepositoryError(error.message, "insert_analysis");
   }
 
+  // LLM 분류 결과(slug)를 엔티티 category_id에 반영한다. 알 수 없는 slug는 무시(false 반환).
+  async assignCategoryBySlug(entityId: string, slug: string): Promise<boolean> {
+    const categoryId = this.categoryIds.get(slug);
+    if (!categoryId) return false;
+    const { error } = await this.client
+      .from("entities")
+      .update({ category_id: categoryId, updated_at: new Date().toISOString() })
+      .eq("id", entityId);
+    if (error) throw new PipelineRepositoryError(error.message, "assign_category");
+    return true;
+  }
+
   async autoApproveAnalyzedCandidates() {
     const { data: analysisRows, error: analysisError } = await this.client
       .from("ai_analyses")
