@@ -521,7 +521,8 @@ button { color: inherit; }
 .error-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
 
 /* 전역 푸터: 본문 하단에 저작권·법적 링크. 얇고 절제된 톤. */
-.site-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 20px; margin: 40px 24px 0; padding: 20px 0; border-top: 1px solid var(--border-default); color: var(--text-tertiary); font-size: 12.5px; }
+/* 우측 padding은 우하단 고정 '맨 위로' 버튼(FAB)과 텍스트가 겹치지 않도록 버튼 열을 비워둔다. */
+.site-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 20px; margin: 40px 24px 0; padding: 20px 56px 20px 0; border-top: 1px solid var(--border-default); color: var(--text-tertiary); font-size: 12.5px; }
 .site-footer-links { display: flex; flex-wrap: wrap; gap: 16px; }
 .site-footer-links a { color: var(--text-secondary); font-weight: 550; }
 .site-footer-links a:hover { color: var(--text-primary); }
