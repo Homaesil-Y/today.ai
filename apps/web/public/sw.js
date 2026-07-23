@@ -1,6 +1,7 @@
-// 오늘의 AI PWA service worker.
+// 오늘의AI PWA service worker.
 // 페이지 요청은 network-first(신선도 우선, 오프라인 시 캐시), 정적 자산은 cache-first.
-const CACHE = "oh-ai-v1";
+// 스타일이 크게 바뀌어 캐시를 무효화(v2)한다.
+const CACHE = "oh-ai-v2";
 const OFFLINE_URL = "/offline.html";
 const PRECACHE = ["/", OFFLINE_URL, "/manifest.webmanifest"];
 
