@@ -20,6 +20,7 @@
     "report:daily": "pnpm --filter @ai-trend-radar/pipeline report:daily",
     "report:send": "pnpm --filter @ai-trend-radar/pipeline report:send",
     "verify:live": "pnpm --filter @ai-trend-radar/pipeline verify:live",
+    "news:collect": "pnpm --filter @ai-trend-radar/pipeline news:collect",
     "preview:live": "pnpm --filter @ai-trend-radar/pipeline preview:live"
   }
 }

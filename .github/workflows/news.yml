@@ -1,0 +1,38 @@
+name: AI news collection
+
+on:
+  schedule:
+    # 글로벌 AI 뉴스 RSS를 3시간마다 수집해 한국어로 요약한다. (UTC)
+    # 수집 파이프라인(:17)·분석 재시도(:47)와 겹치지 않도록 :07에 실행한다.
+    - cron: "7 */3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-news-collection
+  cancel-in-progress: false
+
+jobs:
+  collect-news:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      APP_TIMEZONE: Asia/Seoul
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GEMINI_MODEL: gemini-3.1-flash-lite
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: 글로벌 AI 뉴스 수집·한국어 요약
+        run: pnpm news:collect

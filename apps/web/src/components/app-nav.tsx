@@ -9,6 +9,7 @@ import {
   GitCompareArrows,
   LayoutDashboard,
   Menu,
+  Newspaper,
   Settings,
   Shapes,
   ShieldCheck,
@@ -18,13 +19,23 @@ import type { Route } from "next";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
+// PC 사이드바 순서: 서비스 비교 → 관심 목록 → AI 뉴스 → 리포트
 const nav = [
   { label: "오늘의 레이더", href: "/", icon: LayoutDashboard },
   { label: "트렌드 탐색", href: "/explore", icon: Compass },
   { label: "카테고리", href: "/categories", icon: Shapes },
   { label: "서비스 비교", href: "/compare", icon: GitCompareArrows },
   { label: "관심 목록", href: "/watchlist", icon: Bookmark },
+  { label: "AI 뉴스", href: "/news", icon: Newspaper },
   { label: "리포트", href: "/reports", icon: FileText },
+] as const;
+
+// 모바일 하단 바 기본 탭: 서비스 비교 자리에 AI 뉴스를 노출한다.
+const mobilePrimary = [
+  { label: "레이더", href: "/", icon: LayoutDashboard },
+  { label: "트렌드 탐색", href: "/explore", icon: Compass },
+  { label: "카테고리", href: "/categories", icon: Shapes },
+  { label: "AI 뉴스", href: "/news", icon: Newspaper },
 ] as const;
 
 function useIsActive() {
@@ -64,6 +75,7 @@ export function MobileNavLinks({ isAdmin }: { isAdmin: boolean }) {
   // 하단 바에는 상단 4개만 노출하고, 나머지는 "더보기" 시트로 모은다.
   // (시트는 항목 탭·배경 탭 시 닫힌다.)
   const moreItems: MoreItem[] = [
+    { label: "서비스 비교", href: "/compare" as Route, icon: GitCompareArrows },
     { label: "관심 목록", href: "/watchlist" as Route, icon: Bookmark },
     { label: "리포트", href: "/reports" as Route, icon: FileText },
     ...(isAdmin
@@ -89,8 +101,8 @@ export function MobileNavLinks({ isAdmin }: { isAdmin: boolean }) {
         </div>
       )}
       <nav className="mobile-nav" aria-label="모바일 주요 탐색">
-        {nav.slice(0, 4).map(({ label, href, icon: Icon }) => (
-          <Link key={href} href={href} className={isActive(href) ? "active" : ""} onClick={() => setMoreOpen(false)}><Icon size={20} /><span>{label.replace("오늘의 ", "")}</span></Link>
+        {mobilePrimary.map(({ label, href, icon: Icon }) => (
+          <Link key={href} href={href} className={isActive(href) ? "active" : ""} onClick={() => setMoreOpen(false)}><Icon size={20} /><span>{label}</span></Link>
         ))}
         <button
           type="button"

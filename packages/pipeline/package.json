@@ -13,6 +13,7 @@
     "report:daily": "tsx src/cli/report.ts",
     "report:send": "tsx src/cli/notify.ts",
     "verify:live": "tsx src/cli/verify.ts",
+    "news:collect": "tsx src/cli/news.ts",
     "publish:reviewed": "tsx src/cli/publish-reviewed.ts",
     "bootstrap:owner": "tsx src/cli/bootstrap-owner.ts",
     "preview:live": "tsx src/cli/preview.ts"
