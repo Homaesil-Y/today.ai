@@ -5,6 +5,7 @@ import { getCurrentUserRole } from "@/lib/auth";
 import { MobileNavLinks, SidebarNavLinks } from "./app-nav";
 import { AuthControl } from "./auth-control";
 import { BackToTop } from "./back-to-top";
+import { SiteFooter } from "./site-footer";
 
 export async function AppShell({ children }: { children: ReactNode }) {
   const { role } = await getCurrentUserRole();
@@ -34,7 +35,7 @@ export async function AppShell({ children }: { children: ReactNode }) {
         <SidebarNavLinks isAdmin={isAdmin} />
       </aside>
 
-      <main className="main-content" id="main-content" tabIndex={-1}>{children}</main>
+      <main className="main-content" id="main-content" tabIndex={-1}>{children}<SiteFooter /></main>
 
       <BackToTop />
       <MobileNavLinks isAdmin={isAdmin} />
