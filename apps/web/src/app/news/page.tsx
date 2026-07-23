@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import type { Route } from "next";
 import Link from "next/link";
-import { ArrowUpRight, ChevronLeft, ChevronRight, Newspaper, Search, X } from "lucide-react";
+import { ArrowUpRight, Newspaper, Search, X } from "lucide-react";
+import { Pagination } from "@/components/pagination";
 import { getNewsPage } from "@/data/news";
 
 export const dynamic = "force-dynamic";
@@ -27,23 +28,6 @@ function currentKstDate() {
 }
 function kstDate(iso: string) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date(iso));
-}
-
-// 현재 페이지 주변 + 처음/끝만 노출하고 사이는 생략(…)한다.
-function pageWindow(current: number, total: number): (number | "ellipsis")[] {
-  const shown = new Set<number>();
-  for (let p = 1; p <= total; p += 1) {
-    if (p === 1 || p === total || Math.abs(p - current) <= 1) shown.add(p);
-  }
-  const sorted = [...shown].sort((a, b) => a - b);
-  const out: (number | "ellipsis")[] = [];
-  let prev = 0;
-  for (const p of sorted) {
-    if (prev && p - prev > 1) out.push("ellipsis");
-    out.push(p);
-    prev = p;
-  }
-  return out;
 }
 
 export default async function NewsPage({ searchParams }: { searchParams: SearchParams }) {
@@ -112,27 +96,7 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
             })}
           </div>
 
-          {totalPages > 1 && (
-            <nav className="news-pagination" aria-label="페이지 이동">
-              {page > 1
-                ? <Link className="news-page-arrow" href={hrefFor(page - 1)} aria-label="이전 페이지" rel="prev"><ChevronLeft size={16} />이전</Link>
-                : <span className="news-page-arrow is-disabled" aria-hidden="true"><ChevronLeft size={16} />이전</span>}
-
-              <div className="news-page-numbers">
-                {pageWindow(page, totalPages).map((entry, index) =>
-                  entry === "ellipsis"
-                    ? <span className="news-page-gap" key={`gap-${index}`}>…</span>
-                    : <Link className={`news-page-num ${entry === page ? "active" : ""}`} href={hrefFor(entry)} key={entry} aria-current={entry === page ? "page" : undefined}>{entry}</Link>,
-                )}
-              </div>
-
-              <span className="news-page-status">{page} / {totalPages}</span>
-
-              {page < totalPages
-                ? <Link className="news-page-arrow" href={hrefFor(page + 1)} aria-label="다음 페이지" rel="next">다음<ChevronRight size={16} /></Link>
-                : <span className="news-page-arrow is-disabled" aria-hidden="true">다음<ChevronRight size={16} /></span>}
-            </nav>
-          )}
+          <Pagination page={page} totalPages={totalPages} hrefFor={hrefFor} />
         </>
       )}
     </div>
