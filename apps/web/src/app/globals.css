@@ -451,21 +451,22 @@ button { color: inherit; }
 .news-external { display: inline-flex; align-items: center; gap: 3px; margin-left: auto; color: var(--brand-primary); font-weight: 600; }
 .news-external:hover { color: var(--brand-primary-active); }
 
-.news-pagination { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 20px; }
-.news-page-arrow { display: inline-flex; align-items: center; gap: 3px; height: 38px; padding: 0 14px; border: 1px solid var(--border-default); border-radius: 9px; color: var(--text-primary); font-size: 13px; font-weight: 600; background: var(--bg-surface); }
-.news-page-arrow:hover { border-color: var(--border-strong); background: var(--bg-surface-hover); }
-.news-page-arrow.is-disabled { color: var(--text-tertiary); background: var(--bg-surface-subtle); cursor: not-allowed; }
-.news-page-numbers { display: flex; align-items: center; gap: 4px; }
-.news-page-num { display: inline-flex; align-items: center; justify-content: center; min-width: 38px; height: 38px; padding: 0 6px; border: 1px solid var(--border-default); border-radius: 9px; color: var(--text-secondary); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; background: var(--bg-surface); }
-.news-page-num:hover { border-color: var(--border-strong); background: var(--bg-surface-hover); }
-.news-page-num.active { color: white; border-color: var(--brand-primary); background: var(--brand-primary); }
-.news-page-gap { color: var(--text-tertiary); padding: 0 2px; }
-.news-page-status { display: none; color: var(--text-secondary); font-size: 13px; font-variant-numeric: tabular-nums; }
+/* 공유 페이지네이션(뉴스·탐색). PC는 번호, 모바일은 이전/다음 + "N / M". */
+.pagination { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 20px; }
+.pagination-arrow { display: inline-flex; align-items: center; gap: 3px; height: 38px; padding: 0 14px; border: 1px solid var(--border-default); border-radius: 9px; color: var(--text-primary); font-size: 13px; font-weight: 600; background: var(--bg-surface); }
+.pagination-arrow:hover { border-color: var(--border-strong); background: var(--bg-surface-hover); }
+.pagination-arrow.is-disabled { color: var(--text-tertiary); background: var(--bg-surface-subtle); cursor: not-allowed; }
+.pagination-numbers { display: flex; align-items: center; gap: 4px; }
+.pagination-num { display: inline-flex; align-items: center; justify-content: center; min-width: 38px; height: 38px; padding: 0 6px; border: 1px solid var(--border-default); border-radius: 9px; color: var(--text-secondary); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; background: var(--bg-surface); }
+.pagination-num:hover { border-color: var(--border-strong); background: var(--bg-surface-hover); }
+.pagination-num.active { color: white; border-color: var(--brand-primary); background: var(--brand-primary); }
+.pagination-gap { color: var(--text-tertiary); padding: 0 2px; }
+.pagination-status { display: none; color: var(--text-secondary); font-size: 13px; font-variant-numeric: tabular-nums; }
 /* 모바일: 넘버링 대신 이전/다음 + 현재 페이지 표시 */
 @media (max-width: 767px) {
-  .news-page-numbers { display: none; }
-  .news-page-status { display: inline; }
-  .news-pagination { justify-content: space-between; }
+  .pagination-numbers { display: none; }
+  .pagination-status { display: inline; }
+  .pagination { justify-content: space-between; }
 }
 
 .compare-add { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
