@@ -2,6 +2,7 @@
 
 import { FolderPlus } from "lucide-react";
 import { useActionState } from "react";
+import { SubmitButton } from "@/components/submit-button";
 import { createWatchlist } from "./actions";
 
 const initialState = { error: "" };
@@ -12,7 +13,7 @@ export function FolderCreateForm() {
   return (
     <form className="folder-create" action={formAction}>
       <label><span className="sr-only">새 폴더 이름</span><input name="name" required maxLength={40} placeholder="새 폴더 이름" /></label>
-      <button className="button button-secondary" type="submit"><FolderPlus size={16} />추가</button>
+      <SubmitButton className="button button-secondary" pendingLabel="추가 중…"><FolderPlus size={16} />추가</SubmitButton>
       {state.error && <p className="folder-error" role="alert">{state.error}</p>}
     </form>
   );
