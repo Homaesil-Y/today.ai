@@ -31,16 +31,14 @@ function mapRow(row: z.infer<typeof rowSchema>): NewsItem {
   };
 }
 
-export type NewsField = "content" | "source";
-
 // PostgREST or-필터/ilike를 깨뜨리는 문자를 제거한다.
 function sanitizeQuery(value: string): string {
   return value.replace(/[,()%*]/gu, " ").replace(/\s+/gu, " ").trim().slice(0, 80);
 }
 
-// 검색어(field 대상 ilike)와 페이지네이션을 적용해 뉴스 한 페이지와 전체 건수를 반환한다.
-export const getNewsPage = cache(async (params: { field: NewsField; q: string; page: number; pageSize: number }): Promise<{ items: NewsItem[]; total: number }> => {
-  const { field, page, pageSize } = params;
+// 통합 검색(제목·내용·출처)과 페이지네이션을 적용해 뉴스 한 페이지와 전체 건수를 반환한다.
+export const getNewsPage = cache(async (params: { q: string; page: number; pageSize: number }): Promise<{ items: NewsItem[]; total: number }> => {
+  const { page, pageSize } = params;
   const q = sanitizeQuery(params.q);
   try {
     const supabase = createPublicClient();
@@ -49,9 +47,7 @@ export const getNewsPage = cache(async (params: { field: NewsField; q: string; p
       .select("id, source, url, ko_title, ko_summary, published_at", { count: "exact" })
       .eq("is_published", true);
     if (q) {
-      query = field === "source"
-        ? query.ilike("source", `%${q}%`)
-        : query.or(`ko_title.ilike.%${q}%,ko_summary.ilike.%${q}%`);
+      query = query.or(`ko_title.ilike.%${q}%,ko_summary.ilike.%${q}%,source.ilike.%${q}%`);
     }
     const from = Math.max(0, (page - 1) * pageSize);
     const { data, error, count } = await query
