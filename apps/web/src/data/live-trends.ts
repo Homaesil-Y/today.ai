@@ -1,8 +1,14 @@
 import type { SourceCode, TrendEntity, TrendStatus } from "@ai-trend-radar/types";
+import { unstable_cache } from "next/cache";
 import { cache } from "react";
 import { z } from "zod";
 import { createPublicClient } from "@/lib/supabase/server";
 import { compareByScore } from "./trend-query";
+
+// 공개 데이터는 3시간 주기 파이프라인으로만 바뀌므로 요청마다 Supabase를 다시 치지 않는다.
+// unstable_cache로 서버에서 교차 요청 캐싱(180초)해 TTFB를 줄인다. createPublicClient는 쿠키를
+// 읽지 않으므로(익명 클라이언트) 안전하다. react cache()는 같은 요청 내 중복 호출만 합친다.
+const TRENDS_REVALIDATE_SECONDS = 180;
 
 const entitySchema = z.object({
   id: z.string(),
@@ -65,7 +71,7 @@ function latestByEntity<T extends { entity_id: string }>(rows: T[]) {
   return map;
 }
 
-export const getPublishedTrends = cache(async (): Promise<TrendEntity[]> => {
+export const getPublishedTrends = cache(unstable_cache(async (): Promise<TrendEntity[]> => {
   const supabase = createPublicClient();
   const { data: entityData, error: entityError } = await supabase
     .from("entities")
@@ -160,7 +166,7 @@ export const getPublishedTrends = cache(async (): Promise<TrendEntity[]> => {
     })
     .sort(compareByScore)
     .map((trend, index) => ({ ...trend, rank: index + 1 }));
-});
+}, ["published-trends"], { revalidate: TRENDS_REVALIDATE_SECONDS, tags: ["trends"] }));
 
 export const getPublishedTrend = cache(async (slug: string) => {
   const trends = await getPublishedTrends();
@@ -173,7 +179,7 @@ export type TrendScoreHistoryPoint = { measuredAt: string; score: number };
 
 // 파이프라인이 실행될 때마다 쌓이는 실제 스냅샷(trend_scores) 이력을 시간순으로 반환한다.
 // 기간 탭(24H/7D/30D/90D)이 실제 데이터로 동작하도록 상세 페이지에서 사용한다.
-export const getTrendScoreHistory = cache(async (entityId: string): Promise<TrendScoreHistoryPoint[]> => {
+export const getTrendScoreHistory = cache(unstable_cache(async (entityId: string): Promise<TrendScoreHistoryPoint[]> => {
   const supabase = createPublicClient();
   const { data, error } = await supabase
     .from("trend_scores")
@@ -185,4 +191,4 @@ export const getTrendScoreHistory = cache(async (entityId: string): Promise<Tren
     measuredAt: row.calculated_at,
     score: Math.round(row.total_score * 10) / 10,
   }));
-});
+}, ["trend-score-history"], { revalidate: TRENDS_REVALIDATE_SECONDS, tags: ["trends"] }));
