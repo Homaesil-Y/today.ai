@@ -44,6 +44,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   themeColor: "#6d5dfb",
   colorScheme: "light",
+  // 홈 인디케이터 영역(safe-area) 인셋이 실제 값으로 잡히도록 화면 전체를 사용한다.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
