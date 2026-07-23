@@ -1,10 +1,20 @@
 import type { Metadata, Viewport } from "next";
+import localFont from "next/font/local";
 import { AppShell } from "@/components/app-shell";
 import { PwaRegister } from "@/components/pwa-register";
 import { StructuredData } from "@/components/structured-data";
 import { absoluteUrl, siteConfig } from "@/lib/site";
-import "pretendard/dist/web/static/pretendard.css";
 import "./globals.css";
+
+// Pretendard 가변 폰트를 next/font로 자체 호스팅한다. preload + font-display:swap으로
+// 렌더 블로킹 CSS import와 FOUT을 없앤다. --font-pretendard CSS 변수로 노출.
+const pretendard = localFont({
+  src: "../fonts/PretendardVariable.woff2",
+  display: "swap",
+  weight: "100 900",
+  variable: "--font-pretendard",
+  fallback: ["-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
@@ -68,5 +78,5 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     description: siteConfig.description,
     publisher: { "@id": absoluteUrl("/#organization") },
   };
-  return <html lang="ko"><body><StructuredData data={[organization, website]} /><PwaRegister /><AppShell>{children}</AppShell></body></html>;
+  return <html lang="ko" className={pretendard.variable}><body><StructuredData data={[organization, website]} /><PwaRegister /><AppShell>{children}</AppShell></body></html>;
 }
