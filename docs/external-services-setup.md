@@ -4,7 +4,7 @@ API 정책과 quota는 변동되므로 실제 연결 직전에 각 공식 문서
 
 | 서비스 | 환경변수 | 설정·권한 | callback / 범위 | 호출 제한 | 현재 상태 | 테스트 |
 |---|---|---|---|---|---|---|
-| Supabase | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | 프로젝트 생성, migration, RLS | Auth callback은 로컬/preview/prod URL 등록 | 플랜별 DB/Auth quota 확인 | BLOCKED | staging migration + anon/auth/admin RLS matrix |
+| Supabase | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` (구 `SUPABASE_SERVICE_ROLE_KEY`) | 프로젝트 생성, migration, RLS | Auth callback은 로컬/preview/prod URL 등록 | 플랜별 DB/Auth quota 확인 | BLOCKED | staging migration + anon/auth/admin RLS matrix |
 | Google OAuth | Supabase dashboard + Google client secret | OAuth consent screen, 최소 profile/email | `https://<project-ref>.supabase.co/auth/v1/callback` 및 앱 redirect allowlist | Google/Supabase 정책 확인 | BLOCKED | 신규/기존 사용자, 취소, callback mismatch |
 | GitHub | `GITHUB_TOKEN` 선택 | fine-grained token 또는 무인증 public REST | read-only repository metadata | REST search/core rate limit header를 실행별 저장 | CONNECTED | 30건 DB 저장, 재수집 0 insert/30 update 확인 |
 | Hacker News | 없음 | Algolia HN Search 공개 API | read-only story search | 공식 SLA가 아니므로 보수적 retry/cache | CONNECTED | 50건 DB 저장, 누락 URL fallback·재수집 멱등성 확인 |
