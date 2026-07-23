@@ -1,4 +1,4 @@
-import { Activity, Boxes, GitFork, Radio, SlidersHorizontal } from "lucide-react";
+import { Activity, Boxes, GitFork, Radio, Shapes, ShieldCheck, SlidersHorizontal } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { RankingTable } from "@/components/ranking-table";
@@ -24,14 +24,21 @@ const faqItems = [
 export default async function DashboardPage() {
   const [allTrends, savedEntityIds] = await Promise.all([getPublishedTrends(), getSavedEntityIds()]);
   const trends = allTrends.slice(0, 10);
-  // 값이 0인 지표는 서비스의 가치 제안("확산 속도·교차 신호")을 스스로 부정하므로 숨긴다.
-  // 데이터가 쌓여 0을 벗어나면 카드가 자동으로 다시 나타난다.
+  const risingCount = allTrends.filter(({ status }) => ["RISING", "SURGING", "PEAK"].includes(status)).length;
+  const crossChannelCount = allTrends.filter(({ sources }) => sources.length > 1).length;
+  const categoryCount = new Set(allTrends.map(({ category }) => category)).size;
+  const avgTrust = allTrends.length ? Math.round(allTrends.reduce((sum, { trustScore }) => sum + trustScore, 0) / allTrends.length) : 0;
+  // 값이 0인 지표는 서비스의 가치 제안("확산 속도·교차 신호")을 스스로 부정한다.
+  // 그래서 상승·교차 지표는 유효할 때만 노출하고, 비어 있으면 항상 채워지는 지표(분야 수·평균 신뢰도)로
+  // 4장을 채운다. 공개 수·오픈소스는 항상 유지하며, 데이터가 쌓이면 상승·교차가 자동으로 되살아난다.
   const kpis = [
     { label: "공개된 AI 서비스", value: allTrends.length, delta: "실시간", icon: Radio, tone: "cyan" },
-    { label: "상승 중인 서비스", value: allTrends.filter(({ status }) => ["RISING", "SURGING", "PEAK"].includes(status)).length, delta: "승인 기준", icon: Activity, tone: "orange" },
-    { label: "교차 채널 확산", value: allTrends.filter(({ sources }) => sources.length > 1).length, delta: "2개+ 채널", icon: GitFork, tone: "violet" },
+    { label: "상승 중인 서비스", value: risingCount, delta: "확산 신호", icon: Activity, tone: "orange" },
+    { label: "교차 채널 확산", value: crossChannelCount, delta: "2개+ 채널", icon: GitFork, tone: "violet" },
     { label: "오픈소스", value: allTrends.filter(({ isOpenSource }) => isOpenSource).length, delta: "GitHub 기준", icon: Boxes, tone: "blue" },
-  ].filter(({ value }) => value > 0);
+    { label: "분야", value: categoryCount, delta: "카테고리", icon: Shapes, tone: "violet" },
+    { label: "평균 신뢰도", value: avgTrust, delta: "100점 기준", icon: ShieldCheck, tone: "orange" },
+  ].filter(({ value }) => value > 0).slice(0, 4);
   const updatedAt = trends[0]?.updatedAt ? new Date(trends[0].updatedAt) : null;
   const updatedLabel = updatedAt
     ? new Intl.DateTimeFormat("ko-KR", {
