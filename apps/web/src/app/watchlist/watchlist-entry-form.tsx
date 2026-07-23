@@ -3,6 +3,7 @@
 import { Save } from "lucide-react";
 import { useActionState } from "react";
 import { FormDropdown } from "@/components/form-dropdown";
+import { SubmitButton } from "@/components/submit-button";
 import { WatchButton } from "@/components/watch-button";
 import { updateWatchlistEntry } from "./actions";
 
@@ -30,7 +31,7 @@ export function WatchlistEntryForm({
       <input type="hidden" name="itemId" value={itemId} />
       <label><span>폴더</span><FormDropdown name="watchlistId" ariaLabel="폴더" placeholder="폴더 선택" defaultValue={currentWatchlistId} options={folders.map((folder) => ({ value: folder.id, label: folder.name }))} /></label>
       <label><span>메모</span><textarea name="memo" defaultValue={memo} maxLength={500} placeholder="활용 아이디어나 확인할 내용을 기록하세요." /></label>
-      <div><button className="button button-primary" type="submit"><Save size={16} />변경 저장</button><WatchButton entityId={entityId} initialSaved /></div>
+      <div><SubmitButton className="button button-primary" pendingLabel="저장 중…"><Save size={16} />변경 저장</SubmitButton><WatchButton entityId={entityId} initialSaved /></div>
       {state.error && <p className="folder-error" role="alert">{state.error}</p>}
     </form>
   );

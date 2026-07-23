@@ -528,6 +528,20 @@ button { color: inherit; }
 .skeleton-card { height: 104px; border-radius: var(--radius-md); }
 .skeleton-rows { display: flex; flex-direction: column; gap: 10px; }
 .skeleton-row { height: 56px; border-radius: var(--radius-md); }
+
+/* 제출 중 스피너(reduced-motion에서는 전역 규칙이 정지시킨다). */
+.spin { animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* 액션 성공 토스트. 내비/오버레이보다 위(z 50). */
+.toast { position: fixed; top: 76px; left: 50%; transform: translateX(-50%); z-index: 50; display: flex; align-items: center; gap: 8px; max-width: calc(100vw - 32px); padding: 11px 14px; border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--bg-surface); color: var(--text-primary); box-shadow: var(--shadow-md); font-size: 14px; font-weight: 550; }
+.toast > svg:first-child { color: var(--status-rising); flex: none; }
+.toast-close { display: inline-flex; margin-left: 4px; padding: 0; color: var(--text-tertiary); background: transparent; border: 0; cursor: pointer; }
+
+/* 회원 탈퇴 확인 문구 입력. */
+.danger-typed { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; font-size: 13px; color: var(--text-secondary); }
+.danger-typed input { max-width: 220px; height: 40px; padding: 0 12px; border: 1px solid var(--border-default); border-radius: 9px; background: var(--bg-surface-subtle); font: inherit; color: var(--text-primary); }
+.danger-typed input:focus-visible { border-color: var(--border-focus); background: var(--bg-surface); }
 .login-page { min-height: calc(100vh - 64px); display: grid; place-items: center; padding: 32px; background: radial-gradient(circle at 50% 15%, var(--brand-soft), transparent 38%); }
 .login-card { width: min(100%, 480px); padding: 38px; border: 1px solid var(--border-default); border-radius: 20px; background: var(--bg-surface); box-shadow: var(--shadow-md); text-align: center; }
 .login-brand { width: 48px; height: 48px; margin: 0 auto 20px; border-radius: 14px; }
