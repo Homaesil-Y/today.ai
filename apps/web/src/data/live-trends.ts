@@ -105,6 +105,21 @@ export const getPublishedTrends = cache(unstable_cache(async (): Promise<TrendEn
     scoreHistoryByEntity.set(row.entity_id, list);
   }
 
+  // 순위 변동(▲▼): 스냅샷이 2개 이상 쌓인 엔티티들만 대상으로 현재 점수 순위와 직전 스냅샷 점수 순위를 비교한다.
+  // 이력이 부족한 엔티티는 0(“—”/“초기 집계”)으로 두어 데이터가 없을 때 가짜 변동을 보이지 않는다.
+  const rankChangeByEntity = new Map<string, number>();
+  const eligible = [...scoreHistoryByEntity.entries()].filter(([, list]) => list.length >= 2);
+  if (eligible.length >= 2) {
+    const currentRank = new Map<string, number>();
+    const previousRank = new Map<string, number>();
+    [...eligible].sort((a, b) => (b[1][0] ?? 0) - (a[1][0] ?? 0)).forEach(([id], index) => currentRank.set(id, index + 1));
+    [...eligible].sort((a, b) => (b[1][1] ?? 0) - (a[1][1] ?? 0)).forEach(([id], index) => previousRank.set(id, index + 1));
+    for (const [id] of eligible) {
+      const change = (previousRank.get(id) ?? 0) - (currentRank.get(id) ?? 0);
+      if (change !== 0) rankChangeByEntity.set(id, change);
+    }
+  }
+
   return entities
     .map((entity) => {
       const score = scores.get(entity.id);
@@ -132,7 +147,7 @@ export const getPublishedTrends = cache(unstable_cache(async (): Promise<TrendEn
         isOpenSource: entity.is_open_source,
         status,
         rank: 0,
-        rankChange: 0,
+        rankChange: rankChangeByEntity.get(entity.id) ?? 0,
         trendScore: totalScore,
         trustScore: Math.round((score?.trust_score ?? 0) * 10) / 10,
         scoreBreakdown: {
