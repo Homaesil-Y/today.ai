@@ -1,6 +1,9 @@
+import { unstable_cache } from "next/cache";
 import { cache } from "react";
 import { z } from "zod";
 import { createPublicClient } from "@/lib/supabase/server";
+
+const REPORTS_REVALIDATE_SECONDS = 300;
 
 const topServiceSchema = z.object({
   rank: z.number(),
@@ -41,7 +44,7 @@ export type DailyReport = ReportSummary & {
   content: z.infer<typeof contentSchema>;
 };
 
-export const getPublishedReports = cache(async (): Promise<ReportSummary[]> => {
+export const getPublishedReports = cache(unstable_cache(async (): Promise<ReportSummary[]> => {
   const supabase = createPublicClient();
   const { data, error } = await supabase
     .from("reports")
@@ -57,9 +60,9 @@ export const getPublishedReports = cache(async (): Promise<ReportSummary[]> => {
     summary: row.summary,
     publishedAt: row.published_at,
   }));
-});
+}, ["published-reports"], { revalidate: REPORTS_REVALIDATE_SECONDS, tags: ["reports"] }));
 
-export const getDailyReport = cache(async (reportDate: string): Promise<DailyReport | null> => {
+export const getDailyReport = cache(unstable_cache(async (reportDate: string): Promise<DailyReport | null> => {
   const supabase = createPublicClient();
   const { data, error } = await supabase
     .from("reports")
@@ -78,4 +81,4 @@ export const getDailyReport = cache(async (reportDate: string): Promise<DailyRep
     publishedAt: row.published_at,
     content: contentSchema.catch({ totalPublic: 0, topServices: [] }).parse(row.content_json),
   };
-});
+}, ["daily-report"], { revalidate: REPORTS_REVALIDATE_SECONDS, tags: ["reports"] }));
