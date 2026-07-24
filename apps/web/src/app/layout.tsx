@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { AppShell } from "@/components/app-shell";
+import { GoogleTagManagerNoScript, GoogleTagManagerScript } from "@/components/google-tag-manager";
 import { PwaRegister } from "@/components/pwa-register";
 import { StructuredData } from "@/components/structured-data";
 import { absoluteUrl, siteConfig } from "@/lib/site";
@@ -78,5 +79,15 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     description: siteConfig.description,
     publisher: { "@id": absoluteUrl("/#organization") },
   };
-  return <html lang="ko" className={pretendard.variable}><body><StructuredData data={[organization, website]} /><PwaRegister /><AppShell>{children}</AppShell></body></html>;
+  return (
+    <html lang="ko" className={pretendard.variable}>
+      <GoogleTagManagerScript />
+      <body>
+        <GoogleTagManagerNoScript />
+        <StructuredData data={[organization, website]} />
+        <PwaRegister />
+        <AppShell>{children}</AppShell>
+      </body>
+    </html>
+  );
 }
