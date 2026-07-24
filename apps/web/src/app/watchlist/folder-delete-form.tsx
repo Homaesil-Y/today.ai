@@ -1,7 +1,8 @@
 "use client";
 
 import { Trash2 } from "lucide-react";
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef } from "react";
+import { trackEvent } from "@/lib/analytics";
 import { deleteEmptyWatchlist } from "./actions";
 
 const initialState = { error: "" };
@@ -9,6 +10,11 @@ const initialState = { error: "" };
 // 빈 폴더 삭제 폼. 삭제 불가 상황(기본 폴더·비어있지 않음)을 서버 에러 화면이 아니라 인라인으로 알린다.
 export function FolderDeleteForm({ watchlistId }: { watchlistId: string }) {
   const [state, formAction] = useActionState(deleteEmptyWatchlist, initialState);
+  const prevState = useRef(state);
+  useEffect(() => {
+    if (state !== prevState.current && !state.error) trackEvent("delete_folder", { page_type: "watchlist" });
+    prevState.current = state;
+  }, [state]);
   return (
     <form action={formAction}>
       <input type="hidden" name="watchlistId" value={watchlistId} />

@@ -4,8 +4,9 @@ import { Bookmark, Check } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { setWatchlistItem } from "@/app/watchlist/actions";
+import { pageTypeFor, trackEvent } from "@/lib/analytics";
 
-export function WatchButton({ entityId, compact = false, initialSaved = false }: { entityId: string; compact?: boolean; initialSaved?: boolean }) {
+export function WatchButton({ entityId, slug, compact = false, initialSaved = false }: { entityId: string; slug?: string; compact?: boolean; initialSaved?: boolean }) {
   const [saved, setSaved] = useState(initialSaved);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -25,6 +26,7 @@ export function WatchButton({ entityId, compact = false, initialSaved = false }:
         return;
       }
       setSaved(result.saved);
+      trackEvent("save_watchlist", { page_type: pageTypeFor(pathname), saved: result.saved, ...(slug ? { service_slug: slug } : {}) });
       router.refresh();
     });
   }

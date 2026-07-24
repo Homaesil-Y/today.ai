@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Dropdown } from "@/components/dropdown";
+import { trackEvent } from "@/lib/analytics";
 
 type Option = { slug: string; name: string; category: string };
 
@@ -30,6 +31,7 @@ export function CompareAddForm({ options, selectedSlugs }: { options: Option[]; 
 
   const add = () => {
     if (!slug) return;
+    trackEvent("add_to_compare", { service_slug: slug, compare_count: selectedSlugs.length + 1, trigger: "compare_page", page_type: "compare" });
     router.push(`/compare?slugs=${[...selectedSlugs, slug].join(",")}` as Route);
   };
 

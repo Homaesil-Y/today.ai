@@ -4,7 +4,7 @@ import type { Route } from "next";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { safeNextPath } from "@/lib/navigation";
+import { safeNextPath, withParam } from "@/lib/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -75,6 +75,7 @@ export async function completeOnboarding(formData: FormData) {
   const { error } = await supabase.from("user_profiles").update({ onboarding_completed: true, updated_at: new Date().toISOString() }).eq("id", user.id);
   if (error) throw new Error("온보딩을 완료하지 못했습니다.");
   const nextPath = safeNextPath(formData.get("next"));
-  redirect(nextPath as Route);
+  // onboarded=1은 AnalyticsPageView가 도착 페이지에서 감지해 complete_onboarding 이벤트를 쏘고 스스로 지운다.
+  redirect(withParam(nextPath, "onboarded", "1") as Route);
 }
 

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { Route } from "next";
 import Link from "next/link";
 import { ArrowUpRight, Newspaper, Search, X } from "lucide-react";
+import { AnalyticsNoResults } from "@/components/analytics-no-results";
 import { Pagination } from "@/components/pagination";
 import { StructuredData } from "@/components/structured-data";
 import { getNewsPage } from "@/data/news";
@@ -84,6 +85,7 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
 
       {items.length === 0 ? (
         <div className="empty-state">
+          <AnalyticsNoResults searchTerm={q} pageType="news" />
           <Newspaper size={30} />
           <h2>{q ? "검색 결과가 없습니다" : "아직 수집된 뉴스가 없습니다"}</h2>
           <p>{q ? "다른 검색어나 검색 대상으로 다시 시도해보세요." : "글로벌 AI 뉴스를 3시간마다 수집해 한국어로 정리합니다. 첫 수집이 완료되면 이곳에 표시됩니다."}</p>
@@ -91,27 +93,28 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
       ) : (
         <>
           <div className="news-list">
-            {items.map((item) => {
+            {items.map((item, index) => {
               const isToday = kstDate(item.publishedAt) === today;
+              const gaParams = JSON.stringify({ target: "news_article", news_source: item.source, position: (page - 1) * PAGE_SIZE + index + 1 });
               return (
                 <article className="news-item" key={item.id}>
                   <div className="news-title-row">
                     {isToday && <span className="news-today">TODAY</span>}
-                    <a className="news-title" href={item.url} target="_blank" rel="noreferrer">{item.title}</a>
+                    <a className="news-title" href={item.url} target="_blank" rel="noreferrer" data-ga-event="click_outbound" data-ga-params={gaParams}>{item.title}</a>
                   </div>
                   <p className="news-summary">{item.summary}</p>
                   <div className="news-meta">
                     <span className="news-source">{item.source}</span>
                     <span aria-hidden="true">·</span>
                     <span>{formatDate(item.publishedAt)}</span>
-                    <a className="news-external" href={item.url} target="_blank" rel="noreferrer">원문 <ArrowUpRight size={13} aria-hidden="true" /></a>
+                    <a className="news-external" href={item.url} target="_blank" rel="noreferrer" data-ga-event="click_outbound" data-ga-params={gaParams}>원문 <ArrowUpRight size={13} aria-hidden="true" /></a>
                   </div>
                 </article>
               );
             })}
           </div>
 
-          <Pagination page={page} totalPages={totalPages} hrefFor={hrefFor} />
+          <Pagination page={page} totalPages={totalPages} hrefFor={hrefFor} list="news" />
         </>
       )}
     </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { trackEvent } from "@/lib/analytics";
 import { createClient } from "@/lib/supabase/client";
 
 export function GoogleLoginButton({ configured, nextPath = "/" }: { configured: boolean; nextPath?: string }) {
@@ -11,6 +12,7 @@ export function GoogleLoginButton({ configured, nextPath = "/" }: { configured: 
     if (!configured) return;
     setLoading(true);
     setError(null);
+    trackEvent("login_start", { method: "google", trigger: "login_page" });
     const supabase = createClient();
     const { error: signInError } = await supabase.auth.signInWithOAuth({
       provider: "google",

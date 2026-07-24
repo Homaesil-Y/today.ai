@@ -85,13 +85,13 @@ export default async function DashboardPage() {
       </section>
 
       <section className="section-block">
-        <div className="section-heading ranking-heading"><div><h2>전체 트렌드 랭킹</h2></div><Link className="button button-secondary" href="/explore"><SlidersHorizontal size={17} />필터·정렬로 전체 탐색</Link></div>
+        <div className="section-heading ranking-heading"><div><h2>전체 트렌드 랭킹</h2></div><Link className="button button-secondary" href="/explore" data-ga-event="select_content" data-ga-params={JSON.stringify({ content_type: "cta", item_id: "explore_from_home" })}><SlidersHorizontal size={17} />필터·정렬로 전체 탐색</Link></div>
         <div className="partial-notice" role="status"><Radio size={16} /><span><strong>MVP 데이터 안내</strong> 현재 순위는 GitHub·Hacker News 수집 신호를 기준으로 계산합니다.</span></div>
         {trends.length ? <RankingTable trends={trends} savedEntityIds={savedEntityIds} /> : null}
       </section>
 
       <section className="section-block answer-section" aria-labelledby="answer-heading">
-        <div className="section-heading"><div><h2 id="answer-heading">오늘의AI, 이렇게 활용해 보세요!</h2></div><Link href="/methodology">분석 방법론 전체 보기</Link></div>
+        <div className="section-heading"><div><h2 id="answer-heading">오늘의AI, 이렇게 활용해 보세요!</h2></div><Link href="/methodology" data-ga-event="select_content" data-ga-params={JSON.stringify({ item_id: "methodology" })}>분석 방법론 전체 보기</Link></div>
         <div className="answer-grid">{faqItems.map(({ question, answer }) => <article className="panel" key={question}><h3>{question}</h3><p>{answer}</p></article>)}</div>
       </section>
     </div>

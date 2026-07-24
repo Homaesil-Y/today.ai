@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { safeNextPath } from "./navigation";
+import { safeNextPath, withParam } from "./navigation";
 
 describe("safeNextPath", () => {
   it("keeps valid internal paths", () => {
@@ -28,5 +28,23 @@ describe("safeNextPath", () => {
 
   it("uses the provided fallback", () => {
     expect(safeNextPath("//evil.com", "/home")).toBe("/home");
+  });
+});
+
+describe("withParam", () => {
+  it("appends a query param to a bare path", () => {
+    expect(withParam("/settings", "saved", "1")).toBe("/settings?saved=1");
+  });
+
+  it("appends with & when a query string already exists", () => {
+    expect(withParam("/onboarding?next=/watchlist", "login", "1")).toBe("/onboarding?next=/watchlist&login=1");
+  });
+
+  it("keeps a hash fragment after the appended param", () => {
+    expect(withParam("/reports#top", "login", "1")).toBe("/reports?login=1#top");
+  });
+
+  it("appends before an existing hash when a query string is also present", () => {
+    expect(withParam("/explore?q=ai#section", "login", "1")).toBe("/explore?q=ai&login=1#section");
   });
 });

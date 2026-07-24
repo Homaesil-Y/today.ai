@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
+import { AnalyticsClickListener } from "@/components/analytics-click-listener";
+import { AnalyticsPageView } from "@/components/analytics-page-view";
 import { AppShell } from "@/components/app-shell";
 import { GoogleTagManagerNoScript, GoogleTagManagerScript } from "@/components/google-tag-manager";
 import { PwaRegister } from "@/components/pwa-register";
@@ -86,6 +88,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <GoogleTagManagerNoScript />
         <StructuredData data={[organization, website]} />
         <PwaRegister />
+        <AnalyticsPageView />
+        <AnalyticsClickListener />
         <AppShell>{children}</AppShell>
       </body>
     </html>
