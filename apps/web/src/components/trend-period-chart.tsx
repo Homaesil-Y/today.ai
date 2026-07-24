@@ -2,6 +2,7 @@
 
 import { ArrowUpRight } from "lucide-react";
 import { useMemo, useState } from "react";
+import { trackEvent } from "@/lib/analytics";
 
 type Point = { measuredAt: string; score: number };
 type PeriodKey = "24h" | "7d" | "30d" | "90d";
@@ -34,7 +35,7 @@ function projectPoints(points: Point[], windowStart: number, windowEnd: number) 
 
 // 실제 스냅샷(trend_scores) 이력을 시간축 기준으로 배치해 그리는 기간별 차트.
 // 데이터가 부족한 기간은 있는 그대로("스냅샷 N개")를 보여주고, 없는 값을 지어내지 않는다.
-export function TrendPeriodChart({ history, name, nowIso }: { history: Point[]; name: string; nowIso: string }) {
+export function TrendPeriodChart({ history, name, slug, nowIso }: { history: Point[]; name: string; slug: string; nowIso: string }) {
   const [period, setPeriod] = useState<PeriodKey>("7d");
   const now = useMemo(() => new Date(nowIso).getTime(), [nowIso]);
   const active = PERIODS.find((p) => p.key === period)!;
@@ -46,7 +47,7 @@ export function TrendPeriodChart({ history, name, nowIso }: { history: Point[]; 
     <>
       <div className="period-tabs" aria-label="그래프 기간" role="tablist">
         {PERIODS.map((p) => (
-          <button key={p.key} type="button" role="tab" aria-selected={p.key === period} className={p.key === period ? "active" : ""} onClick={() => setPeriod(p.key)}>
+          <button key={p.key} type="button" role="tab" aria-selected={p.key === period} className={p.key === period ? "active" : ""} onClick={() => { setPeriod(p.key); trackEvent("select_period", { period: p.key, service_slug: slug }); }}>
             {p.label}
           </button>
         ))}

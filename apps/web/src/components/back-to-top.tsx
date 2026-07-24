@@ -2,6 +2,7 @@
 
 import { ArrowUp } from "lucide-react";
 import { useEffect, useState } from "react";
+import { pageTypeFor, trackEvent } from "@/lib/analytics";
 
 const SHOW_AFTER_PX = 400;
 
@@ -34,7 +35,10 @@ export function BackToTop() {
       aria-hidden={!visible}
       tabIndex={visible ? 0 : -1}
       aria-label="맨 위로 이동"
-      onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+      onClick={() => {
+        trackEvent("click_back_to_top", { page_type: pageTypeFor(window.location.pathname) });
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }}
     >
       <ArrowUp size={19} aria-hidden="true" />
     </button>

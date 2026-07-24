@@ -28,7 +28,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         <p className="login-copy">로그인하면 관심 목록, 개인 메모와 맞춤 알림을 사용할 수 있습니다.</p>
         <GoogleLoginButton configured={configured} nextPath={nextPath} />
         <div className="login-assurance"><ShieldCheck size={16} /><span>Google의 기본 프로필과 이메일만 요청합니다.</span></div>
-        <Link className="browse-link" href="/">로그인 없이 둘러보기</Link>
+        <Link className="browse-link" href="/" data-ga-event="skip_login">로그인 없이 둘러보기</Link>
         <div className="login-legal"><Link href="/terms">이용약관</Link><Link href="/privacy">개인정보처리방침</Link></div>
       </section>
     </div>

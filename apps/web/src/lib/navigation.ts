@@ -16,3 +16,16 @@ export function safeNextPath(input: unknown, fallback = "/"): string {
   }
   return input;
 }
+
+/**
+ * 안전한 상대 경로(safeNextPath로 검증된 값)에 쿼리 파라미터 1개를 덧붙인다.
+ * 이미 쿼리·해시가 있어도 안전하게 이어붙이며, key/value는 항상 고정 문자열만 전달한다
+ * (사용자 입력을 직접 이어붙이지 않으므로 인젝션 위험이 없다).
+ */
+export function withParam(path: string, key: string, value: string): string {
+  const hashIndex = path.indexOf("#");
+  const base = hashIndex === -1 ? path : path.slice(0, hashIndex);
+  const hash = hashIndex === -1 ? "" : path.slice(hashIndex);
+  const separator = base.includes("?") ? "&" : "?";
+  return `${base}${separator}${key}=${value}${hash}`;
+}

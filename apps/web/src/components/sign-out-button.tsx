@@ -2,11 +2,13 @@
 
 import { CircleUserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { trackEvent } from "@/lib/analytics";
 import { createClient } from "@/lib/supabase/client";
 
 export function SignOutButton({ displayName }: { displayName: string }) {
   const router = useRouter();
   async function signOut() {
+    trackEvent("logout", {});
     await createClient().auth.signOut();
     router.push("/");
     router.refresh();

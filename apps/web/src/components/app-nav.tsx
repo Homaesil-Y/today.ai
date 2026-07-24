@@ -18,6 +18,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { pageTypeFor, trackEvent } from "@/lib/analytics";
 
 // PC 사이드바 순서: 서비스 비교 → 관심 목록 → AI 뉴스 → 리포트
 const nav = [
@@ -40,18 +41,23 @@ const mobilePrimary = [
 
 function useIsActive() {
   const pathname = usePathname();
-  return (href: string) => (href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`));
+  const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`));
+  return { isActive, pathname };
+}
+
+function trackNavClick(pathname: string, label: string) {
+  trackEvent("select_content", { content_type: "nav", item_id: label, page_type: pageTypeFor(pathname) });
 }
 
 export function SidebarNavLinks({ isAdmin }: { isAdmin: boolean }) {
-  const isActive = useIsActive();
+  const { isActive, pathname } = useIsActive();
   return (
     <>
       <nav>
         {nav.map(({ label, href, icon: Icon }) => {
           const active = isActive(href);
           return (
-            <Link key={href} className={`nav-link ${active ? "active" : ""}`} href={href}>
+            <Link key={href} className={`nav-link ${active ? "active" : ""}`} href={href} onClick={() => trackNavClick(pathname, label)}>
               <Icon size={19} aria-hidden="true" /><span>{label}</span>{active && <ChevronRight className="nav-arrow" size={16} />}
             </Link>
           );
@@ -61,7 +67,7 @@ export function SidebarNavLinks({ isAdmin }: { isAdmin: boolean }) {
         {isAdmin && <Link className={`nav-link ${isActive("/admin/review") ? "active" : ""}`} href={"/admin/review" as Route}><ShieldCheck size={19} /><span>후보 검토</span></Link>}
         {isAdmin && <Link className={`nav-link ${isActive("/admin/categories") ? "active" : ""}`} href={"/admin/categories" as Route}><Shapes size={19} /><span>카테고리 제안</span></Link>}
         {isAdmin && <Link className={`nav-link ${isActive("/admin/ops") ? "active" : ""}`} href={"/admin/ops" as Route}><Gauge size={19} /><span>운영 현황</span></Link>}
-        <Link className={`nav-link ${isActive("/settings") ? "active" : ""}`} href="/settings"><Settings size={19} /><span>설정</span></Link>
+        <Link className={`nav-link ${isActive("/settings") ? "active" : ""}`} href="/settings" onClick={() => trackNavClick(pathname, "설정")}><Settings size={19} /><span>설정</span></Link>
       </div>
     </>
   );
@@ -70,7 +76,7 @@ export function SidebarNavLinks({ isAdmin }: { isAdmin: boolean }) {
 type MoreItem = { label: string; href: Route; icon: typeof Bookmark };
 
 export function MobileNavLinks({ isAdmin }: { isAdmin: boolean }) {
-  const isActive = useIsActive();
+  const { isActive, pathname } = useIsActive();
   const [moreOpen, setMoreOpen] = useState(false);
 
   // 하단 바에는 상단 4개만 노출하고, 나머지는 "더보기" 시트로 모은다.
@@ -96,7 +102,7 @@ export function MobileNavLinks({ isAdmin }: { isAdmin: boolean }) {
       {moreOpen && (
         <div className="mobile-more-sheet" role="menu" aria-label="더보기 메뉴">
           {moreItems.map(({ label, href, icon: Icon }) => (
-            <Link key={href} href={href} role="menuitem" className={`mobile-more-item ${isActive(href) ? "active" : ""}`} onClick={() => setMoreOpen(false)}>
+            <Link key={href} href={href} role="menuitem" className={`mobile-more-item ${isActive(href) ? "active" : ""}`} onClick={() => { setMoreOpen(false); trackNavClick(pathname, label); }}>
               <Icon size={19} aria-hidden="true" /><span>{label}</span><ChevronRight size={16} className="mobile-more-arrow" />
             </Link>
           ))}
@@ -104,14 +110,17 @@ export function MobileNavLinks({ isAdmin }: { isAdmin: boolean }) {
       )}
       <nav className="mobile-nav" aria-label="모바일 주요 탐색">
         {mobilePrimary.map(({ label, href, icon: Icon }) => (
-          <Link key={href} href={href} className={isActive(href) ? "active" : ""} onClick={() => setMoreOpen(false)}><Icon size={20} /><span>{label}</span></Link>
+          <Link key={href} href={href} className={isActive(href) ? "active" : ""} onClick={() => { setMoreOpen(false); trackNavClick(pathname, label); }}><Icon size={20} /><span>{label}</span></Link>
         ))}
         <button
           type="button"
           className={`mobile-more-trigger ${moreOpen || moreActive ? "active" : ""}`}
           aria-haspopup="menu"
           aria-expanded={moreOpen}
-          onClick={() => setMoreOpen((prev) => !prev)}
+          onClick={() => {
+            if (!moreOpen) trackEvent("open_more_menu", { page_type: pageTypeFor(pathname) });
+            setMoreOpen(!moreOpen);
+          }}
         >
           <Menu size={20} /><span>더보기</span>
         </button>

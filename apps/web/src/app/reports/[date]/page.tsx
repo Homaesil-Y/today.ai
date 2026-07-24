@@ -73,7 +73,7 @@ export default async function ReportDetailPage({ params }: Props) {
               <span className="report-rank-no">{String(service.rank).padStart(2, "0")}</span>
               <div className="report-rank-body">
                 <div className="report-rank-head">
-                  <Link href={`/services/${service.slug}`}>{service.name}</Link>
+                  <Link href={`/services/${service.slug}`} data-ga-event="select_content" data-ga-params={JSON.stringify({ content_type: "report_rank", service_slug: service.slug, position: service.rank })}>{service.name}</Link>
                   <span className="category-chip">{service.category}</span>
                 </div>
                 {service.summary && <p>{service.summary}</p>}

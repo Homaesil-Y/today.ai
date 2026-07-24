@@ -40,7 +40,7 @@ export default async function ReportsPage() {
       ) : (
         <section className="report-list" aria-label="공개 리포트 목록">
           {reports.map((report) => (
-            <Link key={`${report.reportType}-${report.reportDate}`} className="report-card" href={`/reports/${report.reportDate}`}>
+            <Link key={`${report.reportType}-${report.reportDate}`} className="report-card" href={`/reports/${report.reportDate}`} data-ga-event="select_content" data-ga-params={JSON.stringify({ content_type: "report", item_id: report.reportDate })}>
               <span className="report-card-date"><CalendarDays size={15} aria-hidden="true" />{formatDate(report.reportDate)}</span>
               <strong>{report.title}</strong>
               {report.summary && <p>{report.summary}</p>}

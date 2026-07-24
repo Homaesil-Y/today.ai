@@ -20,7 +20,7 @@ export function TopOneCard({ trend, initialSaved = false }: { trend: TrendEntity
       <div className="signal-strip">
         {trend.signals.slice(0, 2).map((signal) => <div key={signal.source}><span>{signal.label}</span><strong>{signal.delta24h === 0 ? "초기 집계" : `+${signal.delta24h.toLocaleString("ko-KR")}`}</strong></div>)}
       </div>
-      <div className="card-actions"><Link className="button button-primary" href={`/services/${trend.slug}`}>분석 보기 <ArrowUpRight size={17} /></Link><WatchButton entityId={trend.id} initialSaved={initialSaved} /></div>
+      <div className="card-actions"><Link className="button button-primary" href={`/services/${trend.slug}`} data-ga-event="select_content" data-ga-params={JSON.stringify({ content_type: "trend_card", service_slug: trend.slug, service_category: trend.category, position: trend.rank })}>분석 보기 <ArrowUpRight size={17} /></Link><WatchButton entityId={trend.id} slug={trend.slug} initialSaved={initialSaved} /></div>
     </article>
   );
 }
@@ -32,7 +32,7 @@ export function TopSmallCard({ trend }: { trend: TrendEntity }) {
       <div className="service-heading"><div><p className="eyebrow">{trend.category}</p><h3>{trend.name}</h3></div></div>
       <p className="tagline">{trend.tagline}</p>
       <div className="mini-score"><div><span>Trend Score</span><strong>{trend.trendScore}</strong><small>신뢰도 {trend.trustScore}</small></div><Sparkline values={trend.sparkline} label={`${trend.name} 현재 트렌드 점수 ${trend.trendScore}`} /></div>
-      <div className="small-card-footer"><span>{trend.rankChange === 0 ? "초기 집계" : `${trend.rankChange > 0 ? "▲" : "▼"} ${Math.abs(trend.rankChange)}위`}</span><Link className="card-detail-link" href={`/services/${trend.slug}`}>분석 보기 <ArrowUpRight size={15} aria-hidden="true" /></Link></div>
+      <div className="small-card-footer"><span>{trend.rankChange === 0 ? "초기 집계" : `${trend.rankChange > 0 ? "▲" : "▼"} ${Math.abs(trend.rankChange)}위`}</span><Link className="card-detail-link" href={`/services/${trend.slug}`} data-ga-event="select_content" data-ga-params={JSON.stringify({ content_type: "trend_card", service_slug: trend.slug, service_category: trend.category, position: trend.rank })}>분석 보기 <ArrowUpRight size={15} aria-hidden="true" /></Link></div>
     </article>
   );
 }

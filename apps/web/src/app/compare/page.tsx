@@ -68,8 +68,8 @@ export default async function ComparePage({ searchParams }: Props) {
           <div className="compare-row-head" />
           {selected.map((trend) => (
             <div className="compare-col-head" key={trend.slug}>
-              <Link className="compare-remove" href={compareHref(selectedSlugs.filter((s) => s !== trend.slug))} aria-label={`${trend.name} 비교에서 제거`}><X size={14} /></Link>
-              <Link href={`/services/${trend.slug}` as Route}><strong>{trend.name}</strong></Link>
+              <Link className="compare-remove" href={compareHref(selectedSlugs.filter((s) => s !== trend.slug))} aria-label={`${trend.name} 비교에서 제거`} data-ga-event="remove_from_compare" data-ga-params={JSON.stringify({ service_slug: trend.slug })}><X size={14} /></Link>
+              <Link href={`/services/${trend.slug}` as Route} data-ga-event="select_content" data-ga-params={JSON.stringify({ content_type: "compare_column", service_slug: trend.slug })}><strong>{trend.name}</strong></Link>
               <span className="category-chip">{trend.category}</span>
             </div>
           ))}

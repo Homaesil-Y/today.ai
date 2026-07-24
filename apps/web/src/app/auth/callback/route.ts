@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { safeNextPath } from "@/lib/navigation";
+import { safeNextPath, withParam } from "@/lib/navigation";
 import { siteConfig } from "@/lib/site";
 import { createClient } from "@/lib/supabase/server";
 
@@ -24,9 +24,12 @@ export async function GET(request: Request) {
       const { data: profile } = data.user
         ? await supabase.from("user_profiles").select("onboarding_completed").eq("id", data.user.id).maybeSingle()
         : { data: null };
-      const destination = profile?.onboarding_completed
-        ? next
-        : `/onboarding?next=${encodeURIComponent(next)}`;
+      // login=1은 AnalyticsPageView가 도착 페이지에서 감지해 login 이벤트를 쏘고 스스로 지운다.
+      const destination = withParam(
+        profile?.onboarding_completed ? next : `/onboarding?next=${encodeURIComponent(next)}`,
+        "login",
+        "1",
+      );
       const forwardedHost = request.headers.get("x-forwarded-host");
       const forwardedProto = request.headers.get("x-forwarded-proto") ?? "https";
       if (process.env.NODE_ENV !== "development" && forwardedHost && isAllowedHost(forwardedHost, origin)) {
