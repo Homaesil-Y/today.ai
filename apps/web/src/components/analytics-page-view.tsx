@@ -43,16 +43,29 @@ function AnalyticsPageViewInner() {
       stripParam("login");
     }
     if (searchParams.get("onboarded") === "1") {
-      trackEvent("complete_onboarding", { page_type: pageType });
+      const categoriesCount = searchParams.get("categories_count");
+      trackEvent("complete_onboarding", {
+        page_type: pageType,
+        ...(categoriesCount !== null ? { categories_count: Number(categoriesCount) } : {}),
+      });
       stripParam("onboarded");
+      stripParam("categories_count");
     }
     if (pathname === "/" && searchParams.get("goodbye") === "1") {
       trackEvent("delete_account", { page_type: pageType });
       stripParam("goodbye");
     }
     if (pageType === "settings" && searchParams.get("saved") === "1") {
-      trackEvent("save_preferences", { page_type: pageType });
-      // Toast 컴포넌트도 같은 파라미터를 지우므로 중복 삭제는 안전(멱등)하다.
+      const dailyDigest = searchParams.get("daily_digest");
+      const surgeAlert = searchParams.get("surge_alert");
+      trackEvent("save_preferences", {
+        page_type: pageType,
+        ...(dailyDigest !== null ? { daily_digest: dailyDigest === "1" } : {}),
+        ...(surgeAlert !== null ? { surge_alert: surgeAlert === "1" } : {}),
+      });
+      // Toast 컴포넌트도 saved는 지우므로 중복 삭제는 안전(멱등)하다. daily_digest/surge_alert는 여기서만 지운다.
+      stripParam("daily_digest");
+      stripParam("surge_alert");
     }
 
     // 검색 이벤트: 헤더 검색과 탐색 페이지 자체 검색 폼이 둘 다 /explore로 제출되므로

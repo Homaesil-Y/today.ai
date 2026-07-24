@@ -42,7 +42,11 @@ export async function savePreferences(formData: FormData) {
   const { error } = await persistPreferences(user.id, formData);
   if (error) throw new Error(error);
   revalidatePath("/settings");
-  redirect("/settings?saved=1" as Route);
+  // daily_digest/surge_alert는 AnalyticsPageView가 도착 페이지에서 save_preferences 이벤트에 실어보내고
+  // 스스로 지운다. URL로만 값이 넘어오므로(폼 데이터는 서버에서만 접근 가능) 여기서 리다이렉트에 싣는다.
+  const dailyDigest = formData.get("dailyDigest") === "on" ? "1" : "0";
+  const surgeAlert = formData.get("surgeAlert") === "on" ? "1" : "0";
+  redirect(withParam(withParam(withParam("/settings", "saved", "1"), "daily_digest", dailyDigest), "surge_alert", surgeAlert) as Route);
 }
 
 export async function deleteAccount(_prev: DeleteAccountState, formData: FormData): Promise<DeleteAccountState> {
@@ -75,7 +79,9 @@ export async function completeOnboarding(formData: FormData) {
   const { error } = await supabase.from("user_profiles").update({ onboarding_completed: true, updated_at: new Date().toISOString() }).eq("id", user.id);
   if (error) throw new Error("온보딩을 완료하지 못했습니다.");
   const nextPath = safeNextPath(formData.get("next"));
-  // onboarded=1은 AnalyticsPageView가 도착 페이지에서 감지해 complete_onboarding 이벤트를 쏘고 스스로 지운다.
-  redirect(withParam(nextPath, "onboarded", "1") as Route);
+  // onboarded=1·categories_count는 AnalyticsPageView가 도착 페이지에서 감지해
+  // complete_onboarding 이벤트에 실어보내고 스스로 지운다.
+  const categoriesCount = String(formData.getAll("categories").length);
+  redirect(withParam(withParam(nextPath, "onboarded", "1"), "categories_count", categoriesCount) as Route);
 }
 
