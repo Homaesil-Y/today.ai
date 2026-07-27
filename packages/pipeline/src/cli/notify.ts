@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { loadWorkspaceEnvironment, withRetry } from "@ai-trend-radar/collectors";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
@@ -32,6 +33,11 @@ if (!emailFrom || !provider) {
   process.exit(0);
 }
 const senderFrom = emailFrom;
+
+// apps/web의 unsubscribe-token.ts와 동일한 서명 방식(HMAC-SHA256, SUPABASE_SECRET_KEY 재사용).
+function signUnsubscribeToken(userId: string): string {
+  return createHmac("sha256", secretKey!).update(userId).digest("base64url");
+}
 
 const contentSchema = z.object({
   topServices: z.array(z.object({
@@ -154,7 +160,8 @@ async function sendEmail(to: string, subject: string, html: string) {
   return sendViaResend(to, subject, html);
 }
 
-function buildHtml(email: string) {
+function buildHtml(userId: string) {
+  const unsubscribeUrl = `${appUrl}/unsubscribe?u=${userId}&t=${signUnsubscribeToken(userId)}`;
   const rows = content.topServices.slice(0, 10).map((service) => `
     <tr>
       <td style="padding:8px 0;color:#667085;font-variant-numeric:tabular-nums;width:32px;">${String(service.rank).padStart(2, "0")}</td>
@@ -172,7 +179,7 @@ function buildHtml(email: string) {
       <p style="margin:0 0 18px;color:#667085;font-size:14px;">${escapeHtml(activeReport.summary ?? "")}</p>
       <table style="width:100%;border-collapse:collapse;font-size:14px;">${rows}</table>
       <a href="${appUrl}/reports/${reportDate}" style="display:inline-block;margin-top:20px;padding:10px 16px;background:#6d5dfb;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;">전체 리포트 보기</a>
-      <p style="margin:22px 0 0;color:#98a2b3;font-size:12px;">이 메일은 오늘의AI 알림 설정에서 수신 동의하신 분께 발송됩니다. 설정에서 언제든 변경할 수 있습니다.</p>
+      <p style="margin:22px 0 0;color:#98a2b3;font-size:12px;">이 메일은 오늘의AI 알림 설정에서 수신 동의하신 분께 발송됩니다. <a href="${unsubscribeUrl}" style="color:#98a2b3;">더 이상 받고 싶지 않다면 구독 해지</a></p>
     </div></body></html>`;
 }
 
@@ -186,7 +193,7 @@ const errors: string[] = [];
 for (const subscriber of subscribers) {
   if (sentUserIds.has(subscriber.userId)) { skipped += 1; continue; }
   try {
-    await sendEmail(subscriber.email, activeReport.title, buildHtml(subscriber.email));
+    await sendEmail(subscriber.email, activeReport.title, buildHtml(subscriber.userId));
     await client.from("notifications").insert({
       user_id: subscriber.userId,
       type: "daily_report",

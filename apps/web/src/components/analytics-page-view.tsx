@@ -55,6 +55,10 @@ function AnalyticsPageViewInner() {
       trackEvent("delete_account", { page_type: pageType });
       stripParam("goodbye");
     }
+    if (pageType === "unsubscribe" && searchParams.get("done") === "1") {
+      trackEvent("save_preferences", { page_type: pageType, daily_digest: false, method: "email_link" });
+      stripParam("done");
+    }
     if (pageType === "settings" && searchParams.get("saved") === "1") {
       const dailyDigest = searchParams.get("daily_digest");
       const surgeAlert = searchParams.get("surge_alert");

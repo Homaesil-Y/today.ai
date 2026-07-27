@@ -141,6 +141,7 @@ Next App Router는 소프트 내비게이션 시 전체 페이지 로드가 없�
 |---|---|---|---|---|
 | 설정 저장 | `?saved=1` 감지 | `save_preferences` | `daily_digest: bool`, `surge_alert: bool` | P3 |
 | 회원 탈퇴 완료 | `/?goodbye=1` 감지 | `delete_account` | — | P3 |
+| 이메일 구독 해지 완료 | `/unsubscribe?done=1` 감지 | `save_preferences` | `daily_digest: false`, `method: "email_link"` | P3 — 서명 토큰(HMAC) 링크로 무인증 처리, 확인 페이지에서 사용자가 버튼을 눌러야 실제 해지(이메일 스캐너 오탐 방지) |
 
 ### 측정 제외 (의도적)
 - **관리자 화면(/admin/*)**: 운영자 행동은 지표 오염 → `page_type: "admin"`으로 표시만 하고 GA4 보고서에서 필터 제외, 또는 이벤트 자체를 안 쏨(권장: 안 쏨).
