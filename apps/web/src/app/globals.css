@@ -464,11 +464,11 @@ button { color: inherit; }
 .pagination-num { display: inline-flex; align-items: center; justify-content: center; min-width: 38px; height: 38px; padding: 0 6px; border: 1px solid var(--border-default); border-radius: 9px; color: var(--text-secondary); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; background: var(--bg-surface); }
 .pagination-num:hover { border-color: var(--border-strong); background: var(--bg-surface-hover); }
 .pagination-num.active { color: white; border-color: var(--brand-primary); background: var(--brand-primary); }
-.pagination-gap { color: var(--text-tertiary); padding: 0 2px; }
+.pagination-block { padding: 0 10px; }
 .pagination-status { display: none; color: var(--text-secondary); font-size: 13px; font-variant-numeric: tabular-nums; }
-/* 모바일: 넘버링 대신 이전/다음 + 현재 페이지 표시 */
+/* 모바일: 블록 이동·넘버링 대신 이전/다음 + 현재 페이지 표시 */
 @media (max-width: 767px) {
-  .pagination-numbers { display: none; }
+  .pagination-numbers, .pagination-block { display: none; }
   .pagination-status { display: inline; }
   .pagination { justify-content: space-between; }
 }
