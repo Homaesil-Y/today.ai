@@ -130,9 +130,9 @@ button { color: inherit; }
 .kpi-icon { grid-row: 1 / -1; align-self: center; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 11px; }
 .tone-cyan { color: #087e8b; background: #e9fbfd; }.tone-orange { color: var(--status-surging); background: #fff2e8; }.tone-violet { color: var(--brand-primary); background: var(--brand-soft); }.tone-blue { color: var(--brand-secondary); background: var(--info-bg); }
 .kpi-card > span { align-self: end; color: var(--text-secondary); font-size: 13px; font-weight: 500; line-height: 1.35; }
-.kpi-card > div:last-child { align-self: start; min-height: 31px; display: flex; align-items: baseline; gap: 10px; }
+.kpi-card > div:last-child { align-self: start; min-height: 31px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
 .kpi-card strong { font-size: 28px; line-height: 1; font-weight: 720; font-variant-numeric: tabular-nums; }
-.kpi-card em { color: var(--status-rising); font-size: 12px; line-height: 1.35; font-style: normal; font-weight: 650; white-space: nowrap; }
+.kpi-card em { color: var(--status-rising); font-size: 12px; line-height: 1.35; font-style: normal; font-weight: 650; }
 
 .section-block { margin-top: 42px; }
 .answer-section .section-heading > a { color: var(--brand-primary); font-weight: 650; }
@@ -619,6 +619,9 @@ button { color: inherit; }
 
 @media (max-width: 767px) {
   .admin-summary { display: none; }.admin-toolbar { grid-template-columns: 1fr auto; }.admin-toolbar label:first-child { grid-column: 1 / -1; }.review-card { grid-template-columns: 1fr auto; gap: 14px; padding: 16px; }.review-main { grid-column: 1 / -1; }.review-score { align-items: flex-start; }.review-actions { width: 128px; }
+  /* 관리자 KPI 4개는 항상 고정 노출(조건부 숨김 없음)이고 delta 문구가 길어 홈의 가로 스크롤 캐러셀 폭(224px)에 맞지 않는다. 전체 너비 1열 목록으로 바꿔 스크롤·잘림 없이 노출한다. */
+  .admin-page .kpi-grid { display: flex; flex-direction: column; overflow-x: visible; margin-right: 0; padding-right: 0; scroll-snap-type: none; }
+  .admin-page .kpi-card { flex: initial; min-height: auto; }
   .ops-channel { grid-template-columns: auto 1fr; gap: 12px 14px; }.ops-channel-stats { grid-column: 1 / -1; justify-content: space-between; gap: 12px; text-align: left; }.ops-channel-stats div { align-items: flex-start; }
   .review-edit-form { grid-template-columns: 1fr; }
   .report-list { grid-template-columns: 1fr; }
