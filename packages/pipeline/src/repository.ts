@@ -2,6 +2,7 @@ import type { TrendAnalysisResult } from "@ai-trend-radar/llm";
 import type { SourceCode } from "@ai-trend-radar/types";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { slugifyName } from "./candidate";
 import type { EntityCandidate } from "./schema";
 import { databaseRawItemSchema } from "./schema";
 
@@ -61,6 +62,7 @@ export class SupabasePipelineRepository {
   private readonly entitiesByCanonical = new Map<string, EntityRow>();
   private readonly entitiesByGithub = new Map<string, EntityRow>();
   private readonly entitiesByDomain = new Map<string, EntityRow>();
+  private readonly entitiesBySlugBase = new Map<string, EntityRow>();
   private readonly usedSlugs = new Set<string>();
 
   constructor(client: SupabaseClient) {
@@ -280,14 +282,21 @@ export class SupabasePipelineRepository {
       const github = this.entitiesByGithub.get(candidate.githubUrl);
       if (github) return github;
     }
-    if (candidate.officialDomain !== "github.com") return this.entitiesByDomain.get(candidate.officialDomain);
-    return undefined;
+    if (candidate.officialDomain !== "github.com") {
+      const domain = this.entitiesByDomain.get(candidate.officialDomain);
+      if (domain) return domain;
+    }
+    // 공식 링크(랜딩페이지)와 GitHub 저장소처럼 서로 다른 채널로 같은 제품이 들어오면
+    // URL/도메인이 전혀 겹치지 않는다. 이름이 완전히 같으면 같은 제품으로 보고 병합한다
+    // (그렇지 않으면 슬러그 충돌로 "-<base64>" 접미사가 붙은 중복 엔티티가 생긴다).
+    return this.entitiesBySlugBase.get(candidate.slugBase);
   }
 
   private indexEntity(entity: EntityRow) {
     this.entitiesByCanonical.set(entity.canonical_url, entity);
     if (entity.github_url) this.entitiesByGithub.set(entity.github_url, entity);
     if (entity.official_domain && entity.official_domain !== "github.com") this.entitiesByDomain.set(entity.official_domain, entity);
+    this.entitiesBySlugBase.set(slugifyName(entity.name, entity.canonical_url), entity);
     this.usedSlugs.add(entity.slug);
   }
 
