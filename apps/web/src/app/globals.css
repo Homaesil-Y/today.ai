@@ -96,6 +96,7 @@ button { color: inherit; }
 .icon-button { min-width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 9px; background: transparent; cursor: pointer; transition: background var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard); }
 .icon-button:hover { color: var(--brand-primary); background: var(--brand-soft); }
 .profile-button { display: flex; align-items: center; height: 40px; gap: 7px; padding: 0 10px; border: 1px solid var(--border-default); border-radius: 10px; background: white; cursor: pointer; }
+.profile-avatar { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; flex: none; }
 
 .sidebar { position: sticky; top: 64px; height: calc(100vh - 64px); display: flex; flex-direction: column; justify-content: space-between; padding: 22px 14px 18px; border-right: 1px solid var(--border-default); background: var(--bg-surface); }
 .nav-label { margin: 0 10px 10px; color: var(--text-tertiary); font-size: 10px; font-weight: 700; letter-spacing: .12em; }
