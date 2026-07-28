@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 import { trackEvent } from "@/lib/analytics";
 import { createClient } from "@/lib/supabase/client";
@@ -8,10 +7,9 @@ import { createClient } from "@/lib/supabase/client";
 export function GoogleLoginButton({ configured, nextPath = "/" }: { configured: boolean; nextPath?: string }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [consented, setConsented] = useState(false);
 
   async function signIn() {
-    if (!configured || !consented) return;
+    if (!configured) return;
     setLoading(true);
     setError(null);
     trackEvent("login_start", { method: "google", trigger: "login_page" });
@@ -32,17 +30,11 @@ export function GoogleLoginButton({ configured, nextPath = "/" }: { configured: 
 
   return (
     <div className="login-action">
-      <label className="login-consent">
-        <input type="checkbox" checked={consented} onChange={(event) => setConsented(event.target.checked)} />
-        <span>
-          [필수] <Link href="/terms">이용약관</Link> 및 <Link href="/privacy">개인정보처리방침</Link>에 동의합니다.
-        </span>
-      </label>
       <button
         className="google-button"
         type="button"
         onClick={signIn}
-        disabled={!configured || loading || !consented}
+        disabled={!configured || loading}
       >
         <span className="google-mark" aria-hidden="true">G</span>
         {loading ? "Google로 이동 중…" : "Google로 계속하기"}

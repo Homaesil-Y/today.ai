@@ -15,6 +15,7 @@ const timeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 const DELETE_CONFIRM_PHRASE = "탈퇴";
 
 export type DeleteAccountState = { error: string };
+export type OnboardingFormState = { error: string };
 
 // 설정 저장 핵심 로직. savePreferences(폼 액션)와 completeOnboarding이 공유한다.
 async function persistPreferences(userId: string, formData: FormData): Promise<{ error: string | null }> {
@@ -70,7 +71,10 @@ export async function deleteAccount(_prev: DeleteAccountState, formData: FormDat
   redirect("/?goodbye=1" as Route);
 }
 
-export async function completeOnboarding(formData: FormData) {
+// 최초 가입 시 1회만 동의를 받는다(재로그인마다 다시 받을 필요는 없음). onboarding_completed가 이미 true면
+// 이 액션에 도달하기 전에 페이지 자체가 리다이렉트하므로, 여기 도달한다는 것 자체가 신규 가입자라는 뜻이다.
+export async function completeOnboarding(_prev: OnboardingFormState, formData: FormData): Promise<OnboardingFormState> {
+  if (formData.get("agreeTerms") !== "on") return { error: "이용약관 및 개인정보처리방침에 동의해야 시작할 수 있습니다." };
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/onboarding");
