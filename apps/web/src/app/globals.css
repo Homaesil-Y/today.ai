@@ -200,12 +200,14 @@ button { color: inherit; }
 .score-compare span { color: var(--text-secondary); font-size: 11px; }
 .score-compare strong { font-size: 25px; line-height: 1.2; }
 .score-compare em { grid-column: 1 / -1; font-size: 13px; font-style: normal; font-weight: 700; }
-.watchlist-editor { grid-column: 1 / -1; display: grid; grid-template-columns: 170px minmax(220px, 1fr) auto; align-items: end; gap: 9px; padding-top: 15px; border-top: 1px solid var(--border-default); }
+/* 폴더(select)와 메모(textarea)는 높이가 서로 달라서 end 정렬하면 짧은 쪽이 붕 뜨므로,
+   라벨을 위쪽 기준으로 맞추고(start) 저장 버튼 행은 아래에 전체 폭으로 따로 둔다. */
+.watchlist-editor { grid-column: 1 / -1; display: grid; grid-template-columns: 170px minmax(220px, 1fr); align-items: start; gap: 9px 14px; padding-top: 15px; border-top: 1px solid var(--border-default); }
 .watchlist-editor label { display: grid; gap: 4px; color: var(--text-secondary); font-size: 12px; }
 .watchlist-editor select, .watchlist-editor textarea { width: 100%; min-height: 40px; padding: 9px 10px; border: 1px solid var(--border-default); border-radius: 8px; outline: 0; background: var(--bg-surface-subtle); font: inherit; }
 .watchlist-editor textarea { height: 66px; resize: vertical; }
 .watchlist-editor select:focus, .watchlist-editor textarea:focus { border-color: var(--border-focus); background: white; }
-.watchlist-editor > div { display: flex; gap: 7px; }
+.watchlist-editor > div { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 7px; margin-top: 2px; }
 .watchlist-empty { min-height: 320px; border: 0; background: transparent; padding: 24px 20px; }
 .watchlist-content .watchlist-card { background: var(--bg-surface-subtle); box-shadow: none; }
 .preference-form { display: grid; gap: 16px; }
@@ -229,8 +231,8 @@ button { color: inherit; }
 .preference-save { justify-self: end; min-width: 150px; }
 .danger-section { margin-top: 22px; border-color: #f3c9c4; }
 .danger-section .preference-title svg { color: var(--danger-text); }
-.danger-form { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; }
-.danger-confirm { display: flex; align-items: flex-start; gap: 9px; max-width: 560px; color: var(--text-secondary); font-size: 14px; line-height: 1.5; }
+.danger-form { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 20px; }
+.danger-confirm { flex: 1 1 100%; display: flex; align-items: flex-start; gap: 9px; max-width: 560px; color: var(--text-secondary); font-size: 14px; line-height: 1.5; }
 .danger-confirm input { width: 17px; height: 17px; margin-top: 2px; accent-color: var(--danger-text); }
 .button-danger { min-height: 42px; padding: 0 18px; border: 1px solid #f3c9c4; border-radius: 10px; background: var(--danger-bg); color: var(--danger-text); font-weight: 650; cursor: pointer; }
 .button-danger:hover { background: #fee4e2; }
@@ -572,8 +574,8 @@ button { color: inherit; }
 .toast > svg:first-child { color: var(--status-rising); flex: none; }
 .toast-close { display: inline-flex; margin-left: 4px; padding: 0; color: var(--text-tertiary); background: transparent; border: 0; cursor: pointer; }
 
-/* 회원 탈퇴 확인 문구 입력. */
-.danger-typed { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; font-size: 13px; color: var(--text-secondary); }
+/* 회원 탈퇴 확인 문구 입력. 버튼과 한 줄에서 나란히 정렬되도록 라벨·입력을 가로로 배치한다. */
+.danger-typed { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0; font-size: 13px; color: var(--text-secondary); }
 .danger-typed input { max-width: 220px; height: 40px; padding: 0 12px; border: 1px solid var(--border-default); border-radius: 9px; background: var(--bg-surface-subtle); font: inherit; color: var(--text-primary); }
 .danger-typed input:focus-visible { border-color: var(--border-focus); background: var(--bg-surface); }
 .login-page { min-height: calc(100vh - 64px); display: grid; place-items: center; padding: 32px; background: radial-gradient(circle at 50% 15%, var(--brand-soft), transparent 38%); }
