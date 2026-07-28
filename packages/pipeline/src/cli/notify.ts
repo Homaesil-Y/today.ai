@@ -115,10 +115,20 @@ async function fetchGmailAccessToken(): Promise<string> {
   });
 }
 
+// 헤더의 비ASCII 표시 이름(예: "오늘의AI")은 RFC 2047 encoded-word로 감싸지 않으면
+// 여러 메일 클라이언트가 라틴-1로 오해석해 발신자 이름이 깨져 보인다. 주소 부분은 그대로 둔다.
+function encodeHeaderDisplayName(from: string): string {
+  const match = from.match(/^(.*?)\s*<([^>]+)>\s*$/);
+  if (!match) return from;
+  const [, name, address] = match;
+  if (!name || /^[\x00-\x7F]*$/.test(name)) return from;
+  return `=?UTF-8?B?${Buffer.from(name, "utf-8").toString("base64")}?= <${address}>`;
+}
+
 async function sendViaGmail(accessToken: string, to: string, subject: string, html: string) {
   const encodedSubject = `=?UTF-8?B?${Buffer.from(subject, "utf-8").toString("base64")}?=`;
   const mime = [
-    `From: ${senderFrom}`,
+    `From: ${encodeHeaderDisplayName(senderFrom)}`,
     `To: ${to}`,
     `Subject: ${encodedSubject}`,
     "MIME-Version: 1.0",
