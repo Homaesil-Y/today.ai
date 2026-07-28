@@ -30,6 +30,7 @@ export function pageTypeFor(pathname: string): string {
   if (pathname.startsWith("/settings")) return "settings";
   if (pathname.startsWith("/unsubscribe")) return "unsubscribe";
   if (pathname.startsWith("/login")) return "login";
+  if (pathname.startsWith("/signup")) return "signup";
   if (pathname.startsWith("/onboarding")) return "onboarding";
   return "other";
 }

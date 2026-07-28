@@ -125,6 +125,7 @@ Next App Router는 소프트 내비게이션 시 전체 페이지 로드가 없�
 | 요소 | 트리거 | 이벤트명 | 매개변수 | 우선순위 |
 |---|---|---|---|---|
 | /login "Google로 계속하기" | 클릭 | `login_start` | `method: "google"`, `trigger: "login_page"` | **P1** — GoogleLoginButton은 클라이언트 → trackEvent |
+| /signup "Google로 가입하기" | 클릭(동의 체크 통과 시에만) | `login_start` | `method: "google"`, `trigger: "signup_page"` | **P1** — SignupButton은 클라이언트 → trackEvent. 동의 미체크 시 이벤트를 쏘지 않는다(가입 시도가 시작되지 않으므로). `page_type: "signup"` 신설 |
 | 로그인 완료 | auth 콜백 후 첫 page_view | `login` | `method: "google"` | **P1** — 콜백 리다이렉트에 `?login=1` 부여 → AnalyticsPageView가 감지·push 후 파라미터 제거(기존 Toast의 clearParam 패턴 재사용) |
 | 온보딩 완료 | 제출 성공 | `complete_onboarding` | `categories_count` | P2 — 동일 패턴(`?onboarded=1`) |
 | "로그인 없이 둘러보기" | 클릭 | `skip_login` | — | P2 |
