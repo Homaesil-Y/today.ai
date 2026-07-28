@@ -209,7 +209,6 @@ button { color: inherit; }
 .watchlist-editor select:focus, .watchlist-editor textarea:focus { border-color: var(--border-focus); background: white; }
 .watchlist-editor > div { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 7px; margin-top: 2px; }
 .watchlist-empty { min-height: 320px; border: 0; background: transparent; padding: 24px 20px; }
-.watchlist-content .watchlist-card { background: var(--bg-surface-subtle); box-shadow: none; }
 .preference-form { display: grid; gap: 16px; }
 .preference-section { padding: 26px; }
 .preference-title { display: flex; align-items: flex-start; gap: 11px; margin-bottom: 20px; }
@@ -330,7 +329,7 @@ button { color: inherit; }
 .detail-hero { display: grid; grid-template-columns: 1fr auto; gap: 22px; padding: 26px; border: 1px solid var(--border-default); border-radius: var(--radius-lg); background: var(--bg-surface); }
 .detail-identity { display: flex; align-items: flex-start; }
 .detail-badges { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
-.category-chip { display: inline-flex; padding: 3px 9px; border: 1px solid var(--border-default); border-radius: var(--radius-pill); color: var(--text-secondary); font-size: 12px; font-weight: 550; }
+.category-chip { display: inline-flex; padding: 3px 9px; border: 1px solid var(--brand-border-soft); border-radius: var(--radius-pill); color: var(--brand-primary-active); background: var(--brand-soft); font-size: 12px; font-weight: 550; }
 .detail-identity h1 { margin: 0; font-size: 34px; font-weight: 780; line-height: 1.25; letter-spacing: -.04em; }
 .detail-identity p { margin: 6px 0 0; color: var(--text-secondary); font-size: 15px; }
 .detail-scores { display: flex; gap: 32px; }
