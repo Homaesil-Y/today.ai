@@ -1,9 +1,10 @@
-import type { SourceCode, TrendEntity, TrendStatus } from "@ai-trend-radar/types";
+import type { TrendEntity, TrendStatus } from "@ai-trend-radar/types";
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
 import { z } from "zod";
 import { createPublicClient } from "@/lib/supabase/server";
 import { cleanDisplayName, logoTextFrom } from "./display-name";
+import { resolveSources, sourceSignalLabel } from "./entity-sources";
 import { compareByScore } from "./trend-query";
 
 // 공개 데이터는 3시간 주기 파이프라인으로만 바뀌므로 요청마다 Supabase를 다시 치지 않는다.
@@ -24,6 +25,8 @@ const entitySchema = z.object({
   last_detected_at: z.string(),
   status: z.enum(["NEW", "RISING", "SURGING", "PEAK", "STABLE", "FALLING", "REVIVAL", "WATCH"]),
   categories: z.object({ name: z.string() }).nullable(),
+  // 파이프라인이 저장 시점에 기록한 실제 유입 채널. 백필 전 행은 빈 배열일 수 있다.
+  source_codes: z.array(z.string()).catch([]),
 });
 
 const scoreSchema = z.object({
@@ -55,9 +58,6 @@ const analysisSchema = z.object({
   generated_at: z.string(),
 });
 
-function inferSources(githubUrl: string | null): SourceCode[] {
-  return githubUrl ? ["github"] : ["hacker_news"];
-}
 
 // 점수 이력(최신→과거)을 과거→최신 순의 스파크라인으로 만든다.
 // 스냅샷이 2개 미만이면 아직 추세가 없으므로 평평한 선(같은 값 2개)을 그린다.
@@ -76,7 +76,7 @@ export const getPublishedTrends = cache(unstable_cache(async (): Promise<TrendEn
   const supabase = createPublicClient();
   const { data: entityData, error: entityError } = await supabase
     .from("entities")
-    .select("id, slug, name, canonical_url, github_url, description, pricing_type, is_open_source, first_detected_at, last_detected_at, status, categories(name)")
+    .select("id, slug, name, canonical_url, github_url, description, pricing_type, is_open_source, first_detected_at, last_detected_at, status, source_codes, categories(name)")
     .eq("visibility", "public")
     .order("last_detected_at", { ascending: false });
 
@@ -125,7 +125,8 @@ export const getPublishedTrends = cache(unstable_cache(async (): Promise<TrendEn
       const score = scores.get(entity.id);
       const analysis = analyses.get(entity.id);
       const totalScore = Math.round((score?.total_score ?? 0) * 10) / 10;
-      const source = inferSources(entity.github_url)[0]!;
+      const sources = resolveSources(entity.source_codes, entity.github_url);
+      const source = sources[0]!;
       const status: TrendStatus = score?.status ?? entity.status;
       const description = analysis?.summary ?? entity.description ?? "수집 신호를 기반으로 검토·승인된 AI 서비스입니다.";
       const fallbackReason = "초기 수집 신호가 확인되어 관리자의 검토를 통과했습니다.";
@@ -160,10 +161,10 @@ export const getPublishedTrends = cache(unstable_cache(async (): Promise<TrendEn
           instagram: score?.instagram_score ?? 0,
           quality: score?.quality_score ?? 0,
         },
-        sources: inferSources(entity.github_url),
+        sources,
         signals: [{
           source,
-          label: source === "github" ? "GitHub 감지 점수" : "Hacker News 감지 점수",
+          label: sourceSignalLabel(source),
           value: totalScore,
           delta24h: Math.round(score?.velocity_score ?? 0),
           unit: "engagement",

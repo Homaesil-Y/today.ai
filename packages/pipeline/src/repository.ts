@@ -32,6 +32,11 @@ export const SHARED_HOST_DOMAINS = new Set([
   "npmjs.com",
 ]);
 
+/** 이미 기록된 채널에 새 채널을 더한다. 중복 없이, 순서를 고정해 불필요한 쓰기를 막는다. */
+export function mergeSourceCodes(existing: readonly string[], incoming: string) {
+  return [...new Set([...existing, incoming])].sort();
+}
+
 const sourceSchema = z.object({ id: z.uuid(), code: z.string() });
 const categorySchema = z.object({ id: z.uuid(), slug: z.string(), name: z.string() });
 const entitySchema = z.object({
@@ -48,6 +53,9 @@ const entitySchema = z.object({
   visibility: z.enum(["public", "private", "review"]),
   first_detected_at: z.iso.datetime({ offset: true }),
   last_detected_at: z.iso.datetime({ offset: true }),
+  // 웹 화면이 실제 유입 채널을 표시할 수 있도록 저장 시점에 누적한다.
+  // (entity_mentions·raw_items·sources는 anon 역할에 SELECT 권한이 없어 화면에서 조인할 수 없다.)
+  source_codes: z.array(z.string()).default([]),
 });
 
 type EntityRow = z.infer<typeof entitySchema>;
@@ -106,7 +114,7 @@ export class SupabasePipelineRepository {
     const [sourcesResult, categoriesResult, entitiesResult] = await Promise.all([
       this.client.from("sources").select("id,code"),
       this.client.from("categories").select("id,slug,name").eq("enabled", true).order("sort_order"),
-      this.client.from("entities").select("id,name,slug,canonical_url,official_domain,github_url,description,category_id,pricing_type,is_open_source,visibility,first_detected_at,last_detected_at"),
+      this.client.from("entities").select("id,name,slug,canonical_url,official_domain,github_url,description,category_id,pricing_type,is_open_source,visibility,first_detected_at,last_detected_at,source_codes"),
     ]);
     if (sourcesResult.error) throw new PipelineRepositoryError(sourcesResult.error.message, "load_sources");
     if (categoriesResult.error) throw new PipelineRepositoryError(categoriesResult.error.message, "load_categories");
@@ -158,8 +166,10 @@ export class SupabasePipelineRepository {
         category_id: existing.category_id ?? categoryId,
         pricing_type: existing.pricing_type === "unknown" ? candidate.pricingType : existing.pricing_type,
         is_open_source: existing.is_open_source || candidate.isOpenSource,
+        // 같은 제품이 여러 채널로 들어오면 채널을 누적한다(교차 출처 표시의 근거).
+        source_codes: mergeSourceCodes(existing.source_codes, candidate.source),
         updated_at: candidate.lastDetectedAt,
-      }).eq("id", existing.id).select("id,name,slug,canonical_url,official_domain,github_url,description,category_id,pricing_type,is_open_source,visibility,first_detected_at,last_detected_at").single();
+      }).eq("id", existing.id).select("id,name,slug,canonical_url,official_domain,github_url,description,category_id,pricing_type,is_open_source,visibility,first_detected_at,last_detected_at,source_codes").single();
       if (error) throw new PipelineRepositoryError(error.message, "update_entity");
       entity = entitySchema.parse(data);
     } else {
@@ -176,9 +186,10 @@ export class SupabasePipelineRepository {
         is_open_source: candidate.isOpenSource,
         first_detected_at: candidate.firstDetectedAt,
         last_detected_at: candidate.lastDetectedAt,
+        source_codes: [candidate.source],
         status: "WATCH",
         visibility: "review",
-      }).select("id,name,slug,canonical_url,official_domain,github_url,description,category_id,pricing_type,is_open_source,visibility,first_detected_at,last_detected_at").single();
+      }).select("id,name,slug,canonical_url,official_domain,github_url,description,category_id,pricing_type,is_open_source,visibility,first_detected_at,last_detected_at,source_codes").single();
       if (error) throw new PipelineRepositoryError(error.message, "insert_entity");
       entity = entitySchema.parse(data);
     }
