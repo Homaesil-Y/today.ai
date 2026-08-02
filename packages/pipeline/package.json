@@ -15,6 +15,7 @@
     "verify:live": "tsx src/cli/verify.ts",
     "news:collect": "tsx src/cli/news.ts",
     "reclassify": "tsx src/cli/reclassify.ts",
+    "rename": "tsx src/cli/rename.ts",
     "suggest:categories": "tsx src/cli/suggest-categories.ts",
     "publish:reviewed": "tsx src/cli/publish-reviewed.ts",
     "bootstrap:owner": "tsx src/cli/bootstrap-owner.ts",

@@ -81,8 +81,26 @@ function prettifyRepositoryName(fullName: string) {
 
 function productNameFromHackerNewsTitle(title: string) {
   const withoutPrefix = title.replace(/^show hn:\s*/iu, "").trim();
-  const [candidate] = withoutPrefix.split(/\s+[–—-]\s+|:\s+/u, 1);
+  // 쉼표도 구분자로 처리한다("AgentNest, self-hosted sandboxes …" → "AgentNest").
+  // Reddit 추출기는 처음부터 쉼표를 잘랐는데 HN 쪽만 빠져 있었다.
+  const [candidate] = withoutPrefix.split(/\s*,\s+|\s+[–—-]\s+|:\s+/u, 1);
   return (candidate ?? withoutPrefix).trim().slice(0, 120);
+}
+
+// 제목에서 잘라낸 값이 제품명이 아니라 문장·설명인지 판정한다.
+// Show HN 제목은 "Show HN: MyTool – 설명" 형태가 아니라 완전한 문장인 경우가 흔해서
+// 이 경우 제목 대신 저장소명 등 다른 근거로 이름을 정해야 한다.
+export function looksLikeDescription(name: string) {
+  const trimmed = name.trim();
+  if (/[?!]/u.test(trimmed)) return true;
+  // 관사로 시작하는 짧은 고유명사("The Email Game")를 살리려고 경계를 5단어로 둔다.
+  if (trimmed.split(/\s+/u).length >= 5) return true;
+  return /^(what|why|how|when|i|we|my|our|its|it's)\b/iu.test(trimmed);
+}
+
+function repositoryNameFromUrl(url: string) {
+  const match = /^\/([^/]+)\/([^/]+)/u.exec(new URL(url).pathname);
+  return match?.[2] ? prettifyRepositoryName(match[2]) : null;
 }
 
 function productNameFromRedditTitle(title: string) {
@@ -161,7 +179,12 @@ function extractHackerNewsCandidate(item: DatabaseRawItem): EntityCandidate | nu
   if (!aiTerms.test(evidenceText) || !productIntentTerms.test(evidenceText)) return null;
   if (editorialHosts.has(domain) || /\/(blog|news|article|posts?|p)\//u.test(path)) return null;
 
-  const name = productNameFromHackerNewsTitle(item.title);
+  // 제목이 문장이면(Show HN에 흔함) 제목 대신 저장소명을 쓴다. 저장소가 없으면 그대로 두고
+  // 나중에 `pnpm rename`(LLM)이 설명·도메인을 보고 정정한다.
+  const titleName = productNameFromHackerNewsTitle(item.title);
+  const name = looksLikeDescription(titleName) && isGitHubRepository
+    ? repositoryNameFromUrl(canonicalUrl) ?? titleName
+    : titleName;
   if (name.length < 2 || name.length > 120) return null;
   return {
     name,
@@ -242,7 +265,10 @@ function extractRedditCandidate(item: DatabaseRawItem): EntityCandidate | null {
   if (!aiTerms.test(evidenceText) || !productIntentTerms.test(evidenceText)) return null;
 
   const isGitHubRepository = domain === "github.com" && /^\/[^/]+\/[^/]+/u.test(path);
-  const name = productNameFromRedditTitle(item.title);
+  const titleName = productNameFromRedditTitle(item.title);
+  const name = looksLikeDescription(titleName) && isGitHubRepository
+    ? repositoryNameFromUrl(canonicalUrl) ?? titleName
+    : titleName;
   if (name.length < 2 || name.length > 120) return null;
 
   const score = item.raw_metrics_json.score ?? 0;

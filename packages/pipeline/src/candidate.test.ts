@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyCategory, extractEntityCandidate, slugifyName } from "./candidate";
+import { classifyCategory, extractEntityCandidate, looksLikeDescription, slugifyName } from "./candidate";
 import { calculateInitialTrendScore } from "./initial-score";
 import type { DatabaseRawItem } from "./schema";
 
@@ -121,6 +121,58 @@ describe("candidate extraction", () => {
       raw_metrics_json: { points: 20, comments: 4 },
     });
     expect(candidate).toMatchObject({ officialDomain: "github.com", isOpenSource: true });
+  });
+
+  it("cuts the HN title at a comma so the product name survives", () => {
+    const candidate = extractEntityCandidate({
+      ...githubItem,
+      source: "hacker_news",
+      title: "Show HN: AgentNest, self-hosted sandboxes for AI agents",
+      body: "A platform for running AI agents in isolated sandboxes",
+      url: "https://agentnest.example/",
+      canonical_url: "https://agentnest.example/",
+      raw_payload_json: {},
+      raw_metrics_json: { points: 30, comments: 8 },
+    });
+    expect(candidate).toMatchObject({ name: "AgentNest" });
+  });
+
+  it("falls back to the repository name when the HN title is a full sentence", () => {
+    const candidate = extractEntityCandidate({
+      ...githubItem,
+      source: "hacker_news",
+      title: "Show HN: What should the GUI for AI agents look like?",
+      body: "An AI agent workspace tool",
+      url: "https://github.com/acme/marble-os",
+      canonical_url: "https://github.com/acme/marble-os",
+      raw_payload_json: {},
+      raw_metrics_json: { points: 120, comments: 40 },
+    });
+    expect(candidate).toMatchObject({ name: "Marble Os" });
+  });
+
+  it("keeps a sentence-like HN title when there is no repository to fall back to", () => {
+    // 이 경우는 `pnpm rename`(LLM)이 설명·도메인을 보고 정정하는 몫으로 남긴다.
+    const candidate = extractEntityCandidate({
+      ...githubItem,
+      source: "hacker_news",
+      title: "Show HN: What should the GUI for AI agents look like?",
+      body: "An AI agent workspace tool",
+      url: "https://marbleos.example/demo",
+      canonical_url: "https://marbleos.example/demo",
+      raw_payload_json: {},
+      raw_metrics_json: { points: 120, comments: 40 },
+    });
+    expect(candidate).toMatchObject({ name: "What should the GUI for AI agents look like?" });
+  });
+
+  it("keeps short proper nouns that begin with an article", () => {
+    for (const title of ["Show HN: The Email Game", "Show HN: The AI Lethal Trifecta"]) {
+      expect(looksLikeDescription(title.replace("Show HN: ", ""))).toBe(false);
+    }
+    expect(looksLikeDescription("I built a static verifier for OpenCode")).toBe(true);
+    expect(looksLikeDescription("A verification browser for AI agents")).toBe(true);
+    expect(looksLikeDescription("MarbleOS")).toBe(false);
   });
 
   it("extracts an AI Product Hunt launch and rejects non-AI launches", () => {

@@ -39,5 +39,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: 남은 후보 Gemini 분석 및 자동 승인
         run: pnpm process:live
+      # 게시글 제목이 문장이라 표시명이 제품명으로 잘리지 않은 신규 엔티티만 정정한다.
+      # 대상이 없으면 Gemini를 호출하지 않고 즉시 끝나므로 매 실행에 붙여도 비용이 없다.
+      - name: 표시명 정정
+        run: pnpm rename
       - name: 저장 결과 검증
         run: pnpm verify:live
