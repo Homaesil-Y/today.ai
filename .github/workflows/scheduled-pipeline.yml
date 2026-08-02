@@ -34,6 +34,8 @@ jobs:
       GEMINI_MODEL: gemini-3.1-flash-lite
       GEMINI_ANALYSIS_LIMIT: "50"
       AUTO_APPROVE_ANALYZED: "true"
+      # 표시명 정정에만 쓴다(대상이 없으면 호출 0회). 분석은 --skip-analysis로 계속 제외된다.
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -54,6 +56,10 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: pnpm process:live
+      # 이 워크플로도 AUTO_APPROVE_ANALYZED로 엔티티를 공개로 올릴 수 있으므로
+      # 리포트를 만들기 전에 표시명을 정정한다(정정 대상이 없으면 Gemini 호출 0회).
+      - name: 표시명 정정
+        run: pnpm rename
       - name: 일간 리포트 생성·공개
         run: pnpm report:daily
       - name: 저장 결과 검증
