@@ -13,17 +13,24 @@ export function calculateInitialTrendScore(
 ) {
   const sources = new Set(candidates.map((candidate) => candidate.source));
   const stars = Math.max(0, ...candidates.map((candidate) => candidate.metrics.stars ?? 0));
-  const hnScore = Math.max(0, ...candidates.map((candidate) => candidate.metrics.points ?? 0));
+  const hnPoints = Math.max(0, ...candidates.map((candidate) => candidate.metrics.points ?? 0));
+  // Product Hunt는 추천(votes)으로 같은 종류의 "즉각적인 반응 크기"를 나타낸다. HN의 points와
+  // 척도가 비슷해(수십~수천) 같은 velocity 축에 합산한다. 예전엔 여기서 points만 읽어서 순수
+  // Product Hunt 엔티티는 velocity_score가 항상 0으로 고정돼 "초기 집계"만 영원히 표시됐다.
+  const phVotes = Math.max(0, ...candidates.map((candidate) => candidate.metrics.votes ?? 0));
+  const engagementScore = Math.max(hnPoints, phVotes);
+  // Reddit 업보트는 전용 reddit 축(가중치 10)이 이미 스키마에 있는데도 계속 0으로 고정돼 있었다.
+  const redditScore = Math.max(0, ...candidates.map((candidate) => candidate.metrics.score ?? 0));
   const firstDetected = Math.min(...candidates.map((candidate) => new Date(candidate.firstDetectedAt).getTime()));
   const ageHours = Math.max(0, (now.getTime() - firstDetected) / 3_600_000);
   const bestDescription = candidates.map((candidate) => candidate.description ?? "").sort((a, b) => b.length - a.length)[0] ?? "";
 
   const breakdown: TrendScoreBreakdown = {
     crossSource: Math.min(25, Math.max(0, sources.size - 1) * 8),
-    velocity: cappedLog(hnScore, 20, 5),
+    velocity: cappedLog(engagementScore, 20, 5),
     productGrowth: cappedLog(stars, 15, 3.5),
     threads: 0,
-    reddit: 0,
+    reddit: cappedLog(redditScore, 10, 3),
     novelty: ageHours <= 24 ? 8 : ageHours <= 24 * 7 ? 6 : ageHours <= 24 * 30 ? 3 : 1,
     instagram: 0,
     quality: bestDescription.length >= 80 ? 5 : bestDescription.length >= 20 ? 3 : 1,
