@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyCategory, extractEntityCandidate, looksLikeDescription, slugifyName } from "./candidate";
+import { classifyCategory, extractEntityCandidate, githubRepositoryUrl, looksLikeDescription, slugifyName } from "./candidate";
 import { calculateInitialTrendScore } from "./initial-score";
 import type { DatabaseRawItem } from "./schema";
 
@@ -164,6 +164,50 @@ describe("candidate extraction", () => {
       raw_metrics_json: { points: 120, comments: 40 },
     });
     expect(candidate).toMatchObject({ name: "What should the GUI for AI agents look like?" });
+  });
+
+  it("treats only real repositories as GitHub repositories", () => {
+    // 토론·이슈·PR은 제품이 아니므로 거부한다.
+    expect(githubRepositoryUrl("https://github.com/orgs/modelcontextprotocol/discussions/824")).toBeNull();
+    expect(githubRepositoryUrl("https://github.com/acme/tool/issues/12")).toBeNull();
+    expect(githubRepositoryUrl("https://github.com/acme/tool/pull/12")).toBeNull();
+    expect(githubRepositoryUrl("https://github.com/topics/ai-agents")).toBeNull();
+    expect(githubRepositoryUrl("https://example.com/acme/tool")).toBeNull();
+    // 파일 딥링크는 같은 저장소로 접는다.
+    expect(githubRepositoryUrl("https://github.com/acme/tool/blob/main/README.md")).toBe("https://github.com/acme/tool");
+    expect(githubRepositoryUrl("https://github.com/acme/tool")).toBe("https://github.com/acme/tool");
+  });
+
+  it("rejects a GitHub discussion thread shared on HN", () => {
+    const candidate = extractEntityCandidate({
+      ...githubItem,
+      source: "hacker_news",
+      title: "Show HN: Secure JWT pattern for headless AI agents",
+      body: "A platform pattern for agent auth",
+      url: "https://github.com/orgs/modelcontextprotocol/discussions/824",
+      canonical_url: "https://github.com/orgs/modelcontextprotocol/discussions/824",
+      raw_payload_json: {},
+      raw_metrics_json: { points: 60, comments: 20 },
+    });
+    expect(candidate).toBeNull();
+  });
+
+  it("folds a GitHub file deep link onto the repository root", () => {
+    const candidate = extractEntityCandidate({
+      ...githubItem,
+      source: "hacker_news",
+      title: "Show HN: Patchward keeps AI agents honest",
+      body: "An AI agent audit tool",
+      url: "https://github.com/acme/patchward/blob/main/selfreport/RESULTS.md",
+      canonical_url: "https://github.com/acme/patchward/blob/main/selfreport/RESULTS.md",
+      raw_payload_json: {},
+      raw_metrics_json: { points: 60, comments: 20 },
+    });
+    expect(candidate).toMatchObject({
+      canonicalUrl: "https://github.com/acme/patchward",
+      githubUrl: "https://github.com/acme/patchward",
+      isOpenSource: true,
+    });
   });
 
   it("keeps short proper nouns that begin with an article", () => {

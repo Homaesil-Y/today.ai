@@ -58,6 +58,15 @@ const results = await extractor.extract(
 );
 const nameByIndex = new Map(results.map((result) => [result.index, result.name]));
 
+// 같은 글자인데 대소문자만 다른 제안은 표기 개선일 수도, 퇴행일 수도 있다.
+// 대문자가 줄어드는 방향(Semglot → semglot, Typst-WASM → typst-wasm)은 저장소 경로를
+// 그대로 베낀 결과라 반영하지 않고, 늘어나는 방향(Sphere Sdk → Sphere SDK)만 받는다.
+function isCasingRegression(from: string, to: string) {
+  if (from.toLowerCase() !== to.toLowerCase()) return false;
+  const uppercase = (value: string) => value.replace(/[^A-Z]/gu, "").length;
+  return uppercase(to) < uppercase(from);
+}
+
 const changes: { slug: string; from: string; to: string }[] = [];
 for (let i = 0; i < targets.length; i += 1) {
   const entity = targets[i]!;
@@ -65,6 +74,7 @@ for (let i = 0; i < targets.length; i += 1) {
   if (!newName || newName === entity.name) continue;
   // 모델이 이름 대신 또 문장을 돌려주면 반영하지 않는다.
   if (looksLikeDescription(newName)) continue;
+  if (isCasingRegression(entity.name, newName)) continue;
   changes.push({ slug: entity.slug, from: entity.name, to: newName });
   if (!dryRun) {
     // slug는 그대로 둔다. 이미 공개된 URL과 검색엔진 색인이 걸려 있어 바꾸면 링크가 깨진다.

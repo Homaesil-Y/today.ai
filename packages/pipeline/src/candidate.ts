@@ -103,6 +103,33 @@ function repositoryNameFromUrl(url: string) {
   return match?.[2] ? prettifyRepositoryName(match[2]) : null;
 }
 
+// github.com 경로 중 저장소가 아닌 것들. "슬래시 두 조각"만 보면 토론 스레드
+// (/orgs/<org>/discussions/824)까지 저장소로 통과해 제품이 아닌 항목이 등록됐다.
+const githubReservedOwners = new Set([
+  "orgs", "topics", "features", "about", "pricing", "sponsors", "marketplace",
+  "collections", "explore", "settings", "notifications", "apps", "login", "join", "search", "trending",
+]);
+// 저장소 안이지만 제품이 아니라 대화·이력을 가리키는 경로.
+const githubConversationViews = new Set([
+  "discussions", "issues", "pull", "pulls", "commits", "commit", "compare", "security", "advisories",
+]);
+
+/**
+ * github.com URL이 실제 저장소를 가리킬 때만 저장소 루트 URL로 정규화해 돌려준다.
+ * 토론·이슈·PR은 제품이 아니므로 null. `/blob/…`·`/tree/…` 같은 파일 딥링크는 루트로 접어서
+ * 같은 저장소를 가리키는 링크가 서로 다른 엔티티로 갈라지지 않게 한다.
+ */
+export function githubRepositoryUrl(url: string) {
+  const parsed = new URL(url);
+  if (parsed.hostname.toLowerCase().replace(/^www\./u, "") !== "github.com") return null;
+  const segments = parsed.pathname.split("/").filter(Boolean);
+  const [owner, repository, view] = segments;
+  if (!owner || !repository) return null;
+  if (githubReservedOwners.has(owner.toLowerCase())) return null;
+  if (view && githubConversationViews.has(view.toLowerCase())) return null;
+  return `https://github.com/${owner}/${repository.replace(/\.git$/u, "")}`;
+}
+
 function productNameFromRedditTitle(title: string) {
   const withoutPrefix = title
     .replace(/^\s*(show(\s*hn)?|show reddit|introducing|launch(ing)?|i\s+(just\s+)?(built|made|created|launched|shipped))\s*[:\-–—]?\s*/iu, "")
@@ -168,13 +195,18 @@ function extractGitHubCandidate(item: DatabaseRawItem): EntityCandidate | null {
 }
 
 function extractHackerNewsCandidate(item: DatabaseRawItem): EntityCandidate | null {
-  const canonicalUrl = safeCanonicalUrl(item.canonical_url, item.url);
-  const domain = hostname(canonicalUrl);
+  const rawCanonicalUrl = safeCanonicalUrl(item.canonical_url, item.url);
+  const domain = hostname(rawCanonicalUrl);
   const evidenceText = `${item.title} ${item.body ?? ""}`;
+  const repositoryUrl = domain === "github.com" ? githubRepositoryUrl(rawCanonicalUrl) : null;
+  // 저장소 링크는 루트로 접어 같은 제품이 갈라지지 않게 한다. github.com인데 저장소가 아니면
+  // (토론·이슈·PR) 제품이 아니므로 아래 isShowHn/isGitHubRepository 조건에서 걸러진다.
+  const canonicalUrl = repositoryUrl ?? rawCanonicalUrl;
   const path = new URL(canonicalUrl).pathname.toLowerCase();
   const isShowHn = /^show hn:/iu.test(item.title);
-  const isGitHubRepository = domain === "github.com" && /^\/[^/]+\/[^/]+/u.test(path);
+  const isGitHubRepository = repositoryUrl !== null;
   if (domain === "news.ycombinator.com") return null;
+  if (domain === "github.com" && !isGitHubRepository) return null;
   if (!isShowHn && !isGitHubRepository) return null;
   if (!aiTerms.test(evidenceText) || !productIntentTerms.test(evidenceText)) return null;
   if (editorialHosts.has(domain) || /\/(blog|news|article|posts?|p)\//u.test(path)) return null;
@@ -253,18 +285,21 @@ function extractProductHuntCandidate(item: DatabaseRawItem): EntityCandidate | n
 }
 
 function extractRedditCandidate(item: DatabaseRawItem): EntityCandidate | null {
-  const canonicalUrl = safeCanonicalUrl(item.canonical_url, item.url);
-  const domain = hostname(canonicalUrl);
+  const rawCanonicalUrl = safeCanonicalUrl(item.canonical_url, item.url);
+  const domain = hostname(rawCanonicalUrl);
   // 자체 토론 글(reddit permalink)·기사·에디토리얼은 제품 후보에서 제외한다.
   if (domain === "reddit.com" || domain === "redd.it" || domain === "news.ycombinator.com") return null;
   if (editorialHosts.has(domain)) return null;
+  const repositoryUrl = domain === "github.com" ? githubRepositoryUrl(rawCanonicalUrl) : null;
+  if (domain === "github.com" && !repositoryUrl) return null;
+  const canonicalUrl = repositoryUrl ?? rawCanonicalUrl;
   const path = new URL(canonicalUrl).pathname.toLowerCase();
   if (/\/(blog|news|article|posts?|p)\//u.test(path)) return null;
 
   const evidenceText = `${item.title} ${item.body ?? ""}`;
   if (!aiTerms.test(evidenceText) || !productIntentTerms.test(evidenceText)) return null;
 
-  const isGitHubRepository = domain === "github.com" && /^\/[^/]+\/[^/]+/u.test(path);
+  const isGitHubRepository = repositoryUrl !== null;
   const titleName = productNameFromRedditTitle(item.title);
   const name = looksLikeDescription(titleName) && isGitHubRepository
     ? repositoryNameFromUrl(canonicalUrl) ?? titleName
