@@ -45,17 +45,28 @@ if (targets.length === 0) {
   process.exit(0);
 }
 
-const extractor = createNameExtractorFromEnv(env);
-const results = await extractor.extract(
-  targets.map((entity, index) => ({
-    index,
-    currentName: entity.name,
-    // HN 본문은 매우 길 수 있어 앞부분만 보낸다(제품명은 대개 첫 문단에 등장).
-    description: (entity.description ?? "").slice(0, 600),
-    canonicalUrl: entity.canonical_url,
-    githubUrl: entity.github_url,
-  })),
-);
+// 표시명 정정은 분석 파이프라인의 후속 보정이라 실패해도 실행 전체를 깨뜨리면 안 된다.
+// 같은 워크플로에서 앞선 Gemini 분석이 무료 한도를 소진하면 여기서 429가 나는데, 그때는
+// 경고만 남기고 정상 종료해 다음 실행이 이어받게 한다.
+let results: { index: number; name: string }[];
+try {
+  const extractor = createNameExtractorFromEnv(env);
+  results = await extractor.extract(
+    targets.map((entity, index) => ({
+      index,
+      currentName: entity.name,
+      // HN 본문은 매우 길 수 있어 앞부분만 보낸다(제품명은 대개 첫 문단에 등장).
+      description: (entity.description ?? "").slice(0, 600),
+      canonicalUrl: entity.canonical_url,
+      githubUrl: entity.github_url,
+    })),
+  );
+} catch (error) {
+  const reason = error instanceof Error ? error.message : "알 수 없는 오류";
+  process.stderr.write(`표시명 정정을 건너뜁니다(다음 실행에서 재시도): ${reason}\n`);
+  process.stdout.write(`${JSON.stringify({ total: entityRows.length, targets: targets.length, changed: 0, skipped: reason, dryRun })}\n`);
+  process.exit(0);
+}
 const nameByIndex = new Map(results.map((result) => [result.index, result.name]));
 
 // 같은 글자인데 대소문자만 다른 제안은 표기 개선일 수도, 퇴행일 수도 있다.
