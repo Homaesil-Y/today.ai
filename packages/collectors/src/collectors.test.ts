@@ -123,6 +123,143 @@ describe("ProductHuntCollector", () => {
     expect(result.rateLimit?.resetAt).toBe("2026-07-19T12:10:00.000Z");
   });
 
+  it("uses the unique PH product page instead of the shared tracking redirect", async () => {
+    // 추적 링크(producthunt.com/r/<code>)를 canonical로 쓰면 모든 제품 도메인이 producthunt.com이
+    // 되어 파이프라인이 서로 다른 제품을 한 엔티티로 합쳐버린다. post.url은 제품마다 고유하다.
+    const node = (id: string, name: string, code: string) => ({
+      id, name, tagline: "AI agent", description: null, slug: name.toLowerCase(),
+      url: `https://www.producthunt.com/products/${name.toLowerCase()}?utm_campaign=producthunt-api`,
+      website: `https://producthunt.com/r/${code}`,
+      votesCount: 10, commentsCount: 1, createdAt: "2026-07-18T00:00:00Z",
+      featuredAt: null, user: { name: "A" }, topics: { edges: [] },
+    });
+    let headCalls = 0;
+    const fetcher = async (_url: string | URL | Request, init?: RequestInit) => {
+      if (init?.method === "HEAD") { headCalls += 1; return new Response(null, { status: 200 }); }
+      return new Response(JSON.stringify({
+        data: {
+          posts: {
+            edges: [{ node: node("1", "Clark", "AAA") }, { node: node("2", "Buzzy", "BBB") }],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        },
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    };
+
+    const result = await new ProductHuntCollector().collect(
+      { token: "test-token", fetcher: fetcher as unknown as typeof fetch },
+      { ...context, mode: "live" },
+    );
+
+    // 기본값에서는 추적 링크를 따라가지 않는다(PH가 자동 요청을 차단하고 약관상 과도한 사용이다).
+    expect(headCalls).toBe(0);
+    expect(result.items.map((item) => item.canonicalUrl)).toEqual([
+      "https://producthunt.com/products/clark",
+      "https://producthunt.com/products/buzzy",
+    ]);
+  });
+
+  it("prefers a direct website over the PH product page when PH gives one", async () => {
+    const fetcher = async () => new Response(JSON.stringify({
+      data: {
+        posts: {
+          edges: [{
+            node: {
+              id: "1", name: "Clark", tagline: "AI agent", description: null, slug: "clark",
+              url: "https://www.producthunt.com/products/clark", website: "https://www.clarkchat.com/?ref=producthunt",
+              votesCount: 10, commentsCount: 1, createdAt: "2026-07-18T00:00:00Z",
+              featuredAt: null, user: { name: "A" }, topics: { edges: [] },
+            },
+          }],
+          pageInfo: { hasNextPage: false, endCursor: null },
+        },
+      },
+    }), { status: 200, headers: { "content-type": "application/json" } });
+
+    const result = await new ProductHuntCollector().collect(
+      { token: "test-token", fetcher: fetcher as unknown as typeof fetch },
+      { ...context, mode: "live" },
+    );
+    expect(result.items[0]?.canonicalUrl).toBe("https://clarkchat.com/");
+  });
+
+  it("resolves the tracking redirect when explicitly enabled", async () => {
+    // 실제 체인과 동일하게 www 정규화를 한 번 거친 뒤 제품 사이트로 넘어가게 둔다.
+    const destinations: Record<string, string> = {
+      "https://producthunt.com/r/AAA": "https://www.producthunt.com/r/AAA",
+      "https://www.producthunt.com/r/AAA": "https://www.clarkchat.com/?ref=producthunt",
+      "https://producthunt.com/r/BBB": "https://www.producthunt.com/r/BBB",
+      "https://www.producthunt.com/r/BBB": "https://www.buzzy.now/?utm_source=product_hunt&ref=producthunt",
+    };
+    const node = (id: string, name: string, code: string) => ({
+      id, name, tagline: "AI agent", description: null, slug: name.toLowerCase(),
+      url: `https://ph.co/posts/${name.toLowerCase()}`, website: `https://producthunt.com/r/${code}`,
+      votesCount: 10, commentsCount: 1, createdAt: "2026-07-18T00:00:00Z",
+      featuredAt: null, user: { name: "A" }, topics: { edges: [] },
+    });
+    const headRequests: string[] = [];
+    const fetcher = async (url: string | URL | Request, init?: RequestInit) => {
+      if (init?.method === "HEAD") {
+        const target = String(url);
+        headRequests.push(target);
+        const location = destinations[target];
+        return location
+          ? new Response(null, { status: 302, headers: { location } })
+          : new Response(null, { status: 200 });
+      }
+      return new Response(JSON.stringify({
+        data: {
+          posts: {
+            edges: [{ node: node("1", "Clark", "AAA") }, { node: node("2", "Buzzy", "BBB") }],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        },
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    };
+
+    const result = await new ProductHuntCollector().collect(
+      { token: "test-token", fetcher: fetcher as unknown as typeof fetch, resolveRedirects: true },
+      { ...context, mode: "live" },
+    );
+
+    // 제품당 2홉(www 정규화 → 제품 사이트)을 따라간다.
+    expect(headRequests).toHaveLength(4);
+    // canonicalizeUrl이 www.·ref·utm_*를 정리해 제품별 고유 도메인이 남는다.
+    expect(result.items.map((item) => item.canonicalUrl)).toEqual([
+      "https://clarkchat.com/",
+      "https://buzzy.now/",
+    ]);
+  });
+
+  it("falls back to the PH product page when redirect resolution fails", async () => {
+    // PH가 403으로 막는 경우가 실제로 흔하다. 그때도 항목을 버리지 않고 고유한 제품 페이지를 쓴다.
+    const fetcher = async (url: string | URL | Request, init?: RequestInit) => {
+      if (init?.method === "HEAD") throw new Error("network down");
+      return new Response(JSON.stringify({
+        data: {
+          posts: {
+            edges: [{
+              node: {
+                id: "1", name: "Clark", tagline: "AI agent", description: null, slug: "clark",
+                url: "https://www.producthunt.com/products/clark", website: "https://producthunt.com/r/AAA",
+                votesCount: 10, commentsCount: 1, createdAt: "2026-07-18T00:00:00Z",
+                featuredAt: null, user: { name: "A" }, topics: { edges: [] },
+              },
+            }],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        },
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    };
+
+    const result = await new ProductHuntCollector().collect(
+      { token: "test-token", fetcher: fetcher as unknown as typeof fetch, resolveRedirects: true },
+      { ...context, mode: "live" },
+    );
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]?.canonicalUrl).toBe("https://producthunt.com/products/clark");
+  });
+
   it("throws on GraphQL errors so the run is recorded as failed", async () => {
     const fetcher = async () => new Response(
       JSON.stringify({ errors: [{ message: "invalid token" }] }),

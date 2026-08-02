@@ -10,6 +10,28 @@ import { databaseRawItemSchema } from "./schema";
 export const INGESTED_SOURCES = ["github", "hacker_news", "product_hunt", "reddit"] as const;
 export type IngestedSource = (typeof INGESTED_SOURCES)[number];
 
+/**
+ * 서로 다른 제품 수백 개가 같은 호스트를 공유하는 도메인. 이런 도메인은 "도메인이 같으면 같은 제품"
+ * 규칙에서 제외해야 한다. 제외하지 않으면 해당 도메인의 모든 제품이 첫 엔티티 하나로 흡수된다
+ * (실제로 Product Hunt 제품 131건이 "Lev8" 한 건으로 합쳐졌다. producthunt.com이 제품 홈페이지
+ * 대신 producthunt.com/r/<code> 리다이렉트를 내려주기 때문).
+ */
+export const SHARED_HOST_DOMAINS = new Set([
+  "github.com",
+  "gitlab.com",
+  "producthunt.com",
+  "huggingface.co",
+  "twitter.com",
+  "x.com",
+  "gumroad.com",
+  "notion.so",
+  "apps.apple.com",
+  "play.google.com",
+  "chromewebstore.google.com",
+  "marketplace.visualstudio.com",
+  "npmjs.com",
+]);
+
 const sourceSchema = z.object({ id: z.uuid(), code: z.string() });
 const categorySchema = z.object({ id: z.uuid(), slug: z.string(), name: z.string() });
 const entitySchema = z.object({
@@ -282,7 +304,7 @@ export class SupabasePipelineRepository {
       const github = this.entitiesByGithub.get(candidate.githubUrl);
       if (github) return github;
     }
-    if (candidate.officialDomain !== "github.com") {
+    if (!SHARED_HOST_DOMAINS.has(candidate.officialDomain)) {
       const domain = this.entitiesByDomain.get(candidate.officialDomain);
       if (domain) return domain;
     }
@@ -295,7 +317,7 @@ export class SupabasePipelineRepository {
   private indexEntity(entity: EntityRow) {
     this.entitiesByCanonical.set(entity.canonical_url, entity);
     if (entity.github_url) this.entitiesByGithub.set(entity.github_url, entity);
-    if (entity.official_domain && entity.official_domain !== "github.com") this.entitiesByDomain.set(entity.official_domain, entity);
+    if (entity.official_domain && !SHARED_HOST_DOMAINS.has(entity.official_domain)) this.entitiesByDomain.set(entity.official_domain, entity);
     this.entitiesBySlugBase.set(slugifyName(entity.name, entity.canonical_url), entity);
     this.usedSlugs.add(entity.slug);
   }
