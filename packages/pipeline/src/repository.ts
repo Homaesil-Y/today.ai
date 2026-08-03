@@ -290,9 +290,23 @@ export class SupabasePipelineRepository {
   }
 
   async autoApproveAnalyzedCandidates() {
+    // review 후보만 조회한다(전체 ai_analyses가 아니라). ai_analyses는 계속 쌓여 PostgREST 기본
+    // 응답 상한(1000행)을 이미 넘겼는데, 예전엔 그 테이블 전체를 무페이지네이션으로 읽어서
+    // 1000번째 행 이후에 분석된 엔티티는 review 상태에서 조용히 빠져나오지 못했다(실측: review
+    // 84건 중 16건이 이미 분석 완료 상태로 갇혀 있었다). review 후보 수는 분석 대기열 크기라
+    // 훨씬 작고, 승인·48시간 정리로 계속 소진되므로 이 조회는 1000행 상한에 걸리지 않는다.
+    const { data: reviewRows, error: reviewError } = await this.client
+      .from("entities")
+      .select("id")
+      .eq("visibility", "review");
+    if (reviewError) throw new PipelineRepositoryError(reviewError.message, "load_review_candidates");
+    const reviewIds = (reviewRows ?? []).map((row) => row.id as string);
+    if (reviewIds.length === 0) return 0;
+
     const { data: analysisRows, error: analysisError } = await this.client
       .from("ai_analyses")
-      .select("entity_id");
+      .select("entity_id")
+      .in("entity_id", reviewIds);
     if (analysisError) throw new PipelineRepositoryError(analysisError.message, "load_analyzed_candidates");
 
     const entityIds = [...new Set((analysisRows ?? []).map((row) => row.entity_id).filter((id): id is string => typeof id === "string"))];
