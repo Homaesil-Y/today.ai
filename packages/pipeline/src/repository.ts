@@ -132,6 +132,17 @@ export class SupabasePipelineRepository {
     for (const entity of z.array(entitySchema).parse(entitiesResult.data ?? [])) this.indexEntity(entity);
   }
 
+  /**
+   * app_settings 테이블에서 관리자가 지정한 값을 읽는다. initialize() 없이도 호출할 수 있고,
+   * 행이 없거나(마이그레이션 전) 조회에 실패해도 null만 반환한다 — 이 설정은 부가 기능이라
+   * 읽기에 실패했다고 파이프라인 전체가 멈추면 안 된다. 호출부에서 기본값(Gemini)으로 대체한다.
+   */
+  async loadAppSetting(key: string): Promise<unknown> {
+    const { data, error } = await this.client.from("app_settings").select("value").eq("key", key).maybeSingle();
+    if (error || !data) return null;
+    return data.value;
+  }
+
   async loadRawItems() {
     const output = [];
     for (const source of INGESTED_SOURCES) {

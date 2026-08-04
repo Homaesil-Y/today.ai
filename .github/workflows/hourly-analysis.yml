@@ -25,6 +25,8 @@ jobs:
       SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       GEMINI_MODEL: gemini-3.1-flash-lite
+      # 관리자가 /admin/settings에서 Groq를 고르면 이 키로 넘어간다. 안 골랐으면 안 쓰인다.
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
       GEMINI_ANALYSIS_LIMIT: "50"
       AUTO_APPROVE_ANALYZED: "true"
     steps:

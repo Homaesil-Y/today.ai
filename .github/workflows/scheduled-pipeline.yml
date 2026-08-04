@@ -36,6 +36,8 @@ jobs:
       AUTO_APPROVE_ANALYZED: "true"
       # 표시명 정정에만 쓴다(대상이 없으면 호출 0회). 분석은 --skip-analysis로 계속 제외된다.
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      # 관리자가 /admin/settings에서 Groq를 고른 경우에만 실제로 쓰인다.
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

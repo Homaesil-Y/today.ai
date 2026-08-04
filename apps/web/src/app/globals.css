@@ -227,6 +227,15 @@ button { color: inherit; }
 .toggle-row small { color: var(--text-secondary); }
 .toggle-row input { width: 20px; height: 20px; accent-color: var(--brand-primary); }
 .time-row input { min-height: 40px; padding: 0 10px; border: 1px solid var(--border-default); border-radius: 8px; background: var(--bg-surface-subtle); }
+.llm-provider-choices { display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px; margin: 0; padding: 0; border: 0; }
+.llm-provider-card { position: relative; display: flex; align-items: center; gap: 10px; min-height: 58px; padding: 0 14px; border: 1px solid var(--border-default); border-radius: 10px; background: var(--bg-surface); cursor: pointer; }
+.llm-provider-card:has(input:checked) { border-color: #bdb5ff; background: var(--brand-soft); }
+.llm-provider-card input { width: 17px; height: 17px; accent-color: var(--brand-primary); }
+.llm-provider-card strong { display: block; }
+.llm-provider-card small { display: block; margin-top: 2px; color: var(--text-secondary); }
+.llm-model-field { display: grid; gap: 6px; font-size: 13px; color: var(--text-secondary); }
+.llm-model-field input { min-height: 40px; padding: 0 12px; border: 1px solid var(--border-default); border-radius: 8px; background: var(--bg-surface-subtle); font: inherit; color: var(--text-primary); }
+.llm-model-field input:focus { border-color: var(--border-focus); background: white; outline: 0; }
 .preference-save { justify-self: end; min-width: 150px; }
 .danger-section { margin-top: 22px; border-color: #f3c9c4; }
 .danger-section .preference-title svg { color: var(--danger-text); }

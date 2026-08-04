@@ -4,6 +4,7 @@ import {
   Bookmark,
   ChevronRight,
   Compass,
+  Cpu,
   FileText,
   Gauge,
   GitCompareArrows,
@@ -67,6 +68,7 @@ export function SidebarNavLinks({ isAdmin }: { isAdmin: boolean }) {
         {isAdmin && <Link className={`nav-link ${isActive("/admin/review") ? "active" : ""}`} href={"/admin/review" as Route}><ShieldCheck size={19} /><span>후보 검토</span></Link>}
         {isAdmin && <Link className={`nav-link ${isActive("/admin/categories") ? "active" : ""}`} href={"/admin/categories" as Route}><Shapes size={19} /><span>카테고리 제안</span></Link>}
         {isAdmin && <Link className={`nav-link ${isActive("/admin/ops") ? "active" : ""}`} href={"/admin/ops" as Route}><Gauge size={19} /><span>운영 현황</span></Link>}
+        {isAdmin && <Link className={`nav-link ${isActive("/admin/settings") ? "active" : ""}`} href={"/admin/settings" as Route}><Cpu size={19} /><span>LLM 설정</span></Link>}
         <Link className={`nav-link ${isActive("/settings") ? "active" : ""}`} href="/settings" onClick={() => trackNavClick(pathname, "설정")}><Settings size={19} /><span>설정</span></Link>
       </div>
     </>
@@ -90,6 +92,7 @@ export function MobileNavLinks({ isAdmin }: { isAdmin: boolean }) {
           { label: "후보 검토", href: "/admin/review" as Route, icon: ShieldCheck },
           { label: "카테고리 제안", href: "/admin/categories" as Route, icon: Shapes },
           { label: "운영 현황", href: "/admin/ops" as Route, icon: Gauge },
+          { label: "LLM 설정", href: "/admin/settings" as Route, icon: Cpu },
         ] satisfies MoreItem[])
       : []),
     { label: "설정", href: "/settings" as Route, icon: Settings },
