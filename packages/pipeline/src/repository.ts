@@ -37,6 +37,20 @@ export function mergeSourceCodes(existing: readonly string[], incoming: string) 
   return [...new Set([...existing, incoming])].sort();
 }
 
+/**
+ * 재수집된 기존 엔티티의 visibility를 되돌릴지 결정한다.
+ *
+ * "오래된 후보 정리"로 자동 private된 후보만 review로 복구한다. private는 분석 대기열에서
+ * 제외되고 관리자 화면의 승인/보류도 review 상태만 대상이라, 복구 경로가 없으면 한 번 정리된
+ * 후보는 되살릴 방법이 아예 없다. 반대로 관리자가 직접 "보류"한 것(표시 없음)은 의도적 배제이므로
+ * 손대지 않는다 — 계속 재수집되는 항목을 3시간마다 다시 보류해야 하는 상황을 막는다.
+ * 공개(public)·검토 대기(review) 상태는 그대로 둔다.
+ */
+export function revivedVisibilityPatch(existing: { visibility: string; dismissed_as_stale_at: string | null }) {
+  if (existing.visibility !== "private" || !existing.dismissed_as_stale_at) return {};
+  return { visibility: "review" as const, dismissed_as_stale_at: null };
+}
+
 const sourceSchema = z.object({ id: z.uuid(), code: z.string() });
 const categorySchema = z.object({ id: z.uuid(), slug: z.string(), name: z.string() });
 const entitySchema = z.object({
@@ -56,6 +70,8 @@ const entitySchema = z.object({
   // 웹 화면이 실제 유입 채널을 표시할 수 있도록 저장 시점에 누적한다.
   // (entity_mentions·raw_items·sources는 anon 역할에 SELECT 권한이 없어 화면에서 조인할 수 없다.)
   source_codes: z.array(z.string()).default([]),
+  // "오래된 후보 정리"로 자동 private된 시각(수동 보류는 null). 재수집 시 복구 여부를 가른다.
+  dismissed_as_stale_at: z.string().nullable().default(null),
 });
 
 type EntityRow = z.infer<typeof entitySchema>;
@@ -114,7 +130,7 @@ export class SupabasePipelineRepository {
     const [sourcesResult, categoriesResult, entitiesResult] = await Promise.all([
       this.client.from("sources").select("id,code"),
       this.client.from("categories").select("id,slug,name").eq("enabled", true).order("sort_order"),
-      this.client.from("entities").select("id,name,slug,canonical_url,official_domain,github_url,description,category_id,pricing_type,is_open_source,visibility,first_detected_at,last_detected_at,source_codes"),
+      this.client.from("entities").select("id,name,slug,canonical_url,official_domain,github_url,description,category_id,pricing_type,is_open_source,visibility,first_detected_at,last_detected_at,source_codes,dismissed_as_stale_at"),
     ]);
     if (sourcesResult.error) throw new PipelineRepositoryError(sourcesResult.error.message, "load_sources");
     if (categoriesResult.error) throw new PipelineRepositoryError(categoriesResult.error.message, "load_categories");
@@ -179,8 +195,10 @@ export class SupabasePipelineRepository {
         is_open_source: existing.is_open_source || candidate.isOpenSource,
         // 같은 제품이 여러 채널로 들어오면 채널을 누적한다(교차 출처 표시의 근거).
         source_codes: mergeSourceCodes(existing.source_codes, candidate.source),
+        // 자동 정리된 후보가 다시 수집되면 검토 대기로 복구한다(수동 보류는 유지).
+        ...revivedVisibilityPatch(existing),
         updated_at: candidate.lastDetectedAt,
-      }).eq("id", existing.id).select("id,name,slug,canonical_url,official_domain,github_url,description,category_id,pricing_type,is_open_source,visibility,first_detected_at,last_detected_at,source_codes").single();
+      }).eq("id", existing.id).select("id,name,slug,canonical_url,official_domain,github_url,description,category_id,pricing_type,is_open_source,visibility,first_detected_at,last_detected_at,source_codes,dismissed_as_stale_at").single();
       if (error) throw new PipelineRepositoryError(error.message, "update_entity");
       entity = entitySchema.parse(data);
     } else {
@@ -200,7 +218,7 @@ export class SupabasePipelineRepository {
         source_codes: [candidate.source],
         status: "WATCH",
         visibility: "review",
-      }).select("id,name,slug,canonical_url,official_domain,github_url,description,category_id,pricing_type,is_open_source,visibility,first_detected_at,last_detected_at,source_codes").single();
+      }).select("id,name,slug,canonical_url,official_domain,github_url,description,category_id,pricing_type,is_open_source,visibility,first_detected_at,last_detected_at,source_codes,dismissed_as_stale_at").single();
       if (error) throw new PipelineRepositoryError(error.message, "insert_entity");
       entity = entitySchema.parse(data);
     }

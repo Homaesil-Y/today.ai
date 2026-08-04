@@ -115,7 +115,11 @@ export default async function AdminReviewPage({ searchParams }: Props) {
           <div className="admin-summary"><ShieldCheck size={18} /><strong>{candidates.length}</strong><span>검토 대기</span></div>
           {staleCount > 0 && (
             <form action={dismissStaleCandidates}>
-              <button className="button button-secondary" type="submit" title="48시간 넘게 분석되지 않아 자동 승인이 불가능한 잔여 후보를 보류 처리합니다. 재수집되면 다시 살아납니다.">
+              <button
+                className="button button-secondary"
+                type="submit"
+                title="48시간 넘게 재수집되지 않고 아직 분석되지 않은 후보를 보류 처리합니다. 이 후보들은 AI 분석 대기열에 그대로 남아 있으므로, 분석이 밀려 있을 때는 정리하지 않고 두는 편이 낫습니다. 정리해도 원본이 다시 수집되면 검토 대기로 복구됩니다."
+              >
                 <Trash2 size={15} />오래된 후보 정리 ({staleCount})
               </button>
             </form>
