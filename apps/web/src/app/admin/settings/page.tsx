@@ -7,6 +7,8 @@ import { Toast } from "@/components/toast";
 import { getCurrentUserRole } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { updateTrendAnalysisProvider } from "./actions";
+import { LlmProviderFields } from "./llm-provider-fields";
+import { PROVIDER_LABELS } from "./model-defaults";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "LLM 설정", robots: { index: false, follow: false } };
@@ -15,12 +17,6 @@ const settingSchema = z.object({
   provider: z.enum(["gemini", "groq"]).catch("gemini"),
   model: z.string().trim().min(1).nullable().optional().catch(null),
 });
-
-const PROVIDER_LABELS: Record<string, string> = { gemini: "Google Gemini", groq: "Groq" };
-const PROVIDER_DEFAULT_MODELS: Record<string, string> = {
-  gemini: "gemini-3.1-flash-lite",
-  groq: "openai/gpt-oss-20b",
-};
 
 export default async function AdminSettingsPage({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
   const saved = (await searchParams).saved === "1";
@@ -52,29 +48,7 @@ export default async function AdminSettingsPage({ searchParams }: { searchParams
         </div>
 
         <form className="preference-form" action={updateTrendAnalysisProvider}>
-          <fieldset className="llm-provider-choices">
-            {(["gemini", "groq"] as const).map((provider) => (
-              <label className="llm-provider-card" key={provider}>
-                <input type="radio" name="provider" value={provider} defaultChecked={setting.provider === provider} required />
-                <div>
-                  <strong>{PROVIDER_LABELS[provider]}</strong>
-                  <small>기본 모델: {PROVIDER_DEFAULT_MODELS[provider]}</small>
-                </div>
-              </label>
-            ))}
-          </fieldset>
-
-          <label className="llm-model-field">
-            <span>모델 이름(선택)</span>
-            <input
-              type="text"
-              name="model"
-              defaultValue={setting.model ?? ""}
-              placeholder="비워두면 프로바이더 기본 모델을 사용합니다"
-              maxLength={120}
-            />
-          </label>
-
+          <LlmProviderFields initialProvider={setting.provider} initialModel={setting.model ?? ""} />
           <SubmitButton className="button button-primary" pendingLabel="저장 중…">저장</SubmitButton>
         </form>
 
