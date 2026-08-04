@@ -255,17 +255,21 @@ export class SupabasePipelineRepository {
   }
 
   /**
-   * 주어진 엔티티들에 대해 (model, promptVersion) 기준 가장 최근 분석 시각(epoch ms)을 한 번의 조회로 가져온다.
+   * 주어진 엔티티들에 대해 promptVersion 기준 가장 최근 분석 시각(epoch ms)을 한 번의 조회로 가져온다.
    * 분석 기록이 없는 엔티티는 Map 에 포함되지 않으므로 "미분석" 판별에 사용할 수 있다.
+   *
+   * 모델명은 조건에서 제외한다. 예전엔 model_name까지 일치를 요구해서, 관리자가 프로바이더를
+   * 바꾸면(Gemini→Groq) 기존 분석이 전부 이름이 안 맞아 "미분석"으로 재분류됐다. 실제로 전환
+   * 직후 대기열이 74건에서 386건으로 뛰어, 공개가 필요한 검토 후보가 이미 분석이 끝난 공개
+   * 서비스의 재분석과 경쟁했다. 프롬프트 버전이 같으면 어느 모델이 만든 분석이든 유효하다.
    */
-  async loadLatestAnalysisAt(entityIds: string[], model: string, promptVersion: string) {
+  async loadLatestAnalysisAt(entityIds: string[], promptVersion: string) {
     const latest = new Map<string, number>();
     if (entityIds.length === 0) return latest;
 
     const { data, error } = await this.client.from("ai_analyses")
       .select("entity_id,generated_at")
       .in("entity_id", entityIds)
-      .eq("model_name", model)
       .eq("prompt_version", promptVersion);
     if (error) throw new PipelineRepositoryError(error.message, "load_latest_analysis");
 

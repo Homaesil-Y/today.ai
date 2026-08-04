@@ -8,6 +8,7 @@ import {
 import { selectPendingAnalyses } from "./analysis-queue";
 import { extractEntityCandidate } from "./candidate";
 import { calculateInitialTrendScore } from "./initial-score";
+import { planRateLimitWait } from "./rate-limit-wait";
 import type { SupabasePipelineRepository } from "./repository";
 import type { EntityCandidate } from "./schema";
 
@@ -20,6 +21,8 @@ interface ProcessedGroup {
 export function toEvidenceExcerpt(body: string | null, fallback: string) {
   return (body?.trim() || fallback).slice(0, 2_000);
 }
+
+const sleep = (ms: number) => new Promise<void>((resolve) => { setTimeout(resolve, ms); });
 
 function toEvidence(group: ProcessedGroup, now: Date): TrendEvidence {
   // 스키마 상한(<=20)에 맞춰 자른다. mention이 많은 엔티티는 dedup 후에도 20개를 넘을 수 있어
@@ -85,12 +88,13 @@ export async function runEntityPipeline(options: {
   const analysisQueue = { unanalyzed: 0, stale: 0, selected: 0, remaining: 0 };
   // 이번 실행에서 분석에 성공한 엔티티 목록. 분석 후 한 번의 배치 호출로 카테고리를 재분류한다.
   const analyzedForCategory: { entityId: string; name: string; description: string }[] = [];
+  let rateLimitWaitedMs = 0;
+  let stoppedEarly = false;
   if (options.analysisProvider) {
     const limit = Math.max(0, options.analysisLimit ?? 50);
     const staleThreshold = now.getTime() - 24 * 3_600_000;
     const latestAnalysisAt = await options.repository.loadLatestAnalysisAt(
       processed.map((group) => group.entity.id),
-      options.analysisProvider.model,
       TREND_ANALYSIS_PROMPT_VERSION,
     );
     // 우선순위: 미분석 review 후보 → 오래된 public 재분석. 보류(private) 후보는 제외.
@@ -106,25 +110,41 @@ export async function runEntityPipeline(options: {
     analysisQueue.selected = queue.pending.length;
     analysisQueue.remaining = queue.remaining;
     for (const group of queue.pending) {
-      try {
-        const result = await options.analysisProvider.analyze(toEvidence(group, now));
-        await options.repository.saveAnalysis(group.entity.id, result);
-        analysesCreated += 1;
-        // 한국어 요약은 카테고리 분류에 좋은 신호라 분류 입력으로 쓴다.
-        analyzedForCategory.push({ entityId: group.entity.id, name: group.entity.name, description: result.analysis.summary });
-      } catch (error) {
-        analysisErrors.push({
-          entity: group.entity.slug,
-          error: error instanceof Error ? error.message : "Unknown analysis failure",
-        });
-        if (error instanceof LlmProviderError && (
-          error.code === "RATE_LIMIT" || error.code === "AUTH" || error.code === "CONFIG"
-        )) {
-          analysisStoppedReason = error.code;
-          if (error.code === "RATE_LIMIT") lastRateLimitAt = new Date().toISOString();
-          break;
+      // 분당 한도에 걸리면 서버가 알려준 만큼 기다렸다 같은 후보를 한 번 더 시도한다.
+      // 예산(누적 대기 시간)을 넘기면 이번 실행을 끝내고 다음 주기에 맡긴다.
+      let attempted = false;
+      while (!attempted) {
+        attempted = true;
+        try {
+          const result = await options.analysisProvider.analyze(toEvidence(group, now));
+          await options.repository.saveAnalysis(group.entity.id, result);
+          analysesCreated += 1;
+          // 한국어 요약은 카테고리 분류에 좋은 신호라 분류 입력으로 쓴다.
+          analyzedForCategory.push({ entityId: group.entity.id, name: group.entity.name, description: result.analysis.summary });
+        } catch (error) {
+          analysisErrors.push({
+            entity: group.entity.slug,
+            error: error instanceof Error ? error.message : "Unknown analysis failure",
+          });
+          if (error instanceof LlmProviderError && (
+            error.code === "RATE_LIMIT" || error.code === "AUTH" || error.code === "CONFIG"
+          )) {
+            if (error.code === "RATE_LIMIT") {
+              lastRateLimitAt = new Date().toISOString();
+              const plan = planRateLimitWait({ retryAfterMs: error.retryAfterMs, waitedMs: rateLimitWaitedMs });
+              if (plan) {
+                rateLimitWaitedMs += plan.waitMs;
+                await sleep(plan.waitMs);
+                attempted = false; // 같은 후보를 다시 시도한다.
+                continue;
+              }
+            }
+            analysisStoppedReason = error.code;
+            stoppedEarly = true;
+          }
         }
       }
+      if (stoppedEarly) break;
     }
     // 이번 실행에서 처리하지 못하고 남은 대기 후보 수(중단으로 처리 못 한 pending 포함).
     analysisQueue.remaining += queue.pending.length - analysesCreated;
@@ -164,6 +184,8 @@ export async function runEntityPipeline(options: {
     analysisErrors,
     analysisStoppedReason,
     lastRateLimitAt,
+    // 분당 한도에 걸려 기다린 누적 시간. 0보다 크면 즉시 중단 대신 기다려서 더 처리했다는 뜻이다.
+    rateLimitWaitedMs,
     analysisQueue,
     autoApproved,
     leaders: processed.slice(0, 10).map((group) => ({

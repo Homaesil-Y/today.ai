@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { buildTrendAnalysisPrompt, TREND_ANALYSIS_PROMPT_VERSION } from "./prompt";
-import { LlmProviderError, type TrendAnalysisProvider } from "./provider";
+import { LlmProviderError, parseRetryAfterMs, type TrendAnalysisProvider } from "./provider";
 import {
   trendAnalysisJsonSchema,
   trendAnalysisSchema,
@@ -100,7 +100,13 @@ export class GroqTrendAnalysisProvider implements TrendAnalysisProvider {
           : response.status === 429
             ? "RATE_LIMIT"
             : "UPSTREAM";
-        throw new LlmProviderError(message, code, response.status === 429 || response.status >= 500, response.status);
+        throw new LlmProviderError(
+          message,
+          code,
+          response.status === 429 || response.status >= 500,
+          response.status,
+          response.status === 429 ? parseRetryAfterMs(response.headers, message) : undefined,
+        );
       }
 
       const parsedResponse = groqResponseSchema.safeParse(payload);
