@@ -51,6 +51,11 @@ export async function runEntityPipeline(options: {
   categoryClassifier?: GeminiCategoryClassifier;
   analysisLimit?: number;
   autoApproveAnalyzed?: boolean;
+  /**
+   * 분석을 이 시각까지만 진행한다. 넘기면 남은 후보는 다음 주기에 맡기고 자동 승인으로 넘어간다.
+   * 잡 타임아웃에 걸려 프로세스가 죽으면 분석을 저장해두고도 공개가 안 되기 때문에 필요하다.
+   */
+  analysisDeadline?: Date;
 }) {
   const now = options.now ?? new Date();
   await options.repository.initialize();
@@ -82,7 +87,7 @@ export async function runEntityPipeline(options: {
 
   let analysesCreated = 0;
   let analysesSkipped = 0;
-  let analysisStoppedReason: "RATE_LIMIT" | "AUTH" | "CONFIG" | null = null;
+  let analysisStoppedReason: "RATE_LIMIT" | "AUTH" | "CONFIG" | "DEADLINE" | null = null;
   let lastRateLimitAt: string | null = null;
   const analysisErrors: Array<{ entity: string; error: string }> = [];
   const analysisQueue = { unanalyzed: 0, stale: 0, selected: 0, remaining: 0 };
@@ -109,9 +114,19 @@ export async function runEntityPipeline(options: {
     analysisQueue.stale = queue.stale;
     analysisQueue.selected = queue.pending.length;
     analysisQueue.remaining = queue.remaining;
+    // 마감이 없으면 무한대로 두어 기존 동작(한도에 걸릴 때까지 계속)을 유지한다.
+    const deadlineMs = options.analysisDeadline?.getTime() ?? Number.POSITIVE_INFINITY;
+    const remainingMs = () => deadlineMs - Date.now();
+
     for (const group of queue.pending) {
+      // 마감을 넘겼으면 남은 후보는 다음 주기에 맡긴다. 여기서 멈춰야 자동 승인이 실행된다.
+      if (remainingMs() <= 0) {
+        analysisStoppedReason = "DEADLINE";
+        stoppedEarly = true;
+        break;
+      }
       // 분당 한도에 걸리면 서버가 알려준 만큼 기다렸다 같은 후보를 한 번 더 시도한다.
-      // 예산(누적 대기 시간)을 넘기면 이번 실행을 끝내고 다음 주기에 맡긴다.
+      // 마감까지 기다릴 여유가 없으면 이번 실행을 끝내고 다음 주기에 맡긴다.
       let attempted = false;
       while (!attempted) {
         attempted = true;
@@ -131,7 +146,7 @@ export async function runEntityPipeline(options: {
           )) {
             if (error.code === "RATE_LIMIT") {
               lastRateLimitAt = new Date().toISOString();
-              const plan = planRateLimitWait({ retryAfterMs: error.retryAfterMs, waitedMs: rateLimitWaitedMs });
+              const plan = planRateLimitWait({ retryAfterMs: error.retryAfterMs, remainingMs: remainingMs() });
               if (plan) {
                 rateLimitWaitedMs += plan.waitMs;
                 await sleep(plan.waitMs);

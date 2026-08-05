@@ -33,6 +33,9 @@ jobs:
       REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
       GEMINI_MODEL: gemini-3.1-flash-lite
       GEMINI_ANALYSIS_LIMIT: "50"
+      # 이 잡은 같은 15분 안에서 수집까지 하므로 분석 예산을 hourly-analysis보다 짧게 잡는다.
+      # 분석이 오래 걸려도 자동 승인·표시명 정정·리포트·검증 단계가 실행되도록 보장한다.
+      ANALYSIS_BUDGET_MINUTES: "6"
       AUTO_APPROVE_ANALYZED: "true"
       # 표시명 정정에만 쓴다(대상이 없으면 호출 0회). 분석은 --skip-analysis로 계속 제외된다.
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

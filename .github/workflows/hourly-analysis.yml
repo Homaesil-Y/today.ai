@@ -28,6 +28,9 @@ jobs:
       # 관리자가 /admin/settings에서 Groq를 고르면 이 키로 넘어간다. 안 골랐으면 안 쓰인다.
       GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
       GEMINI_ANALYSIS_LIMIT: "50"
+      # 아래 timeout-minutes보다 짧게 잡아, 분석이 느려도 자동 승인·표시명 정정·검증이 실행되게 한다.
+      # 이 값이 없던 시절 Groq 전환 후 분석만 하다 타임아웃에 걸려, 저장된 분석 22건이 공개되지 못했다.
+      ANALYSIS_BUDGET_MINUTES: "9"
       AUTO_APPROVE_ANALYZED: "true"
     steps:
       - uses: actions/checkout@v4
