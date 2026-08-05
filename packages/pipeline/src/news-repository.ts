@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { chunkForFilter } from "./query-chunks";
 
 export class NewsRepositoryError extends Error {
   constructor(message: string, readonly operation: string) {
@@ -36,12 +37,17 @@ export class NewsRepository {
 
   async loadExistingCanonicalUrls(urls: string[]): Promise<Set<string>> {
     if (urls.length === 0) return new Set();
-    const { data, error } = await this.client
-      .from("news_items")
-      .select("canonical_url")
-      .in("canonical_url", urls);
-    if (error) throw new NewsRepositoryError(error.message, "load_existing");
-    return new Set(z.array(existingRowSchema).parse(data ?? []).map((row) => row.canonical_url));
+    // URL 은 값 하나가 100자를 넘어 목록을 그대로 필터에 넣으면 요청 헤드 한도에 금방 닿는다.
+    const existing = new Set<string>();
+    for (const chunk of chunkForFilter(urls)) {
+      const { data, error } = await this.client
+        .from("news_items")
+        .select("canonical_url")
+        .in("canonical_url", chunk);
+      if (error) throw new NewsRepositoryError(error.message, "load_existing");
+      for (const row of z.array(existingRowSchema).parse(data ?? [])) existing.add(row.canonical_url);
+    }
+    return existing;
   }
 
   async insertNews(rows: NewsInsertRow[]): Promise<number> {

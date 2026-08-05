@@ -3,6 +3,7 @@ import type { SourceCode } from "@ai-trend-radar/types";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { slugifyName } from "./candidate";
+import { chunkForFilter, readAllPages } from "./query-chunks";
 import type { EntityCandidate } from "./schema";
 import { databaseRawItemSchema } from "./schema";
 
@@ -262,23 +263,32 @@ export class SupabasePipelineRepository {
    * 바꾸면(Gemini→Groq) 기존 분석이 전부 이름이 안 맞아 "미분석"으로 재분류됐다. 실제로 전환
    * 직후 대기열이 74건에서 386건으로 뛰어, 공개가 필요한 검토 후보가 이미 분석이 끝난 공개
    * 서비스의 재분석과 경쟁했다. 프롬프트 버전이 같으면 어느 모델이 만든 분석이든 유효하다.
+   *
+   * 엔티티 목록은 청크로 나눠 보낸다. 한 요청에 전부 넣으면 URL 이 요청 헤드 한도를 넘어
+   * fetch 가 실패한다(자세한 배경은 query-chunks.ts 참고).
    */
   async loadLatestAnalysisAt(entityIds: string[], promptVersion: string) {
     const latest = new Map<string, number>();
     if (entityIds.length === 0) return latest;
 
-    const { data, error } = await this.client.from("ai_analyses")
-      .select("entity_id,generated_at")
-      .in("entity_id", entityIds)
-      .eq("prompt_version", promptVersion);
-    if (error) throw new PipelineRepositoryError(error.message, "load_latest_analysis");
+    for (const chunk of chunkForFilter(entityIds)) {
+      const rows = await readAllPages(async (from, to) => {
+        const { data, error } = await this.client.from("ai_analyses")
+          .select("entity_id,generated_at")
+          .in("entity_id", chunk)
+          .eq("prompt_version", promptVersion)
+          .range(from, to);
+        if (error) throw new PipelineRepositoryError(error.message, "load_latest_analysis");
+        return data ?? [];
+      });
 
-    for (const row of data ?? []) {
-      if (typeof row.entity_id !== "string" || typeof row.generated_at !== "string") continue;
-      const timestamp = new Date(row.generated_at).getTime();
-      if (Number.isNaN(timestamp)) continue;
-      const current = latest.get(row.entity_id);
-      if (current === undefined || timestamp > current) latest.set(row.entity_id, timestamp);
+      for (const row of rows) {
+        if (typeof row.entity_id !== "string" || typeof row.generated_at !== "string") continue;
+        const timestamp = new Date(row.generated_at).getTime();
+        if (Number.isNaN(timestamp)) continue;
+        const current = latest.get(row.entity_id);
+        if (current === undefined || timestamp > current) latest.set(row.entity_id, timestamp);
+      }
     }
     return latest;
   }
@@ -336,23 +346,35 @@ export class SupabasePipelineRepository {
     const reviewIds = (reviewRows ?? []).map((row) => row.id as string);
     if (reviewIds.length === 0) return 0;
 
-    const { data: analysisRows, error: analysisError } = await this.client
-      .from("ai_analyses")
-      .select("entity_id")
-      .in("entity_id", reviewIds);
-    if (analysisError) throw new PipelineRepositoryError(analysisError.message, "load_analyzed_candidates");
+    const analysisRows: Array<{ entity_id?: unknown }> = [];
+    for (const chunk of chunkForFilter(reviewIds)) {
+      analysisRows.push(...await readAllPages(async (from, to) => {
+        const { data, error } = await this.client
+          .from("ai_analyses")
+          .select("entity_id")
+          .in("entity_id", chunk)
+          .range(from, to);
+        if (error) throw new PipelineRepositoryError(error.message, "load_analyzed_candidates");
+        return data ?? [];
+      }));
+    }
 
-    const entityIds = [...new Set((analysisRows ?? []).map((row) => row.entity_id).filter((id): id is string => typeof id === "string"))];
+    const entityIds = [...new Set(analysisRows.map((row) => row.entity_id).filter((id): id is string => typeof id === "string"))];
     if (entityIds.length === 0) return 0;
 
-    const { data, error } = await this.client
-      .from("entities")
-      .update({ visibility: "public", updated_at: new Date().toISOString() })
-      .in("id", entityIds)
-      .eq("visibility", "review")
-      .select("id");
-    if (error) throw new PipelineRepositoryError(error.message, "auto_approve_analyzed_candidates");
-    return data?.length ?? 0;
+    const approvedAt = new Date().toISOString();
+    let approved = 0;
+    for (const chunk of chunkForFilter(entityIds)) {
+      const { data, error } = await this.client
+        .from("entities")
+        .update({ visibility: "public", updated_at: approvedAt })
+        .in("id", chunk)
+        .eq("visibility", "review")
+        .select("id");
+      if (error) throw new PipelineRepositoryError(error.message, "auto_approve_analyzed_candidates");
+      approved += data?.length ?? 0;
+    }
+    return approved;
   }
 
   private findEntity(candidate: EntityCandidate) {

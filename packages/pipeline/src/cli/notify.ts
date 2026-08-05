@@ -2,6 +2,7 @@ import { createHmac } from "node:crypto";
 import { loadWorkspaceEnvironment, withRetry } from "@ai-trend-radar/collectors";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { chunkForFilter } from "../query-chunks";
 
 const env = loadWorkspaceEnvironment();
 const url = env.NEXT_PUBLIC_SUPABASE_URL;
@@ -74,11 +75,12 @@ if (prefError) throw new Error(`구독 설정 조회 실패: ${prefError.message
 const subscriberIds = z.array(z.object({ user_id: z.string() })).parse(prefRows ?? []).map((row) => row.user_id);
 
 const subscribers: Array<{ userId: string; email: string }> = [];
-if (subscriberIds.length > 0) {
+// 구독자가 늘면 id 목록을 한 요청에 다 넣을 수 없다(요청 헤드 한도 → fetch 실패).
+for (const chunk of chunkForFilter(subscriberIds)) {
   const { data: profileRows, error: profileError } = await client
     .from("user_profiles")
     .select("id, email")
-    .in("id", subscriberIds);
+    .in("id", chunk);
   if (profileError) throw new Error(`구독자 이메일 조회 실패: ${profileError.message}`);
   for (const row of z.array(z.object({ id: z.string(), email: z.string() })).parse(profileRows ?? [])) {
     subscribers.push({ userId: row.id, email: row.email });
