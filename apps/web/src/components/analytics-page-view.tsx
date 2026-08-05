@@ -2,7 +2,7 @@
 
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef } from "react";
-import { pageTypeFor, trackEvent } from "@/lib/analytics";
+import { pageTypeFor, trackedPagePath, trackEvent } from "@/lib/analytics";
 
 // URL에서 표시용 마커 파라미터를 제거한다(새로고침 시 이벤트 재발화 방지).
 // 기존 Toast 컴포넌트의 clearParam 패턴과 동일한 방식.
@@ -31,8 +31,10 @@ function AnalyticsPageViewInner() {
     // 관리자 화면은 운영자 행동이라 지표에서 제외한다.
     if (pageType === "admin") return;
 
+    // page_path에는 추적 허용 목록에 있는 쿼리만 싣는다. 구독 해지 링크의 사용자 id·토큰처럼
+    // 민감한 값이 URL에 있어도 GA로 나가지 않아야 한다(중복 판정용 key는 전체 URL 그대로 쓴다).
     trackEvent("page_view", {
-      page_path: search ? `${pathname}?${search}` : pathname,
+      page_path: trackedPagePath(pathname, searchParams),
       page_title: typeof document !== "undefined" ? document.title : "",
       page_type: pageType,
     });
