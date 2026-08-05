@@ -14,7 +14,7 @@ export default function OpenGraphImage() {
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
         <div style={{ display: "flex", color: "#6d5dfb", fontSize: 22, fontWeight: 700, letterSpacing: 3 }}>LIVE AI TREND INTELLIGENCE</div>
         <div style={{ display: "flex", maxWidth: 940, fontSize: 68, lineHeight: 1.12, fontWeight: 800, letterSpacing: -3 }}>오늘 뜨는 AI 서비스를<br />신호와 근거로 확인하세요.</div>
-        <div style={{ display: "flex", color: "#667085", fontSize: 26 }}>GitHub · Hacker News 데이터와 한국어 AI 분석</div>
+        <div style={{ display: "flex", color: "#667085", fontSize: 26 }}>공개 채널 데이터와 한국어 AI 분석</div>
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 24, borderTop: "2px solid #e5e7eb", color: "#667085", fontSize: 20 }}><span>매일 업데이트</span><span>oh-ai-news.vercel.app</span></div>
     </div>,

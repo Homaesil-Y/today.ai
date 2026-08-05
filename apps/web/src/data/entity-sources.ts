@@ -4,13 +4,13 @@ import type { SourceCode } from "@ai-trend-radar/types";
 const DISPLAYABLE_SOURCES = ["github", "hacker_news", "product_hunt", "reddit", "threads", "instagram"] as const;
 const DISPLAYABLE = new Set<string>(DISPLAYABLE_SOURCES);
 
-const SOURCE_LABELS: Record<string, string> = {
-  github: "GitHub 감지 점수",
-  hacker_news: "Hacker News 감지 점수",
-  product_hunt: "Product Hunt 감지 점수",
-  reddit: "Reddit 감지 점수",
-  threads: "Threads 감지 점수",
-  instagram: "Instagram 감지 점수",
+const SOURCE_NAMES: Record<string, string> = {
+  github: "GitHub",
+  hacker_news: "Hacker News",
+  product_hunt: "Product Hunt",
+  reddit: "Reddit",
+  threads: "Threads",
+  instagram: "Instagram",
 };
 
 /**
@@ -31,6 +31,22 @@ export function resolveSources(sourceCodes: readonly string[], githubUrl: string
   return githubUrl ? ["github"] : ["hacker_news"];
 }
 
+export function sourceDisplayName(source: string): string {
+  return SOURCE_NAMES[source] ?? source;
+}
+
 export function sourceSignalLabel(source: SourceCode): string {
-  return SOURCE_LABELS[source] ?? `${source} 감지 점수`;
+  return `${sourceDisplayName(source)} 감지 점수`;
+}
+
+/**
+ * 실제 관측된 채널들을 "GitHub·Hacker News·Product Hunt" 형태의 문구로 묶는다.
+ *
+ * 화면에서 수집 채널을 이야기하는 문구는 하드코딩하지 말고 이걸 쓴다. 예전엔 홈 화면 세 곳
+ * (제목·순위 안내·FAQ)이 각각 채널 이름을 직접 적어두어, Product Hunt를 붙인 뒤 한 곳만 갱신되고
+ * 나머지는 "GitHub·Hacker News"에 머물러 서로 어긋났다. 반대로 Reddit은 API 승인이 거절돼
+ * 실제로 수집되지 않으므로, 채널 목록을 미리 적어두면 없는 출처를 광고하게 된다.
+ */
+export function collectionChannelsLabel(sources: Iterable<string>): string {
+  return [...new Set(sources)].sort().map(sourceDisplayName).join("·");
 }

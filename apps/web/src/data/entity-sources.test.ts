@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveSources, sourceSignalLabel } from "./entity-sources";
+import { collectionChannelsLabel, resolveSources, sourceSignalLabel } from "./entity-sources";
 
 describe("resolveSources", () => {
   // 이 테스트가 없어서 채널을 추가할 때 표시 계층이 방치됐다.
@@ -42,5 +42,22 @@ describe("sourceSignalLabel", () => {
     expect(sourceSignalLabel("hacker_news")).toBe("Hacker News 감지 점수");
     expect(sourceSignalLabel("product_hunt")).toBe("Product Hunt 감지 점수");
     expect(sourceSignalLabel("reddit")).toBe("Reddit 감지 점수");
+  });
+});
+
+describe("collectionChannelsLabel", () => {
+  it("names only the channels present in the data", () => {
+    // Reddit 은 API 승인이 거절돼 실제 수집되지 않는다 — 없는 출처를 광고하지 않아야 한다.
+    expect(collectionChannelsLabel(["hacker_news", "product_hunt", "github"]))
+      .toBe("GitHub·Hacker News·Product Hunt");
+  });
+
+  it("collapses duplicates across entities", () => {
+    expect(collectionChannelsLabel(["github", "github", "hacker_news"])).toBe("GitHub·Hacker News");
+  });
+
+  it("returns an empty string when nothing is published yet", () => {
+    // 호출부가 이걸 보고 문구를 생략하거나 일반 표현으로 대체한다.
+    expect(collectionChannelsLabel([])).toBe("");
   });
 });
