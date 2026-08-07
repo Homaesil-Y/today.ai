@@ -128,14 +128,25 @@ export class SupabasePipelineRepository {
   }
 
   async initialize() {
-    const [sourcesResult, categoriesResult, entitiesResult] = await Promise.all([
+    // 엔티티는 페이지네이션으로 끝까지 읽는다. PostgREST는 기본 1000행까지만 돌려주므로,
+    // 그냥 select() 하면 1000건을 넘는 순간 뒷부분이 조용히 잘린다 — findEntity 가 기존
+    // 엔티티를 못 찾아 같은 제품이 중복 생성되기 시작한다(현재 466건, 하루 +20~26건 증가라
+    // 몇 주 안에 도달할 수순이었다).
+    const [sourcesResult, categoriesResult, entityRows] = await Promise.all([
       this.client.from("sources").select("id,code"),
       this.client.from("categories").select("id,slug,name").eq("enabled", true).order("sort_order"),
-      this.client.from("entities").select("id,name,slug,canonical_url,official_domain,github_url,description,category_id,pricing_type,is_open_source,visibility,first_detected_at,last_detected_at,source_codes,dismissed_as_stale_at"),
+      readAllPages(async (from, to) => {
+        const { data, error } = await this.client
+          .from("entities")
+          .select("id,name,slug,canonical_url,official_domain,github_url,description,category_id,pricing_type,is_open_source,visibility,first_detected_at,last_detected_at,source_codes,dismissed_as_stale_at")
+          .order("id")
+          .range(from, to);
+        if (error) throw new PipelineRepositoryError(error.message, "load_entities");
+        return data ?? [];
+      }),
     ]);
     if (sourcesResult.error) throw new PipelineRepositoryError(sourcesResult.error.message, "load_sources");
     if (categoriesResult.error) throw new PipelineRepositoryError(categoriesResult.error.message, "load_categories");
-    if (entitiesResult.error) throw new PipelineRepositoryError(entitiesResult.error.message, "load_entities");
 
     for (const source of z.array(sourceSchema).parse(sourcesResult.data ?? [])) {
       if (INGESTED_SOURCES.includes(source.code as IngestedSource)) {
@@ -146,7 +157,16 @@ export class SupabasePipelineRepository {
       this.categoryIds.set(category.slug, category.id);
       this.categoryTaxonomy.push({ slug: category.slug, label: category.name });
     }
-    for (const entity of z.array(entitySchema).parse(entitiesResult.data ?? [])) this.indexEntity(entity);
+    for (const entity of z.array(entitySchema).parse(entityRows)) this.indexEntity(entity);
+  }
+
+  /**
+   * 후보를 기존 엔티티에 읽기 전용으로 매칭한다. upsertCandidate 와 같은 규칙(canonical URL →
+   * GitHub URL → 도메인 → 이름)을 쓰되 아무것도 쓰지 않는다. 분석 전용 실행에서 쓴다 —
+   * 매칭되지 않는 신규 후보는 수집 워크플로가 다음 주기에 생성하므로 여기서는 건너뛴다.
+   */
+  matchEntity(candidate: EntityCandidate) {
+    return this.findEntity(candidate) ?? null;
   }
 
   /**

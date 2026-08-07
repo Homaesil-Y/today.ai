@@ -44,8 +44,10 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # --analysis-only: 엔티티·점수 재기록(후보당 3~4회 DB 왕복, 5~10분)을 건너뛰고 분석에 집중한다.
+      # 그 기록은 scheduled-pipeline 이 같은 3시간 주기(30분 앞서)로 이미 하고 있다.
       - name: 남은 후보 Gemini 분석 및 자동 승인
-        run: pnpm process:live
+        run: pnpm process:live -- --analysis-only
       # 게시글 제목이 문장이라 표시명이 제품명으로 잘리지 않은 신규 엔티티만 정정한다.
       # 대상이 없으면 Gemini를 호출하지 않고 즉시 끝나므로 매 실행에 붙여도 비용이 없다.
       - name: 표시명 정정

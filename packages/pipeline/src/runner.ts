@@ -56,6 +56,15 @@ export async function runEntityPipeline(options: {
    * 잡 타임아웃에 걸려 프로세스가 죽으면 분석을 저장해두고도 공개가 안 되기 때문에 필요하다.
    */
   analysisDeadline?: Date;
+  /**
+   * 엔티티·점수를 다시 쓰지 않고 기존 엔티티에 읽기 전용 매칭만 해서 분석에 집중한다.
+   *
+   * 분석 재시도 워크플로가 매 실행 전체 후보를 순차 upsert(후보당 3~4회 DB 왕복)하는 데
+   * 5~10분을 쓰는데, 그 쓰기는 30분 전 수집 워크플로가 이미 한 일의 반복이다. 실측으로
+   * upsert 단계가 10분을 먹어 분석 예산이 시작 전에 소진된 실행(분석 0건)이 있었다.
+   * 이 모드에서 매칭되지 않는 신규 후보는 건너뛴다 — 생성은 수집 워크플로의 몫이다.
+   */
+  analysisOnly?: boolean;
 }) {
   const now = options.now ?? new Date();
   await options.repository.initialize();
@@ -69,8 +78,15 @@ export async function runEntityPipeline(options: {
     });
 
   const grouped = new Map<string, { entity: ProcessedGroup["entity"]; candidates: EntityCandidate[] }>();
+  let candidatesUnmatched = 0;
   for (const candidate of candidates) {
-    const entity = await options.repository.upsertCandidate(candidate);
+    const entity = options.analysisOnly
+      ? options.repository.matchEntity(candidate)
+      : await options.repository.upsertCandidate(candidate);
+    if (!entity) {
+      candidatesUnmatched += 1;
+      continue;
+    }
     const current = grouped.get(entity.id);
     if (current) current.candidates.push(candidate);
     else grouped.set(entity.id, { entity, candidates: [candidate] });
@@ -79,8 +95,10 @@ export async function runEntityPipeline(options: {
   const processed: ProcessedGroup[] = [];
   const scoreDate = now.toISOString().slice(0, 10);
   for (const group of grouped.values()) {
+    // 점수는 대기열 우선순위 정렬에 필요해 항상 계산하되, 분석 전용 실행에서는 저장하지 않는다
+    // (수집 워크플로가 이미 같은 날짜로 저장했다).
     const score = calculateInitialTrendScore(group.candidates, now);
-    await options.repository.saveScore(group.entity.id, score, scoreDate);
+    if (!options.analysisOnly) await options.repository.saveScore(group.entity.id, score, scoreDate);
     processed.push({ ...group, score });
   }
   processed.sort((a, b) => b.score.totalScore - a.score.totalScore || b.score.trustScore - a.score.trustScore);
@@ -200,8 +218,11 @@ export async function runEntityPipeline(options: {
     rawItemsRead: rawItems.length,
     candidatesAccepted: candidates.length,
     candidatesRejected: rawItems.length - candidates.length,
+    // 분석 전용 실행에서 기존 엔티티에 매칭되지 않아 건너뛴 후보 수(생성은 수집 워크플로의 몫).
+    candidatesUnmatched,
     entitiesProcessed: processed.length,
-    scoresCreated: processed.length,
+    // 분석 전용 실행은 점수를 저장하지 않으므로 0으로 보고한다(계산은 정렬용으로만 썼다).
+    scoresCreated: options.analysisOnly ? 0 : processed.length,
     analysesCreated,
     analysesSkipped,
     categoriesUpdated,
