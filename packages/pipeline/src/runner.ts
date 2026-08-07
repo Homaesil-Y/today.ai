@@ -102,13 +102,18 @@ export async function runEntityPipeline(options: {
       processed.map((group) => group.entity.id),
       TREND_ANALYSIS_PROMPT_VERSION,
     );
-    // 우선순위: 미분석 review 후보 → 오래된 public 재분석. 보류(private) 후보는 제외.
-    const queue = selectPendingAnalyses(processed, limit, (group) => {
-      if (group.entity.visibility === "private") return "excluded";
-      const latest = latestAnalysisAt.get(group.entity.id);
-      if (latest === undefined) return "unanalyzed";
-      return latest < staleThreshold ? "stale" : "recent";
-    });
+    // 우선순위: 미분석 review 후보(점수순) → 재분석 대상(가장 오래된 것부터). 보류(private)는 제외.
+    const queue = selectPendingAnalyses(
+      processed,
+      limit,
+      (group) => {
+        if (group.entity.visibility === "private") return "excluded";
+        const latest = latestAnalysisAt.get(group.entity.id);
+        if (latest === undefined) return "unanalyzed";
+        return latest < staleThreshold ? "stale" : "recent";
+      },
+      (group) => latestAnalysisAt.get(group.entity.id) ?? 0,
+    );
     analysesSkipped = queue.skipped;
     analysisQueue.unanalyzed = queue.unanalyzed;
     analysisQueue.stale = queue.stale;
