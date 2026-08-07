@@ -97,7 +97,11 @@ export async function runEntityPipeline(options: {
   let stoppedEarly = false;
   if (options.analysisProvider) {
     const limit = Math.max(0, options.analysisLimit ?? 50);
-    const staleThreshold = now.getTime() - 24 * 3_600_000;
+    // 재분석 주기. 24시간이었을 때는 공개 엔티티 수(458건, 하루 +20~26 증가)만큼이 매일 대기열로
+    // 되돌아와 자연 처리량(하루 76~145건)으로는 영구히 따라잡을 수 없었다. 재분석이 갱신하는 건
+    // 상세 페이지의 요약·인사이트 텍스트뿐이고 순위·점수는 LLM 없이 매 실행 갱신되므로, 72시간이면
+    // 제품상 충분하면서 필요 처리량(~153건/일)이 처리 능력 범위에 들어온다.
+    const staleThreshold = now.getTime() - 72 * 3_600_000;
     const latestAnalysisAt = await options.repository.loadLatestAnalysisAt(
       processed.map((group) => group.entity.id),
       TREND_ANALYSIS_PROMPT_VERSION,
