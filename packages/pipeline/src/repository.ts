@@ -170,6 +170,43 @@ export class SupabasePipelineRepository {
   }
 
   /**
+   * 엔티티별 과거 점수 요약(직전 총점, 누적 스냅샷 수)을 가져온다.
+   *
+   * 상태 판정(RISING/FALLING/PEAK 등)은 직전 스냅샷과 비교해야 하는데, 예전엔 호출부가
+   * previousScore/dataPoints 를 상수로 넘겨 모든 엔티티가 영구히 WATCH 였다. `scoreDate` 는
+   * 이번 실행이 기록할 날짜라, 같은 날 재실행해도 직전 값이 자기 자신으로 덮이지 않게 제외한다.
+   */
+  async loadScoreHistory(entityIds: string[], scoreDate: string) {
+    const summary = new Map<string, { previousScore: number; dataPoints: number }>();
+    if (entityIds.length === 0) return summary;
+
+    for (const chunk of chunkForFilter(entityIds)) {
+      const rows = await readAllPages(async (from, to) => {
+        const { data, error } = await this.client
+          .from("trend_scores")
+          .select("entity_id,total_score,score_date")
+          .in("entity_id", chunk)
+          .lt("score_date", scoreDate)
+          .order("score_date", { ascending: false })
+          .range(from, to);
+        if (error) throw new PipelineRepositoryError(error.message, "load_score_history");
+        return data ?? [];
+      });
+
+      for (const row of rows) {
+        if (typeof row.entity_id !== "string" || typeof row.total_score !== "number") continue;
+        const current = summary.get(row.entity_id);
+        // 내림차순이라 처음 만나는 행이 직전 스냅샷이다.
+        if (current) current.dataPoints += 1;
+        else summary.set(row.entity_id, { previousScore: row.total_score, dataPoints: 1 });
+      }
+    }
+    // dataPoints 는 이번에 기록할 스냅샷까지 포함해야 calculateStatus 의 "2건 이상" 조건과 맞는다.
+    for (const value of summary.values()) value.dataPoints += 1;
+    return summary;
+  }
+
+  /**
    * app_settings 테이블에서 관리자가 지정한 값을 읽는다. initialize() 없이도 호출할 수 있고,
    * 행이 없거나(마이그레이션 전) 조회에 실패해도 null만 반환한다 — 이 설정은 부가 기능이라
    * 읽기에 실패했다고 파이프라인 전체가 멈추면 안 된다. 호출부에서 기본값(Gemini)으로 대체한다.

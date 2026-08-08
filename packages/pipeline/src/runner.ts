@@ -101,10 +101,12 @@ export async function runEntityPipeline(options: {
 
   const processed: ProcessedGroup[] = [];
   const scoreDate = now.toISOString().slice(0, 10);
+  // 상태 판정(RISING/FALLING/PEAK 등)은 직전 스냅샷과 비교해야 한다.
+  const scoreHistory = await options.repository.loadScoreHistory([...grouped.keys()], scoreDate);
   for (const group of grouped.values()) {
     // 점수는 대기열 우선순위 정렬에 필요해 항상 계산하되, 분석 전용 실행에서는 저장하지 않는다
     // (수집 워크플로가 이미 같은 날짜로 저장했다).
-    const score = calculateInitialTrendScore(group.candidates, now, percentiles);
+    const score = calculateInitialTrendScore(group.candidates, now, percentiles, scoreHistory.get(group.entity.id));
     if (!options.analysisOnly) await options.repository.saveScore(group.entity.id, score, scoreDate);
     processed.push({ ...group, score });
   }

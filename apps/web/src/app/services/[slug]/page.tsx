@@ -9,6 +9,7 @@ import { TrendPeriodChart } from "@/components/trend-period-chart";
 import { WatchButton } from "@/components/watch-button";
 import { getPublishedTrend, getTrendScoreHistory } from "@/data/live-trends";
 import { getSavedEntityIds } from "@/data/watchlist";
+import { formatScoreDelta } from "@/lib/score-delta";
 import { absoluteUrl, siteConfig } from "@/lib/site";
 
 type Props = { params: Promise<{ slug: string }> };
@@ -77,7 +78,7 @@ export default async function ServiceDetailPage({ params }: Props) {
 
       <section className="detail-grid">
         <article className="panel trend-panel"><div className="panel-heading"><div><h2>트렌드 신호</h2></div></div><TrendPeriodChart history={scoreHistory} name={trend.name} slug={trend.slug} nowIso={nowIso} /></article>
-        <article className="panel platform-panel"><div className="panel-heading"><div><h2>플랫폼별 지표</h2></div></div>{trend.signals.map((signal) => <div className="platform-row" key={signal.source}><SourceBrandIcon source={signal.source} size="medium" /><span><strong>{signal.label}</strong><small><Clock3 size={12} />{formatCollectedAt(signal.measuredAt)} 수집 · {signal.reliability === "verified" ? "검증됨" : "추정"}</small></span><span><strong>{signal.value.toLocaleString("ko-KR")}</strong><em>+{signal.delta24h.toLocaleString("ko-KR")}</em></span></div>)}</article>
+        <article className="panel platform-panel"><div className="panel-heading"><div><h2>플랫폼별 지표</h2></div></div>{trend.signals.map((signal) => <div className="platform-row" key={signal.source}><SourceBrandIcon source={signal.source} size="medium" /><span><strong>{signal.label}</strong><small><Clock3 size={12} />{formatCollectedAt(signal.measuredAt)} 수집 · {signal.reliability === "verified" ? "검증됨" : "추정"}</small></span><span><strong>{signal.value.toLocaleString("ko-KR")}</strong><em className={formatScoreDelta(signal.delta24h).tone}>{formatScoreDelta(signal.delta24h).label}</em></span></div>)}</article>
       </section>
 
       <section className="reaction-grid">

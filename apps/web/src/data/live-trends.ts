@@ -125,6 +125,12 @@ export const getPublishedTrends = cache(unstable_cache(async (): Promise<TrendEn
       const score = scores.get(entity.id);
       const analysis = analyses.get(entity.id);
       const totalScore = Math.round((score?.total_score ?? 0) * 10) / 10;
+      // 이력은 최신→과거 정렬이라 [1]이 직전 스냅샷이다. 없으면 비교 불가(null).
+      const history = scoreHistoryByEntity.get(entity.id);
+      const previousScore = history && history.length >= 2 ? history[1] : undefined;
+      const scoreDelta = previousScore === undefined
+        ? null
+        : Math.round((totalScore - previousScore) * 10) / 10;
       const sources = resolveSources(entity.source_codes, entity.github_url);
       const source = sources[0]!;
       const status: TrendStatus = score?.status ?? entity.status;
@@ -166,7 +172,8 @@ export const getPublishedTrends = cache(unstable_cache(async (): Promise<TrendEn
           source,
           label: sourceSignalLabel(source),
           value: totalScore,
-          delta24h: Math.round(score?.velocity_score ?? 0),
+          // 직전 스냅샷과의 실제 점수 차이. 이력이 한 건뿐이면 비교 대상이 없어 null.
+          delta24h: scoreDelta,
           unit: "engagement",
           measuredAt: score?.calculated_at ?? entity.last_detected_at,
           reliability: "estimated",

@@ -33,7 +33,11 @@ export interface SourceSignal {
   source: SourceCode;
   label: string;
   value: number;
-  delta24h: number;
+  /**
+   * 직전 스냅샷 대비 변화량. 비교할 이전 스냅샷이 없으면 null — 0(변화 없음)과 구분해야 한다.
+   * 예전엔 velocity 점수를 그대로 넣어, 시간 변화와 무관한 값이 "24H 변화"로 표시됐다.
+   */
+  delta24h: number | null;
   unit: "stars" | "votes" | "points" | "mentions" | "engagement";
   measuredAt: string;
   reliability: "verified" | "estimated" | "delayed";

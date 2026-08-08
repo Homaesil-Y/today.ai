@@ -1,6 +1,7 @@
 import type { TrendEntity } from "@ai-trend-radar/types";
 import { ArrowUpRight, TrendingUp } from "lucide-react";
 import Link from "next/link";
+import { formatScoreDelta } from "@/lib/score-delta";
 import { Sparkline } from "./sparkline";
 import { StatusBadge } from "./status-badge";
 import { WatchButton } from "./watch-button";
@@ -18,7 +19,7 @@ export function TopOneCard({ trend, initialSaved = false }: { trend: TrendEntity
         {trend.whyTrending.slice(0, 2).map((reason) => <li key={reason}><TrendingUp size={15} aria-hidden="true" />{reason}</li>)}
       </ul>
       <div className="signal-strip">
-        {trend.signals.slice(0, 2).map((signal) => <div key={signal.source}><span>{signal.label}</span><strong>{signal.delta24h === 0 ? "초기 집계" : `+${signal.delta24h.toLocaleString("ko-KR")}`}</strong></div>)}
+        {trend.signals.slice(0, 2).map((signal) => <div key={signal.source}><span>{signal.label}</span><strong className={formatScoreDelta(signal.delta24h).tone}>{formatScoreDelta(signal.delta24h).label}</strong></div>)}
       </div>
       <div className="card-actions"><Link className="button button-primary" href={`/services/${trend.slug}`} data-ga-event="select_content" data-ga-params={JSON.stringify({ content_type: "trend_card", service_slug: trend.slug, service_category: trend.category, position: trend.rank })}>분석 보기 <ArrowUpRight size={17} /></Link><WatchButton entityId={trend.id} slug={trend.slug} initialSaved={initialSaved} /></div>
     </article>

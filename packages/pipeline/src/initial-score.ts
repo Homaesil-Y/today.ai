@@ -28,10 +28,19 @@ export function velocityFromRank(rank: number) {
   return Math.round(bounded * bounded * VELOCITY_CAP * 10) / 10;
 }
 
+/** 이 엔티티의 과거 점수 스냅샷 요약. 없으면 상태는 WATCH 로 남는다. */
+export interface EntityScoreHistory {
+  /** 직전(오늘 이전) 스냅샷의 총점. */
+  previousScore: number;
+  /** 이번 스냅샷을 포함한 누적 스냅샷 수. calculateStatus 는 2 이상부터 판정한다. */
+  dataPoints: number;
+}
+
 export function calculateInitialTrendScore(
   candidates: EntityCandidate[],
   now: Date,
   percentiles?: EngagementPercentiles,
+  history?: EntityScoreHistory,
 ) {
   const sources = new Set(candidates.map((candidate) => candidate.source));
   const stars = Math.max(0, ...candidates.map((candidate) => candidate.metrics.stars ?? 0));
@@ -58,12 +67,16 @@ export function calculateInitialTrendScore(
     quality: bestDescription.length >= 80 ? 5 : bestDescription.length >= 20 ? 3 : 1,
   };
   const totalScore = calculateTrendScore(breakdown);
+  // 이력이 없으면 calculateStatus 가 WATCH 를 돌려주도록 dataPoints 1을 넘긴다. 예전엔 이 값이
+  // 항상 1로 고정돼 있어서, 정의된 8개 상태 중 WATCH 를 제외한 7개가 도달 불가능했다
+  // (실측: 공개 486건이 예외 없이 WATCH 라 화면의 상태 배지가 전부 "관찰 대상"이었다).
   const status = calculateStatus({
     firstDetectedHours: ageHours,
-    velocityDelta: 0,
+    // 직전 스냅샷 대비 점수 상승폭. 스냅샷이 하나뿐이면 비교 대상이 없어 0.
+    velocityDelta: history ? totalScore - history.previousScore : 0,
     score: totalScore,
-    previousScore: totalScore,
-    dataPoints: 1,
+    previousScore: history?.previousScore ?? totalScore,
+    dataPoints: history ? history.dataPoints : 1,
   });
   const averageConfidence = candidates.reduce((sum, candidate) => sum + candidate.confidence, 0) / candidates.length;
   const trustScore = Math.round(Math.min(95, 45 + averageConfidence * 40 + Math.min(10, sources.size * 5)));

@@ -1,6 +1,7 @@
 import type { TrendEntity } from "@ai-trend-radar/types";
-import { ArrowUp, ChevronRight } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronRight } from "lucide-react";
 import Link from "next/link";
+import { formatScoreDelta } from "@/lib/score-delta";
 import { Sparkline } from "./sparkline";
 import { getSourceLabel, SourceBrandIcon } from "./source-brand-icon";
 import { StatusBadge } from "./status-badge";
@@ -23,7 +24,11 @@ export function RankingTable({ trends, savedEntityIds = new Set<string>(), start
               <td className="numeric score-cell">{trend.trendScore}</td>
               <td><Sparkline values={trend.sparkline} label={`${trend.name} 트렌드 변화`} /></td>
               <td><div className="source-pills" aria-label={`수집 채널 ${trend.sources.map(getSourceLabel).join(", ")}`}>{trend.sources.slice(0, 4).map((source) => <SourceBrandIcon key={source} source={source} />)}</div></td>
-              <td className="numeric positive">{trend.signals[0]?.delta24h ? <><ArrowUp size={14} /> +{trend.signals[0].delta24h.toLocaleString("ko-KR")}</> : "초기 집계"}</td>
+              <td className={`numeric ${formatScoreDelta(trend.signals[0]?.delta24h).tone}`}>{(() => {
+                const delta = formatScoreDelta(trend.signals[0]?.delta24h);
+                if (delta.tone === "neutral") return delta.label;
+                return <>{delta.tone === "positive" ? <ArrowUp size={14} /> : <ArrowDown size={14} />} {delta.label}</>;
+              })()}</td>
               <td><div className="row-actions"><WatchButton entityId={trend.id} slug={trend.slug} compact initialSaved={savedEntityIds.has(trend.id)} /><Link className="icon-button" href={`/services/${trend.slug}`} aria-label={`${trend.name} 상세 보기`} data-ga-event="select_content" data-ga-params={gaParamsFor(trend, index)}><ChevronRight size={18} /></Link></div></td>
             </tr>
           ))}
@@ -42,7 +47,7 @@ export function RankingTable({ trends, savedEntityIds = new Set<string>(), start
               <span className="mobile-meta">
                 <StatusBadge status={trend.status} />
                 <span className="mobile-sources" aria-label={`수집 채널 ${trend.sources.map(getSourceLabel).join(", ")}`}>{trend.sources.slice(0, 3).map((source) => <SourceBrandIcon key={source} source={source} />)}</span>
-                {trend.signals[0]?.delta24h ? <span className="mobile-delta positive">+{trend.signals[0].delta24h.toLocaleString("ko-KR")}</span> : <span className="mobile-delta">초기 집계</span>}
+                <span className={`mobile-delta ${formatScoreDelta(trend.signals[0]?.delta24h).tone}`}>{formatScoreDelta(trend.signals[0]?.delta24h).label}</span>
               </span>
             </span>
             <span className="mobile-score">{trend.trendScore}<small>점</small></span>
