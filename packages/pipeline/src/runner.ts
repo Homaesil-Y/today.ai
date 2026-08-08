@@ -7,7 +7,8 @@ import {
 } from "@ai-trend-radar/llm";
 import { selectPendingAnalyses } from "./analysis-queue";
 import { extractEntityCandidate } from "./candidate";
-import { calculateInitialTrendScore } from "./initial-score";
+import { EngagementPercentiles } from "./engagement-percentile";
+import { calculateInitialTrendScore, engagementValue } from "./initial-score";
 import { planRateLimitWait } from "./rate-limit-wait";
 import type { SupabasePipelineRepository } from "./repository";
 import type { EntityCandidate } from "./schema";
@@ -92,12 +93,18 @@ export async function runEntityPipeline(options: {
     else grouped.set(entity.id, { entity, candidates: [candidate] });
   }
 
+  // 반응 지표는 채널별 척도가 달라(HN points 중앙값 2, PH votes 중앙값 194) 절대값을 비교할 수
+  // 없다. 이번 실행에서 수집한 후보 전체로 채널별 분포를 만들어 상대 순위로 환산한다.
+  const percentiles = new EngagementPercentiles(
+    candidates.map((candidate) => ({ source: candidate.source, value: engagementValue(candidate) })),
+  );
+
   const processed: ProcessedGroup[] = [];
   const scoreDate = now.toISOString().slice(0, 10);
   for (const group of grouped.values()) {
     // 점수는 대기열 우선순위 정렬에 필요해 항상 계산하되, 분석 전용 실행에서는 저장하지 않는다
     // (수집 워크플로가 이미 같은 날짜로 저장했다).
-    const score = calculateInitialTrendScore(group.candidates, now);
+    const score = calculateInitialTrendScore(group.candidates, now, percentiles);
     if (!options.analysisOnly) await options.repository.saveScore(group.entity.id, score, scoreDate);
     processed.push({ ...group, score });
   }
