@@ -354,4 +354,23 @@ describe("Supabase raw item mapping", () => {
     });
     expect(rows[0]?.raw_payload_json).toBeTruthy();
   });
+
+  it("collapses duplicate sourceItemId within a batch, keeping the last", () => {
+    // Product Hunt 가 같은 node.id 를 한 응답에 두 번 실어 보내면 Postgres upsert 가 배치째 실패했다.
+    const base = {
+      title: "Dup", body: null, url: "https://example.com/", canonicalUrl: "https://example.com/",
+      authorName: null, publishedAt: "2026-08-11T00:00:00Z", rawPayload: {}, collectedAt: "2026-08-11T00:00:00Z",
+      source: "product_hunt" as const,
+    };
+    const rows = toRawItemRows("11111111-1111-4111-8111-111111111111", [
+      { ...base, sourceItemId: "A", metrics: { votes: 10 } },
+      { ...base, sourceItemId: "B", metrics: { votes: 20 } },
+      { ...base, sourceItemId: "A", metrics: { votes: 99 } },
+    ]);
+
+    expect(rows).toHaveLength(2);
+    const a = rows.find((r) => r.source_item_id === "A");
+    // 뒤에 온 항목이 더 최신 지표라 마지막 것을 남긴다.
+    expect(a?.raw_metrics_json).toEqual({ votes: 99 });
+  });
 });

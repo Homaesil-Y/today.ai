@@ -27,7 +27,15 @@ export class CollectorStorageError extends Error {
 }
 
 export function toRawItemRows(sourceId: string, items: RawItem[]) {
-  return items.map((item) => ({
+  // 한 배치 안에서 sourceItemId 가 중복되면 제거한다. Postgres 는 upsert 한 번에 같은 conflict
+  // 키(source_id,source_item_id)를 두 번 건드리면 "ON CONFLICT DO UPDATE command cannot affect
+  // row a second time" 로 배치 전체를 거부한다 — 실제로 Product Hunt 가 같은 node.id 를 한 응답에
+  // 두 번 실어 보내(페이지 경계 중복·다중 토픽 노출) 수집 워크플로가 반복 실패했다. 뒤에 온 항목이
+  // 더 최신 지표라 마지막 것을 남긴다.
+  const deduped = new Map<string, RawItem>();
+  for (const item of items) deduped.set(item.sourceItemId, item);
+
+  return [...deduped.values()].map((item) => ({
     source_id: sourceId,
     source_item_id: item.sourceItemId,
     title: item.title,
