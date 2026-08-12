@@ -217,19 +217,31 @@ export class SupabasePipelineRepository {
     return data.value;
   }
 
+  /**
+   * 채널별 원본 항목을 끝까지 읽어온다.
+   *
+   * 예전엔 소스당 최신 1000건만 읽었다. 엔티티와 점수는 여기서 나온 항목에서만 만들어지므로,
+   * 어떤 엔티티의 원본이 이 창을 벗어나면 그 엔티티는 조용히 점수 갱신과 재분석 대기열에서
+   * 빠진다 — 공개 상태로 남은 채 점수·상태·스파크라인이 그 시점에 얼어붙는다. 게다가 개수
+   * 기준 창이라 채널이 쌓일수록 커버하는 기간이 저절로 줄어, 언제 그 절벽이 오는지 알 수 없다
+   * (실측 2026-08-12: hacker_news 930건으로 하루 ~32건 증가 — 이틀 뒤 도달 예정이었다).
+   */
   async loadRawItems() {
     const output = [];
     for (const source of INGESTED_SOURCES) {
       const sourceId = this.sourceIds.get(source);
       if (!sourceId) throw new PipelineRepositoryError(`source seed가 없습니다: ${source}`, "load_raw_items");
-      const { data, error } = await this.client
-        .from("raw_items")
-        .select("id,source_id,source_item_id,title,body,url,canonical_url,author_name,published_at,collected_at,raw_metrics_json,raw_payload_json")
-        .eq("source_id", sourceId)
-        .order("published_at", { ascending: false })
-        .limit(1_000);
-      if (error) throw new PipelineRepositoryError(error.message, "load_raw_items");
-      for (const row of data ?? []) output.push(databaseRawItemSchema.parse({ ...row, source }));
+      const rows = await readAllPages(async (from, to) => {
+        const { data, error } = await this.client
+          .from("raw_items")
+          .select("id,source_id,source_item_id,title,body,url,canonical_url,author_name,published_at,collected_at,raw_metrics_json,raw_payload_json")
+          .eq("source_id", sourceId)
+          .order("published_at", { ascending: false })
+          .range(from, to);
+        if (error) throw new PipelineRepositoryError(error.message, "load_raw_items");
+        return data ?? [];
+      });
+      for (const row of rows) output.push(databaseRawItemSchema.parse({ ...row, source }));
     }
     return output;
   }

@@ -2,6 +2,7 @@ import { loadWorkspaceEnvironment } from "@ai-trend-radar/collectors";
 import { createCategoryClassifierFromEnv } from "@ai-trend-radar/llm";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { readAllPages } from "../query-chunks";
 
 // 기존 공개 엔티티의 카테고리를 LLM으로 재분류한다. 전체를 배치로 묶어 최소 호출 수(수십 건당 1콜)만 사용.
 // 사용법: pnpm reclassify        (실제 반영)
@@ -31,7 +32,14 @@ const entRows = z.array(z.object({
   name: z.string(),
   description: z.string().nullable(),
   category_id: z.string().nullable(),
-})).parse((await supabase.from("entities").select("id,name,description,category_id").eq("visibility", "public")).data ?? []);
+// 상한 없이 읽으면 1000건을 넘는 순간 뒷부분이 재분류 대상에서 조용히 빠진다.
+})).parse(await readAllPages(async (from, to) => {
+  const { data, error } = await supabase
+    .from("entities").select("id,name,description,category_id")
+    .eq("visibility", "public").order("id").range(from, to);
+  if (error) throw new Error(`공개 엔티티 조회 실패: ${error.message}`);
+  return data ?? [];
+}));
 
 if (entRows.length === 0) {
   process.stdout.write("공개 엔티티가 없습니다.\n");

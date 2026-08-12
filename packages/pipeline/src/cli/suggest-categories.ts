@@ -2,6 +2,7 @@ import { loadWorkspaceEnvironment } from "@ai-trend-radar/collectors";
 import { createCategorySuggesterFromEnv } from "@ai-trend-radar/llm";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { readAllPages } from "../query-chunks";
 
 // '기타'로 분류된 공개 서비스에서 새 카테고리 후보를 발굴해 category_suggestions에 쌓는다.
 // 자동 생성이 아니라 '제안'만 한다 — 관리자가 /admin/categories에서 승인해야 실제 카테고리가 된다.
@@ -26,7 +27,14 @@ const existing = cats.map((c) => ({ slug: c.slug, label: c.name }));
 
 const otherRows = otherId
   ? z.array(z.object({ name: z.string(), description: z.string().nullable() })).parse(
-      (await supabase.from("entities").select("name,description").eq("visibility", "public").eq("category_id", otherId)).data ?? [],
+      await readAllPages(async (from, to) => {
+        const { data, error } = await supabase
+          .from("entities").select("name,description")
+          .eq("visibility", "public").eq("category_id", otherId)
+          .order("name").range(from, to);
+        if (error) throw new Error(`미분류 엔티티 조회 실패: ${error.message}`);
+        return data ?? [];
+      }),
     )
   : [];
 

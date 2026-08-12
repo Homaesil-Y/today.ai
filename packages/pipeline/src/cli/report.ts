@@ -1,6 +1,7 @@
 import { loadWorkspaceEnvironment } from "@ai-trend-radar/collectors";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { readAllPages } from "../query-chunks";
 
 const env = loadWorkspaceEnvironment();
 const url = env.NEXT_PUBLIC_SUPABASE_URL;
@@ -26,13 +27,19 @@ const rowSchema = z.object({
   ai_analyses: z.array(z.object({ summary: z.string(), generated_at: z.string() })).default([]),
 });
 
-const { data, error } = await client
-  .from("entities")
-  .select("id,slug,name,categories(name),trend_scores(total_score,trust_score,status,calculated_at),ai_analyses(summary,generated_at)")
-  .eq("visibility", "public");
-if (error) throw new Error(`공개 엔티티 조회 실패: ${error.message}`);
+// 상한 없이 읽으면 1000건을 넘는 순간 뒷부분이 일간 리포트 순위 집계에서 조용히 빠진다.
+const data = await readAllPages(async (from, to) => {
+  const { data: page, error } = await client
+    .from("entities")
+    .select("id,slug,name,categories(name),trend_scores(total_score,trust_score,status,calculated_at),ai_analyses(summary,generated_at)")
+    .eq("visibility", "public")
+    .order("id")
+    .range(from, to);
+  if (error) throw new Error(`공개 엔티티 조회 실패: ${error.message}`);
+  return page ?? [];
+});
 
-const rows = z.array(rowSchema).parse(data ?? []);
+const rows = z.array(rowSchema).parse(data);
 const ranked = rows
   .map((row) => {
     const score = [...row.trend_scores].sort((a, b) => b.calculated_at.localeCompare(a.calculated_at))[0];

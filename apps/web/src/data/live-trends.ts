@@ -2,6 +2,7 @@ import type { TrendEntity, TrendStatus } from "@ai-trend-radar/types";
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
 import { z } from "zod";
+import { readAllByIds, readAllPages } from "@/lib/supabase-paging";
 import { createPublicClient } from "@/lib/supabase/server";
 import { cleanDisplayName, logoTextFrom } from "./display-name";
 import { resolveSources, sourceSignalLabel } from "./entity-sources";
@@ -74,28 +75,50 @@ function latestByEntity<T extends { entity_id: string }>(rows: T[]) {
 
 export const getPublishedTrends = cache(unstable_cache(async (): Promise<TrendEntity[]> => {
   const supabase = createPublicClient();
-  const { data: entityData, error: entityError } = await supabase
-    .from("entities")
-    .select("id, slug, name, canonical_url, github_url, description, pricing_type, is_open_source, first_detected_at, last_detected_at, status, source_codes, categories(name)")
-    .eq("visibility", "public")
-    .order("last_detected_at", { ascending: false });
-
-  if (entityError) throw new Error(`공개 서비스 조회 실패: ${entityError.message}`);
-  const entities = z.array(entitySchema).parse(entityData ?? []);
+  // 공개 엔티티는 하루 20~26건씩 늘어난다(2026-08-12 기준 577건). 상한 없이 읽으면 1000건을
+  // 넘는 순간 뒷부분이 조용히 사라져 목록에서 서비스가 누락된다.
+  const entityData = await readAllPages(async (from, to) => {
+    const { data, error } = await supabase
+      .from("entities")
+      .select("id, slug, name, canonical_url, github_url, description, pricing_type, is_open_source, first_detected_at, last_detected_at, status, source_codes, categories(name)")
+      .eq("visibility", "public")
+      .order("last_detected_at", { ascending: false })
+      .range(from, to);
+    if (error) throw new Error(`공개 서비스 조회 실패: ${error.message}`);
+    return data ?? [];
+  });
+  const entities = z.array(entitySchema).parse(entityData);
   if (entities.length === 0) return [];
 
+  // id 목록을 청크로 나눠 각 청크를 끝까지 읽는다. 한 번에 넣으면 (1) 1000행 상한에서 이력이
+  // 조용히 잘리고 (2) URL 이 요청 헤드 한도를 넘는다. 배경은 lib/supabase-paging.ts 참고.
   const ids = entities.map(({ id }) => id);
-  const [{ data: scoreData, error: scoreError }, { data: analysisData, error: analysisError }] = await Promise.all([
-    supabase.from("trend_scores").select("entity_id, total_score, cross_source_score, velocity_score, product_growth_score, threads_score, reddit_score, novelty_score, instagram_score, quality_score, trust_score, status, calculated_at").in("entity_id", ids).order("calculated_at", { ascending: false }),
-    supabase.from("ai_analyses").select("entity_id, summary, why_trending_json, target_users_json, strengths_json, weaknesses_json, use_cases_json, benchmark_points_json, korea_opportunity, generated_at").in("entity_id", ids).order("generated_at", { ascending: false }),
+  const [scoreData, analysisData] = await Promise.all([
+    readAllByIds(ids, async (chunk, from, to) => {
+      const { data, error } = await supabase
+        .from("trend_scores")
+        .select("entity_id, total_score, cross_source_score, velocity_score, product_growth_score, threads_score, reddit_score, novelty_score, instagram_score, quality_score, trust_score, status, calculated_at")
+        .in("entity_id", chunk)
+        .order("calculated_at", { ascending: false })
+        .range(from, to);
+      if (error) throw new Error(`트렌드 점수 조회 실패: ${error.message}`);
+      return data ?? [];
+    }),
+    readAllByIds(ids, async (chunk, from, to) => {
+      const { data, error } = await supabase
+        .from("ai_analyses")
+        .select("entity_id, summary, why_trending_json, target_users_json, strengths_json, weaknesses_json, use_cases_json, benchmark_points_json, korea_opportunity, generated_at")
+        .in("entity_id", chunk)
+        .order("generated_at", { ascending: false })
+        .range(from, to);
+      if (error) throw new Error(`AI 분석 조회 실패: ${error.message}`);
+      return data ?? [];
+    }),
   ]);
-
-  if (scoreError) throw new Error(`트렌드 점수 조회 실패: ${scoreError.message}`);
-  if (analysisError) throw new Error(`AI 분석 조회 실패: ${analysisError.message}`);
 
   const parsedScores = z.array(scoreSchema).parse(scoreData ?? []);
   const scores = latestByEntity(parsedScores);
-  const analyses = latestByEntity(z.array(analysisSchema).parse(analysisData ?? []));
+  const analyses = latestByEntity(z.array(analysisSchema).parse(analysisData));
 
   // 이미 조회한 점수 행(최신→과거 정렬)으로 엔티티별 이력을 만든다. 추가 쿼리 없음.
   const scoreHistoryByEntity = new Map<string, number[]>();

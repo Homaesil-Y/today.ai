@@ -3,6 +3,7 @@ import { createNameExtractorFromEnv } from "@ai-trend-radar/llm";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { looksLikeDescription } from "../candidate";
+import { readAllPages } from "../query-chunks";
 
 // 공개 엔티티의 표시명을 LLM으로 정정한다. 커뮤니티 게시글 제목을 기계적으로 잘라 만든 이름은
 // 제품명이 아니라 문장·설명인 경우가 많아(예: "What should the GUI for AI agents look like?" → "MarbleOS")
@@ -33,10 +34,17 @@ const entityRows = z.array(z.object({
   canonical_url: z.string(),
   github_url: z.string().nullable(),
 })).parse(
-  (await supabase
-    .from("entities")
-    .select("id,name,slug,description,canonical_url,github_url")
-    .eq("visibility", "public")).data ?? [],
+  // 공개 엔티티는 1000건을 넘으면 상한에서 조용히 잘려 뒷부분 표시명이 영구 미정정으로 남는다.
+  await readAllPages(async (from, to) => {
+    const { data, error } = await supabase
+      .from("entities")
+      .select("id,name,slug,description,canonical_url,github_url")
+      .eq("visibility", "public")
+      .order("id")
+      .range(from, to);
+    if (error) throw new Error(`공개 엔티티 조회 실패: ${error.message}`);
+    return data ?? [];
+  }),
 );
 
 const targets = checkAll ? entityRows : entityRows.filter((entity) => looksLikeDescription(entity.name));
