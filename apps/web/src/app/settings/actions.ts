@@ -7,8 +7,8 @@ import { z } from "zod";
 import { safeNextPath, withParam } from "@/lib/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { sanitizeCategories } from "./sanitize-categories";
 
-const categorySchema = z.array(z.string().min(1).max(80)).max(20);
 const timeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 
 // 회원 탈퇴 확인 문구. 사용자가 직접 입력해야 진행된다.
@@ -19,7 +19,13 @@ export type DeleteAccountState = { error: string };
 // 설정 저장 핵심 로직. savePreferences(폼 액션)와 completeOnboarding이 공유한다.
 async function persistPreferences(userId: string, formData: FormData): Promise<{ error: string | null }> {
   const supabase = await createClient();
-  const categories = categorySchema.parse(formData.getAll("categories").map(String));
+  // 제출값은 존재하는 카테고리인지로 검증한다. 개수 상한으로 막던 방식은 카테고리가 늘어나
+  // 상한을 넘긴 순간 "전체 선택"이 항상 저장 실패했다(자세한 배경은 sanitize-categories.ts).
+  const { data: enabledRows } = await supabase.from("categories").select("slug").eq("enabled", true);
+  const categories = sanitizeCategories(
+    formData.getAll("categories").map(String),
+    enabledRows ? enabledRows.map((row) => String(row.slug)) : null,
+  );
   const digestTime = timeSchema.catch("08:00").parse(String(formData.get("digestTime") ?? "08:00"));
   const { error } = await supabase.from("user_preferences").upsert({
     user_id: userId,
