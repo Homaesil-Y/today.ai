@@ -86,7 +86,10 @@ export class GeminiNewsSummarizer {
     this.apiKey = config.apiKey;
     this.model = config.model ?? "gemini-3.1-flash-lite";
     this.endpoint = config.endpoint ?? "https://generativelanguage.googleapis.com/v1beta";
-    this.timeoutMs = config.timeoutMs ?? 45_000;
+    // 최대 30건을 한 번에 요약하며 출력이 8,192 토큰까지 나오므로 45초로는 빡빡했다(실측
+    // 2026-08-13: 정확히 45초 한도에 걸려 수집 워크플로가 실패). 잡 예산은 10분이라
+    // 3회 재시도(news-runner)를 감안해도 90초씩은 충분히 들어간다.
+    this.timeoutMs = config.timeoutMs ?? 90_000;
     this.fetchImpl = config.fetchImpl ?? fetch;
   }
 
