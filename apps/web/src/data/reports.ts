@@ -1,6 +1,7 @@
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
 import { z } from "zod";
+import { cacheBucket } from "@/lib/cache-bucket";
 import { createPublicClient } from "@/lib/supabase/server";
 
 const REPORTS_REVALIDATE_SECONDS = 300;
@@ -44,7 +45,8 @@ export type DailyReport = ReportSummary & {
   content: z.infer<typeof contentSchema>;
 };
 
-export const getPublishedReports = cache(unstable_cache(async (): Promise<ReportSummary[]> => {
+// `_bucket` 은 캐시 키를 주기적으로 회전시키는 인자다(lib/cache-bucket.ts 참고).
+const loadPublishedReports = unstable_cache(async (_bucket: number): Promise<ReportSummary[]> => {
   const supabase = createPublicClient();
   const { data, error } = await supabase
     .from("reports")
@@ -60,9 +62,13 @@ export const getPublishedReports = cache(unstable_cache(async (): Promise<Report
     summary: row.summary,
     publishedAt: row.published_at,
   }));
-}, ["published-reports"], { revalidate: REPORTS_REVALIDATE_SECONDS, tags: ["reports"] }));
+}, ["published-reports"], { revalidate: REPORTS_REVALIDATE_SECONDS, tags: ["reports"] });
 
-export const getDailyReport = cache(unstable_cache(async (reportDate: string): Promise<DailyReport | null> => {
+export const getPublishedReports = cache(
+  (): Promise<ReportSummary[]> => loadPublishedReports(cacheBucket(REPORTS_REVALIDATE_SECONDS)),
+);
+
+const loadDailyReport = unstable_cache(async (reportDate: string, _bucket: number): Promise<DailyReport | null> => {
   const supabase = createPublicClient();
   const { data, error } = await supabase
     .from("reports")
@@ -81,4 +87,9 @@ export const getDailyReport = cache(unstable_cache(async (reportDate: string): P
     publishedAt: row.published_at,
     content: contentSchema.catch({ totalPublic: 0, topServices: [] }).parse(row.content_json),
   };
-}, ["daily-report"], { revalidate: REPORTS_REVALIDATE_SECONDS, tags: ["reports"] }));
+}, ["daily-report"], { revalidate: REPORTS_REVALIDATE_SECONDS, tags: ["reports"] });
+
+export const getDailyReport = cache(
+  (reportDate: string): Promise<DailyReport | null> =>
+    loadDailyReport(reportDate, cacheBucket(REPORTS_REVALIDATE_SECONDS)),
+);

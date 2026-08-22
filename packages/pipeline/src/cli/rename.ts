@@ -12,10 +12,16 @@ import { readAllPages } from "../query-chunks";
 // 사용법: pnpm rename            (이름이 문장으로 보이는 것만 정정)
 //        pnpm rename --dry      (변경 예정만 출력, 쓰기 없음)
 //        pnpm rename --all      (공개 엔티티 전체를 재검토)
+//        pnpm rename --slug=a,b (지정한 slug 만 재검토)
 
 const env = loadWorkspaceEnvironment();
 const dryRun = process.argv.includes("--dry");
 const checkAll = process.argv.includes("--all");
+const onlySlugs = process.argv
+  .filter((arg) => arg.startsWith("--slug="))
+  .flatMap((arg) => arg.slice("--slug=".length).split(","))
+  .map((slug) => slug.trim())
+  .filter(Boolean);
 
 const url = env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const key = env.SUPABASE_SECRET_KEY ?? env.SUPABASE_SERVICE_ROLE_KEY ?? "";
@@ -47,7 +53,16 @@ const entityRows = z.array(z.object({
   }),
 );
 
-const targets = checkAll ? entityRows : entityRows.filter((entity) => looksLikeDescription(entity.name));
+// 특정 서비스만 다시 검토한다. 문장형이 아닌 잘못된 이름(예: 제품이 쓰는 도구명을 제품명으로
+// 뽑은 "Claude Code")은 기본 필터에 걸리지 않아, 전체를 LLM에 다시 돌리지 않고 지목해서 고칠
+// 수단이 필요하다.
+const targets = onlySlugs.length > 0
+  ? entityRows.filter((entity) => onlySlugs.includes(entity.slug))
+  : checkAll ? entityRows : entityRows.filter((entity) => looksLikeDescription(entity.name));
+if (onlySlugs.length > 0) {
+  const missing = onlySlugs.filter((slug) => !entityRows.some((entity) => entity.slug === slug));
+  if (missing.length > 0) process.stderr.write(`공개 엔티티에서 찾지 못한 slug: ${missing.join(", ")}\n`);
+}
 if (targets.length === 0) {
   process.stdout.write(`${JSON.stringify({ total: entityRows.length, targets: 0, changed: 0, dryRun })}\n`);
   process.exit(0);

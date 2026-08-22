@@ -2,6 +2,7 @@ import type { TrendEntity, TrendStatus } from "@ai-trend-radar/types";
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
 import { z } from "zod";
+import { cacheBucket } from "@/lib/cache-bucket";
 import { readAllByIds, readAllPages } from "@/lib/supabase-paging";
 import { createPublicClient } from "@/lib/supabase/server";
 import { cleanDisplayName, logoTextFrom } from "./display-name";
@@ -73,7 +74,9 @@ function latestByEntity<T extends { entity_id: string }>(rows: T[]) {
   return map;
 }
 
-export const getPublishedTrends = cache(unstable_cache(async (): Promise<TrendEntity[]> => {
+// `_bucket` 은 캐시 키를 주기적으로 회전시키기 위한 인자다. 값 자체는 쓰지 않는다 —
+// unstable_cache 의 revalidate 가 갱신되지 않는 문제를 우회한다(lib/cache-bucket.ts 참고).
+const loadPublishedTrends = unstable_cache(async (_bucket: number): Promise<TrendEntity[]> => {
   const supabase = createPublicClient();
   // 공개 엔티티는 하루 20~26건씩 늘어난다(2026-08-12 기준 577건). 상한 없이 읽으면 1000건을
   // 넘는 순간 뒷부분이 조용히 사라져 목록에서 서비스가 누락된다.
@@ -215,7 +218,11 @@ export const getPublishedTrends = cache(unstable_cache(async (): Promise<TrendEn
     })
     .sort(compareByScore)
     .map((trend, index) => ({ ...trend, rank: index + 1 }));
-}, ["published-trends"], { revalidate: TRENDS_REVALIDATE_SECONDS, tags: ["trends"] }));
+}, ["published-trends"], { revalidate: TRENDS_REVALIDATE_SECONDS, tags: ["trends"] });
+
+export const getPublishedTrends = cache(
+  (): Promise<TrendEntity[]> => loadPublishedTrends(cacheBucket(TRENDS_REVALIDATE_SECONDS)),
+);
 
 export const getPublishedTrend = cache(async (slug: string) => {
   const trends = await getPublishedTrends();
@@ -228,7 +235,7 @@ export type TrendScoreHistoryPoint = { measuredAt: string; score: number };
 
 // 파이프라인이 실행될 때마다 쌓이는 실제 스냅샷(trend_scores) 이력을 시간순으로 반환한다.
 // 기간 탭(24H/7D/30D/90D)이 실제 데이터로 동작하도록 상세 페이지에서 사용한다.
-export const getTrendScoreHistory = cache(unstable_cache(async (entityId: string): Promise<TrendScoreHistoryPoint[]> => {
+const loadTrendScoreHistory = unstable_cache(async (entityId: string, _bucket: number): Promise<TrendScoreHistoryPoint[]> => {
   const supabase = createPublicClient();
   const { data, error } = await supabase
     .from("trend_scores")
@@ -240,4 +247,9 @@ export const getTrendScoreHistory = cache(unstable_cache(async (entityId: string
     measuredAt: row.calculated_at,
     score: Math.round(row.total_score * 10) / 10,
   }));
-}, ["trend-score-history"], { revalidate: TRENDS_REVALIDATE_SECONDS, tags: ["trends"] }));
+}, ["trend-score-history"], { revalidate: TRENDS_REVALIDATE_SECONDS, tags: ["trends"] });
+
+export const getTrendScoreHistory = cache(
+  (entityId: string): Promise<TrendScoreHistoryPoint[]> =>
+    loadTrendScoreHistory(entityId, cacheBucket(TRENDS_REVALIDATE_SECONDS)),
+);

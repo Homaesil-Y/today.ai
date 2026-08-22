@@ -1,6 +1,7 @@
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
 import { z } from "zod";
+import { cacheBucket } from "@/lib/cache-bucket";
 import { createPublicClient } from "@/lib/supabase/server";
 
 const NEWS_REVALIDATE_SECONDS = 300;
@@ -40,7 +41,8 @@ function sanitizeQuery(value: string): string {
 }
 
 // 통합 검색(제목·내용·출처)과 페이지네이션을 적용해 뉴스 한 페이지와 전체 건수를 반환한다.
-export const getNewsPage = cache(unstable_cache(async (params: { q: string; page: number; pageSize: number }): Promise<{ items: NewsItem[]; total: number }> => {
+// `_bucket` 은 캐시 키를 주기적으로 회전시키는 인자다(lib/cache-bucket.ts 참고).
+const loadNewsPage = unstable_cache(async (params: { q: string; page: number; pageSize: number }, _bucket: number): Promise<{ items: NewsItem[]; total: number }> => {
   const { page, pageSize } = params;
   const q = sanitizeQuery(params.q);
   try {
@@ -61,7 +63,12 @@ export const getNewsPage = cache(unstable_cache(async (params: { q: string; page
   } catch {
     return { items: [], total: 0 };
   }
-}, ["news-page"], { revalidate: NEWS_REVALIDATE_SECONDS, tags: ["news"] }));
+}, ["news-page"], { revalidate: NEWS_REVALIDATE_SECONDS, tags: ["news"] });
+
+export const getNewsPage = cache(
+  (params: { q: string; page: number; pageSize: number }): Promise<{ items: NewsItem[]; total: number }> =>
+    loadNewsPage(params, cacheBucket(NEWS_REVALIDATE_SECONDS)),
+);
 
 // 공개된 뉴스를 최신순으로 읽는다. 테이블 미생성/오류 시 빈 배열을 반환해 페이지가 빈 상태를 보여주게 한다.
 export const getLatestNews = cache(async (limit = 40): Promise<NewsItem[]> => {
