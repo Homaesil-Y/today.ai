@@ -23,6 +23,7 @@
     "news:collect": "pnpm --filter @ai-trend-radar/pipeline news:collect",
     "reclassify": "pnpm --filter @ai-trend-radar/pipeline reclassify",
     "rename": "pnpm --filter @ai-trend-radar/pipeline rename",
+    "hide": "pnpm --filter @ai-trend-radar/pipeline hide",
     "suggest:categories": "pnpm --filter @ai-trend-radar/pipeline suggest:categories",
     "preview:live": "pnpm --filter @ai-trend-radar/pipeline preview:live"
   }

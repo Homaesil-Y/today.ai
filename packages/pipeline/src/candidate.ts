@@ -36,15 +36,51 @@ const aiTerms = /\b(ai|artificial intelligence|agentic|agent|llm|gpt|machine lea
 const nonProductTerms = /\b(awesome|course|certification|certified|practitioner|tutorial|roadmap|interview|papers?|resources?|learning notes?|study guide|cheatsheet|curated list|dataset|compendium|from scratch|solution template|taxonomy|skill cards?|benchmark|eccv|cvpr|neurips|lecture|syllabus)\b/iu;
 const productIntentTerms = /\b(show hn|launch|introducing|built|tool|platform|app|studio|agent|assistant|automation|open[ -]?source)\b/iu;
 const githubProductIntentTerms = /\b(agent|assistant|platform|tool|suite|scanner|hub|ide|alternative|automation|sdk|client|extension|orchestration|companion|studio|builder|workflow)\b/iu;
+/**
+ * 제품 홈이 아니라 글·스레드·영상을 호스팅하는 도메인. 이런 링크로 들어온 항목은 제품이 아니라
+ * "그 제품에 대한 글"이라, 엔티티로 등록하면 이름을 정할 근거가 없다(실측: towardsdev.com 기사가
+ * "A sandbox for AI agents using nothing but Go's standard library" 라는 문장 이름으로,
+ * reddit.com 스레드와 twitter.com 트윗 2건이 각각 엔티티로 남아 있었다).
+ *
+ * 서브도메인까지 막는다. 예전엔 정확히 일치하는 호스트만 걸러서 `towardsdev.com` 같은 Medium
+ * 계열 도메인과 `*.substack.com`·`*.medium.com` 형태가 그대로 통과했다.
+ *
+ * github.io·itch.io·apps.apple.com 은 제품이 실제로 배포되는 곳이라 넣지 않는다.
+ */
 const editorialHosts = new Set([
   "medium.com",
+  "towardsdev.com",
+  "towardsdatascience.com",
   "thenewstack.io",
   "substack.com",
   "blogspot.com",
+  "wordpress.com",
+  "tumblr.com",
   "dev.to",
+  "hashnode.dev",
   "youtube.com",
   "youtu.be",
+  "reddit.com",
+  "twitter.com",
+  "x.com",
+  "linkedin.com",
+  "quora.com",
+  "stackoverflow.com",
+  "note.com",
+  "velog.io",
+  "tistory.com",
+  "arxiv.org",
+  "researchgate.net",
 ]);
+
+export function isEditorialHost(domain: string) {
+  const host = domain.toLowerCase().replace(/^www\./u, "");
+  if (editorialHosts.has(host)) return true;
+  for (const editorial of editorialHosts) {
+    if (host.endsWith(`.${editorial}`)) return true;
+  }
+  return false;
+}
 
 function hostname(value: string) {
   return new URL(value).hostname.toLowerCase().replace(/^www\./u, "");
@@ -209,7 +245,7 @@ function extractHackerNewsCandidate(item: DatabaseRawItem): EntityCandidate | nu
   if (domain === "github.com" && !isGitHubRepository) return null;
   if (!isShowHn && !isGitHubRepository) return null;
   if (!aiTerms.test(evidenceText) || !productIntentTerms.test(evidenceText)) return null;
-  if (editorialHosts.has(domain) || /\/(blog|news|article|posts?|p)\//u.test(path)) return null;
+  if (isEditorialHost(domain) || /\/(blog|news|article|posts?|p)\//u.test(path)) return null;
 
   // 제목이 문장이면(Show HN에 흔함) 제목 대신 저장소명을 쓴다. 저장소가 없으면 그대로 두고
   // 나중에 `pnpm rename`(LLM)이 설명·도메인을 보고 정정한다.
@@ -254,7 +290,7 @@ function extractProductHuntCandidate(item: DatabaseRawItem): EntityCandidate | n
 
   const canonicalUrl = safeCanonicalUrl(item.canonical_url, item.url);
   const domain = hostname(canonicalUrl);
-  if (editorialHosts.has(domain)) return null;
+  if (isEditorialHost(domain)) return null;
 
   const name = post.name.trim().slice(0, 120);
   if (name.length < 2) return null;
@@ -289,7 +325,7 @@ function extractRedditCandidate(item: DatabaseRawItem): EntityCandidate | null {
   const domain = hostname(rawCanonicalUrl);
   // 자체 토론 글(reddit permalink)·기사·에디토리얼은 제품 후보에서 제외한다.
   if (domain === "reddit.com" || domain === "redd.it" || domain === "news.ycombinator.com") return null;
-  if (editorialHosts.has(domain)) return null;
+  if (isEditorialHost(domain)) return null;
   const repositoryUrl = domain === "github.com" ? githubRepositoryUrl(rawCanonicalUrl) : null;
   if (domain === "github.com" && !repositoryUrl) return null;
   const canonicalUrl = repositoryUrl ?? rawCanonicalUrl;

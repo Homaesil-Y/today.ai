@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "scripts": {
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
@@ -19,7 +21,8 @@
     "suggest:categories": "tsx src/cli/suggest-categories.ts",
     "publish:reviewed": "tsx src/cli/publish-reviewed.ts",
     "bootstrap:owner": "tsx src/cli/bootstrap-owner.ts",
-    "preview:live": "tsx src/cli/preview.ts"
+    "preview:live": "tsx src/cli/preview.ts",
+    "hide": "tsx src/cli/hide.ts"
   },
   "dependencies": {
     "@ai-trend-radar/collectors": "workspace:*",
