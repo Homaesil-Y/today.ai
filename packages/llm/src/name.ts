@@ -9,6 +9,14 @@ export const nameInputSchema = z.object({
   description: z.string(),
   canonicalUrl: z.string(),
   githubUrl: z.string().nullable().optional(),
+  /**
+   * 제품 페이지가 스스로 밝히는 이름(og:site_name / <title>). 가져오지 못하면 빈 문자열.
+   *
+   * 이게 없던 동안 추출기는 커뮤니티 게시글 텍스트만 보고 판단했다. 그래서 게시글에 제품명이
+   * 없으면 이름을 고칠 근거가 아예 없었고, 제품이 이름을 바꿔도 알 수 없었다 — 실측:
+   * metavoice.io 가 스스로 "Familiar" 라고 밝히는데 저장된 이름은 게시글에서 뽑은 "Mia & Leo"였다.
+   */
+  siteName: z.string().optional(),
 });
 export type NameInput = z.infer<typeof nameInputSchema>;
 
@@ -43,6 +51,7 @@ function buildNamePrompt(items: NameInput[]): string {
         `[${item.index}]`,
         `현재 표기: ${item.currentName}`,
         `공식 URL: ${item.canonicalUrl}`,
+        ...(item.siteName ? [`제품 페이지가 밝힌 이름: ${item.siteName}`] : []),
         ...(item.githubUrl ? [`GitHub: ${item.githubUrl}`] : []),
         `설명: ${item.description}`,
       ].join("\n"),
@@ -61,6 +70,9 @@ function buildNamePrompt(items: NameInput[]): string {
     "- 그 제품이 단지 사용·연동·확장하는 제3자 도구/플랫폼/모델 이름(예: Claude Code, ChatGPT, Slack, Notion, Kubernetes)은 제품명이 아닙니다. 제목이 \"X를 위한 플러그인/확장/클론/대안\" 형태면 X를 반환하지 마세요.",
     "- 작성자·회사 대표의 사람 이름은 제품명이 아닙니다.",
     "- 문장형 제목에서 제품명을 못 찾으면, 공식 URL 도메인의 서비스명(예: fn2.ai → FN2)을 우선 사용하세요.",
+    // 게시글은 시간이 지나면 낡는다. 제품이 스스로 밝히는 이름이 가장 신뢰할 수 있는 근거다.
+    "- \"제품 페이지가 밝힌 이름\"이 주어지면 그것을 최우선 근거로 삼고, 현재 표기와 다르면 그 이름으로 바꾸세요(단, 그 값이 접속 오류·차단 페이지 문구인 경우는 무시하세요).",
+    "- 표기 대소문자도 제품 페이지 표기를 따르세요(예: alphai).",
     "- 제목에 제품명이 없으면 설명 본문이나 공식 URL 도메인, GitHub 저장소명에서 찾으세요.",
     "- 이름 뒤에 붙은 버전·태그·부제(\"v1.1 is out\", \"(Skill)\", \"- 설명\")는 제거하세요.",
     "- 현재 표기가 이미 올바른 제품명이면 그대로 반환하세요.",
