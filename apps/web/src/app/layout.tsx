@@ -19,6 +19,17 @@ const pretendard = localFont({
   fallback: ["-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
 });
 
+/**
+ * 서버 렌더링을 서울에서 실행한다.
+ *
+ * 기본값은 워싱턴(iad1)이었는데 Supabase 는 아시아 리전에 있다(이 PC에서 최소 왕복 44ms).
+ * 응답 헤더가 `x-vercel-id: icn1::iad1::…` 로, 요청은 서울 엣지로 들어오지만 함수는 미국에서
+ * 실행되고 있음을 보여줬다. 그래서 DB 왕복마다 태평양을 건너고 목록 데이터(약 6.3MB)도 그
+ * 경로로 전송돼, 캐시가 비어 있을 때 렌더가 11~14초까지 걸렸다(실측 2026-08-23).
+ * DB 와 같은 대륙에서 실행하면 왕복이 200ms 대에서 한 자리 ms 로 떨어진다.
+ */
+export const preferredRegion = ["icn1"];
+
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
   applicationName: siteConfig.name,

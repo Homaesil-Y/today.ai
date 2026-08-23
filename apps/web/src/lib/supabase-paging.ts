@@ -61,14 +61,22 @@ export async function readAllPages<Row>(
   }
 }
 
-/** id 목록을 청크로 나눠 각 청크를 끝까지 읽고 하나로 합친다. */
+/**
+ * id 목록을 청크로 나눠 각 청크를 끝까지 읽고 하나로 합친다.
+ *
+ * 청크는 병렬로 읽는다. 순차로 읽던 동안 공개 목록 한 번을 만드는 데 왕복이 (엔티티 1) +
+ * (청크 8 x 테이블 2) 로 쌓여, 캐시가 비어 있을 때 렌더가 11~14초 걸렸다(실측 2026-08-23).
+ * 청크끼리는 서로 의존하지 않으므로 기다릴 이유가 없다.
+ *
+ * 반환 순서는 청크 순서를 유지한다 — 호출부가 엔티티별 최신 행을 "먼저 나온 행" 으로 고르기
+ * 때문에(latestByEntity) 순서가 흔들리면 잘못된 행을 최신으로 볼 수 있다.
+ */
 export async function readAllByIds<Row, Id>(
   ids: readonly Id[],
   fetchPage: (chunk: Id[], from: number, to: number) => Promise<Row[]>,
 ): Promise<Row[]> {
-  const rows: Row[] = [];
-  for (const chunk of chunkForFilter(ids)) {
-    rows.push(...await readAllPages((from, to) => fetchPage(chunk, from, to)));
-  }
-  return rows;
+  const perChunk = await Promise.all(
+    chunkForFilter(ids).map((chunk) => readAllPages((from, to) => fetchPage(chunk, from, to))),
+  );
+  return perChunk.flat();
 }
