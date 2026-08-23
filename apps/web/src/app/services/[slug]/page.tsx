@@ -7,7 +7,7 @@ import { getSourceLabel, SourceBrandIcon } from "@/components/source-brand-icon"
 import { StatusBadge } from "@/components/status-badge";
 import { TrendPeriodChart } from "@/components/trend-period-chart";
 import { WatchButton } from "@/components/watch-button";
-import { getPublishedTrend, getTrendScoreHistory } from "@/data/live-trends";
+import { getPublishedTrend, getTrendScoreHistory, withTrendAnalysis } from "@/data/live-trends";
 import { getSavedEntityIds } from "@/data/watchlist";
 import { formatScoreDelta } from "@/lib/score-delta";
 import { absoluteUrl, siteConfig } from "@/lib/site";
@@ -33,9 +33,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function ServiceDetailPage({ params }: Props) {
-  const [trend, savedEntityIds] = await Promise.all([getPublishedTrend((await params).slug), getSavedEntityIds()]);
+  const [listTrend, savedEntityIds] = await Promise.all([getPublishedTrend((await params).slug), getSavedEntityIds()]);
+  if (!listTrend) notFound();
+  // 목록은 상세 전용 분석 필드를 비워서 오므로 이 화면에서 필요한 1건만 채운다.
+  const [[trend], scoreHistory] = await Promise.all([
+    withTrendAnalysis([listTrend]),
+    getTrendScoreHistory(listTrend.id),
+  ]);
   if (!trend) notFound();
-  const scoreHistory = await getTrendScoreHistory(trend.id);
   const nowIso = new Date().toISOString();
   const pageUrl = absoluteUrl(`/services/${trend.slug}`);
   const structuredData = {

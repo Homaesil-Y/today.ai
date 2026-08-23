@@ -4,7 +4,7 @@ import type { Route } from "next";
 import Link from "next/link";
 import { CompareAddForm } from "@/components/compare-add-form";
 import { SourceBrandIcon } from "@/components/source-brand-icon";
-import { getPublishedTrends } from "@/data/live-trends";
+import { getPublishedTrends, withTrendAnalysis } from "@/data/live-trends";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +35,10 @@ export default async function ComparePage({ searchParams }: Props) {
   const trends = await getPublishedTrends();
   const bySlug = new Map(trends.map((trend) => [trend.slug, trend]));
 
-  const selected = requested.map((slug) => bySlug.get(slug)).filter((t): t is NonNullable<typeof t> => Boolean(t));
+  // 비교표는 강점·약점·국내 기회를 보여주므로, 선택된 최대 4건만 상세 분석을 채운다.
+  const selected = await withTrendAnalysis(
+    requested.map((slug) => bySlug.get(slug)).filter((t): t is NonNullable<typeof t> => Boolean(t)),
+  );
   const selectedSlugs = selected.map((t) => t.slug);
   const available = trends.filter((t) => !selectedSlugs.includes(t.slug));
 

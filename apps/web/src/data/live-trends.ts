@@ -41,6 +41,18 @@ const scoreSchema = z.object({
   calculated_at: z.string(),
 });
 
+/**
+ * 목록이 실제로 렌더하는 분석 필드만. 상세 전용 배열(강점·약점·활용 사례·추천 대상·국내 기회)은
+ * 목록에서 쓰지 않는데도 함께 받아, 762건을 얻으려고 5,247행 약 4.4MB 를 옮기고 있었다.
+ * 상세·비교 페이지는 자기 화면에 필요한 몇 건만 loadTrendAnalysis 로 따로 가져온다.
+ */
+const listAnalysisSchema = z.object({
+  entity_id: z.string(),
+  summary: z.string(),
+  why_trending_json: z.array(z.string()).catch([]),
+  generated_at: z.string(),
+});
+
 const analysisSchema = z.object({
   entity_id: z.string(),
   summary: z.string(),
@@ -103,7 +115,7 @@ const loadPublishedTrends = unstable_cache(async (_bucket: number): Promise<Tren
     readAllByIds(ids, async (chunk, from, to) => {
       const { data, error } = await supabase
         .from("ai_analyses")
-        .select("entity_id, summary, why_trending_json, target_users_json, strengths_json, weaknesses_json, use_cases_json, korea_opportunity, generated_at")
+        .select("entity_id, summary, why_trending_json, generated_at")
         .in("entity_id", chunk)
         .order("generated_at", { ascending: false })
         .range(from, to);
@@ -114,7 +126,7 @@ const loadPublishedTrends = unstable_cache(async (_bucket: number): Promise<Tren
 
   const parsedScores = z.array(scoreSchema).parse(scoreData ?? []);
   const scores = latestByEntity(parsedScores);
-  const analyses = latestByEntity(z.array(analysisSchema).parse(analysisData));
+  const analyses = latestByEntity(z.array(listAnalysisSchema).parse(analysisData));
 
   // 이미 조회한 점수 행(최신→과거 정렬)으로 엔티티별 이력을 만든다. 추가 쿼리 없음.
   const scoreHistoryByEntity = new Map<string, number[]>();
@@ -188,11 +200,12 @@ const loadPublishedTrends = unstable_cache(async (_bucket: number): Promise<Tren
           reliability: "estimated",
         }],
         whyTrending: analysis?.why_trending_json.length ? analysis.why_trending_json : [fallbackReason],
-        strengths: analysis?.strengths_json.length ? analysis.strengths_json : ["분석 데이터 생성 대기 중"],
-        weaknesses: analysis?.weaknesses_json.length ? analysis.weaknesses_json : ["추가 출처 교차 검증 필요"],
-        useCases: analysis?.use_cases_json.length ? analysis.use_cases_json : ["서비스 공식 문서 확인 필요"],
-        targetUsers: analysis?.target_users_json.length ? analysis.target_users_json : ["AI 도구 탐색 사용자"],
-        koreaOpportunity: analysis?.korea_opportunity ?? "국내 적용 가능성은 추가 분석이 필요합니다.",
+        // 목록에서는 쓰지 않는 상세 전용 필드. 상세·비교 화면이 withTrendAnalysis 로 채운다.
+        strengths: [],
+        weaknesses: [],
+        useCases: [],
+        targetUsers: [],
+        koreaOpportunity: "",
         updatedAt: score?.calculated_at ?? entity.last_detected_at,
         firstDetectedAt: entity.first_detected_at,
         sparkline: buildSparkline(scoreHistoryByEntity.get(entity.id), totalScore),
@@ -209,6 +222,39 @@ export const getPublishedTrends = cache(
 export const getPublishedTrend = cache(async (slug: string) => {
   const trends = await getPublishedTrends();
   return trends.find((trend) => trend.slug === slug);
+});
+
+/**
+ * 상세 전용 분석 필드를 채워 넣는다. 목록은 이 필드들을 렌더하지 않아 비워둔 채 오므로,
+ * 실제로 보여주는 화면(상세 1건, 비교 최대 4건)에서만 해당 엔티티 것을 가져온다.
+ */
+const loadTrendAnalyses = unstable_cache(async (entityIds: string[], _bucket: number) => {
+  if (entityIds.length === 0) return [];
+  const supabase = createPublicClient();
+  const { data, error } = await supabase
+    .from("ai_analyses")
+    .select("entity_id, summary, why_trending_json, target_users_json, strengths_json, weaknesses_json, use_cases_json, korea_opportunity, generated_at")
+    .in("entity_id", entityIds)
+    .order("generated_at", { ascending: false });
+  if (error) throw new Error(`AI 분석 상세 조회 실패: ${error.message}`);
+  return z.array(analysisSchema).parse(data ?? []);
+}, ["trend-analysis-detail"], { revalidate: TRENDS_REVALIDATE_SECONDS, tags: ["trends"] });
+
+export const withTrendAnalysis = cache(async (trends: TrendEntity[]): Promise<TrendEntity[]> => {
+  if (trends.length === 0) return trends;
+  const rows = await loadTrendAnalyses(trends.map(({ id }) => id), cacheBucket(TRENDS_REVALIDATE_SECONDS));
+  const byEntity = latestByEntity(rows);
+  return trends.map((trend) => {
+    const analysis = byEntity.get(trend.id);
+    return {
+      ...trend,
+      strengths: analysis?.strengths_json.length ? analysis.strengths_json : ["분석 데이터 생성 대기 중"],
+      weaknesses: analysis?.weaknesses_json.length ? analysis.weaknesses_json : ["추가 출처 교차 검증 필요"],
+      useCases: analysis?.use_cases_json.length ? analysis.use_cases_json : ["서비스 공식 문서 확인 필요"],
+      targetUsers: analysis?.target_users_json.length ? analysis.target_users_json : ["AI 도구 탐색 사용자"],
+      koreaOpportunity: analysis?.korea_opportunity ?? "국내 적용 가능성은 추가 분석이 필요합니다.",
+    };
+  });
 });
 
 const historyRowSchema = z.object({ total_score: z.coerce.number(), calculated_at: z.string() });
