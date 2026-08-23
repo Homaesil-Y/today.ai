@@ -71,7 +71,6 @@ export interface TrendEntity {
   rankChange: number;
   trendScore: number;
   trustScore: number;
-  scoreBreakdown: TrendScoreBreakdown;
   sources: SourceCode[];
   signals: SourceSignal[];
   whyTrending: string[];
@@ -79,7 +78,6 @@ export interface TrendEntity {
   weaknesses: string[];
   useCases: string[];
   targetUsers: string[];
-  benchmarkPoints: string[];
   koreaOpportunity: string;
   updatedAt: string;
   firstDetectedAt: string;

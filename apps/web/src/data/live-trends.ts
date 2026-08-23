@@ -31,17 +31,11 @@ const entitySchema = z.object({
   source_codes: z.array(z.string()).catch([]),
 });
 
+// 점수 축별 세부값(cross_source·velocity·novelty 등)은 화면에서 렌더하지 않으므로 가져오지 않는다.
+// 8개 컬럼 x 7,686행이라 전송량에서 차지하는 비중이 컸다.
 const scoreSchema = z.object({
   entity_id: z.string(),
   total_score: z.coerce.number(),
-  cross_source_score: z.coerce.number(),
-  velocity_score: z.coerce.number(),
-  product_growth_score: z.coerce.number(),
-  threads_score: z.coerce.number(),
-  reddit_score: z.coerce.number(),
-  novelty_score: z.coerce.number(),
-  instagram_score: z.coerce.number(),
-  quality_score: z.coerce.number(),
   trust_score: z.coerce.number(),
   status: z.enum(["NEW", "RISING", "SURGING", "PEAK", "STABLE", "FALLING", "REVIVAL", "WATCH"]),
   calculated_at: z.string(),
@@ -55,7 +49,6 @@ const analysisSchema = z.object({
   strengths_json: z.array(z.string()).catch([]),
   weaknesses_json: z.array(z.string()).catch([]),
   use_cases_json: z.array(z.string()).catch([]),
-  benchmark_points_json: z.array(z.string()).catch([]),
   korea_opportunity: z.string().nullable(),
   generated_at: z.string(),
 });
@@ -100,7 +93,7 @@ const loadPublishedTrends = unstable_cache(async (_bucket: number): Promise<Tren
     readAllByIds(ids, async (chunk, from, to) => {
       const { data, error } = await supabase
         .from("trend_scores")
-        .select("entity_id, total_score, cross_source_score, velocity_score, product_growth_score, threads_score, reddit_score, novelty_score, instagram_score, quality_score, trust_score, status, calculated_at")
+        .select("entity_id, total_score, trust_score, status, calculated_at")
         .in("entity_id", chunk)
         .order("calculated_at", { ascending: false })
         .range(from, to);
@@ -110,7 +103,7 @@ const loadPublishedTrends = unstable_cache(async (_bucket: number): Promise<Tren
     readAllByIds(ids, async (chunk, from, to) => {
       const { data, error } = await supabase
         .from("ai_analyses")
-        .select("entity_id, summary, why_trending_json, target_users_json, strengths_json, weaknesses_json, use_cases_json, benchmark_points_json, korea_opportunity, generated_at")
+        .select("entity_id, summary, why_trending_json, target_users_json, strengths_json, weaknesses_json, use_cases_json, korea_opportunity, generated_at")
         .in("entity_id", chunk)
         .order("generated_at", { ascending: false })
         .range(from, to);
@@ -183,16 +176,6 @@ const loadPublishedTrends = unstable_cache(async (_bucket: number): Promise<Tren
         rankChange: rankChangeByEntity.get(entity.id) ?? 0,
         trendScore: totalScore,
         trustScore: Math.round((score?.trust_score ?? 0) * 10) / 10,
-        scoreBreakdown: {
-          crossSource: score?.cross_source_score ?? 0,
-          velocity: score?.velocity_score ?? 0,
-          productGrowth: score?.product_growth_score ?? 0,
-          threads: score?.threads_score ?? 0,
-          reddit: score?.reddit_score ?? 0,
-          novelty: score?.novelty_score ?? 0,
-          instagram: score?.instagram_score ?? 0,
-          quality: score?.quality_score ?? 0,
-        },
         sources,
         signals: [{
           source,
@@ -209,7 +192,6 @@ const loadPublishedTrends = unstable_cache(async (_bucket: number): Promise<Tren
         weaknesses: analysis?.weaknesses_json.length ? analysis.weaknesses_json : ["추가 출처 교차 검증 필요"],
         useCases: analysis?.use_cases_json.length ? analysis.use_cases_json : ["서비스 공식 문서 확인 필요"],
         targetUsers: analysis?.target_users_json.length ? analysis.target_users_json : ["AI 도구 탐색 사용자"],
-        benchmarkPoints: analysis?.benchmark_points_json ?? [],
         koreaOpportunity: analysis?.korea_opportunity ?? "국내 적용 가능성은 추가 분석이 필요합니다.",
         updatedAt: score?.calculated_at ?? entity.last_detected_at,
         firstDetectedAt: entity.first_detected_at,
