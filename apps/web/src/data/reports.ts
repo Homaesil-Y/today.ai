@@ -4,7 +4,8 @@ import { z } from "zod";
 import { cacheBucket } from "@/lib/cache-bucket";
 import { createPublicClient } from "@/lib/supabase/server";
 
-const REPORTS_REVALIDATE_SECONDS = 300;
+// 리포트는 하루 1회 발행이라 300초로 다시 읽을 이유가 없다.
+const REPORTS_REVALIDATE_SECONDS = 1_800;
 
 const topServiceSchema = z.object({
   rank: z.number(),

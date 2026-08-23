@@ -4,7 +4,8 @@ import { z } from "zod";
 import { cacheBucket } from "@/lib/cache-bucket";
 import { createPublicClient } from "@/lib/supabase/server";
 
-const NEWS_REVALIDATE_SECONDS = 300;
+// 뉴스는 3시간 주기 수집으로만 바뀐다. 300초는 불필요하게 잦아 egress 만 태웠다(무료 한도 5GB/월 초과 원인).
+const NEWS_REVALIDATE_SECONDS = 900;
 
 const rowSchema = z.object({
   id: z.string(),

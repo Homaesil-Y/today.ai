@@ -9,10 +9,17 @@ import { cleanDisplayName, logoTextFrom } from "./display-name";
 import { resolveSources, sourceSignalLabel } from "./entity-sources";
 import { compareByScore } from "./trend-query";
 
-// 공개 데이터는 3시간 주기 파이프라인으로만 바뀌므로 요청마다 Supabase를 다시 치지 않는다.
-// unstable_cache로 서버에서 교차 요청 캐싱(180초)해 TTFB를 줄인다. createPublicClient는 쿠키를
-// 읽지 않으므로(익명 클라이언트) 안전하다. react cache()는 같은 요청 내 중복 호출만 합친다.
-const TRENDS_REVALIDATE_SECONDS = 180;
+/**
+ * 공개 데이터 캐시 주기.
+ *
+ * 데이터는 3시간 주기 파이프라인으로만 바뀌므로 그보다 잦게 다시 읽을 이유가 없다. 180초로
+ * 두었더니 하루 480번 미스가 나고, 미스마다 목록 전체를 Supabase 에서 다시 받아 egress 를
+ * 태웠다 — 무료 한도 5GB/월에 대해 계산상 월 112GB 규모였고, 실제로 8/22 하루에 2.8GB 를 쓰고
+ * 프로젝트가 한도 초과(7.09GB) 상태가 됐다. 초과 상태에서는 응답이 제한돼 사이트가 느려진다.
+ *
+ * 30분이면 3시간 파이프라인 기준 충분히 신선하고, 하루 48회 미스로 내려간다.
+ */
+const TRENDS_REVALIDATE_SECONDS = 1_800;
 
 const entitySchema = z.object({
   id: z.string(),
@@ -112,12 +119,13 @@ const loadPublishedTrends = unstable_cache(async (_bucket: number): Promise<Tren
       if (error) throw new Error(`트렌드 점수 조회 실패: ${error.message}`);
       return data ?? [];
     }),
-    readAllByIds(ids, async (chunk, from, to) => {
+    // latest_ai_analyses 는 엔티티별 최신 1행만 돌려주는 뷰다. ai_analyses 를 직접 읽으면
+    // 재분석 이력까지 와서, 770건이 필요한데 5,247행(4.9MB)을 옮기고 클라이언트에서 최신만
+    // 골라내야 했다. 뷰로는 770행 641KB 다. id 필터가 없어 청크도 필요 없다.
+    readAllPages(async (from, to) => {
       const { data, error } = await supabase
-        .from("ai_analyses")
+        .from("latest_ai_analyses")
         .select("entity_id, summary, why_trending_json, generated_at")
-        .in("entity_id", chunk)
-        .order("generated_at", { ascending: false })
         .range(from, to);
       if (error) throw new Error(`AI 분석 조회 실패: ${error.message}`);
       return data ?? [];
@@ -232,10 +240,9 @@ const loadTrendAnalyses = unstable_cache(async (entityIds: string[], _bucket: nu
   if (entityIds.length === 0) return [];
   const supabase = createPublicClient();
   const { data, error } = await supabase
-    .from("ai_analyses")
+    .from("latest_ai_analyses")
     .select("entity_id, summary, why_trending_json, target_users_json, strengths_json, weaknesses_json, use_cases_json, korea_opportunity, generated_at")
-    .in("entity_id", entityIds)
-    .order("generated_at", { ascending: false });
+    .in("entity_id", entityIds);
   if (error) throw new Error(`AI 분석 상세 조회 실패: ${error.message}`);
   return z.array(analysisSchema).parse(data ?? []);
 }, ["trend-analysis-detail"], { revalidate: TRENDS_REVALIDATE_SECONDS, tags: ["trends"] });
