@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Check, ExternalLink, EyeOff, Pencil, RefreshCw, ShieldCheck, Trash2 } from "lucide-react";
 import { redirect } from "next/navigation";
 import { getCurrentUserRole } from "@/lib/auth";
@@ -7,6 +8,10 @@ import { approveCandidate, dismissStaleCandidates, rejectCandidate, requestReana
 import { SourcePreviewDialog } from "./source-preview-dialog";
 
 export const dynamic = "force-dynamic";
+
+// robots.txt 의 Disallow 는 크롤링만 막고, 링크로 발견된 URL 이 색인되는 것까지 막지는 못한다.
+// 형제 관리자 페이지(categories·settings)와 같은 선언을 둔다.
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 type Props = { searchParams: Promise<{ q?: string; analysis?: string }> };
 

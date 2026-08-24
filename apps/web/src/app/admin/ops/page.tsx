@@ -1,4 +1,5 @@
 import type { SourceCode } from "@ai-trend-radar/types";
+import type { Metadata } from "next";
 import { AlertTriangle, CheckCircle2, Clock, Database, Gauge, Layers } from "lucide-react";
 import { redirect } from "next/navigation";
 import { getCurrentUserRole } from "@/lib/auth";
@@ -6,6 +7,10 @@ import { SourceBrandIcon, getSourceLabel } from "@/components/source-brand-icon"
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
+
+// robots.txt 의 Disallow 는 크롤링만 막고, 링크로 발견된 URL 이 색인되는 것까지 막지는 못한다.
+// 형제 관리자 페이지(categories·settings)와 같은 선언을 둔다.
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 const INGESTED_SOURCES: SourceCode[] = ["github", "hacker_news", "product_hunt", "reddit"];
 

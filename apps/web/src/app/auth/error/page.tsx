@@ -1,4 +1,9 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+
+// 로그인 실패 안내 화면. 익명 사용자에게도 그대로 렌더되므로 크롤러가 도달할 수 있는데,
+// 검색 결과에 남을 내용이 아니다(형제 인증 페이지 /login·/signup 과 같은 선언).
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 export default function AuthErrorPage() {
   return (
