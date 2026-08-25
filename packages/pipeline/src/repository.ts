@@ -1,7 +1,9 @@
+import { withRetry } from "@ai-trend-radar/collectors";
 import type { TrendAnalysisResult } from "@ai-trend-radar/llm";
 import type { SourceCode } from "@ai-trend-radar/types";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { chunkRows, dedupeByKey } from "./batch-write";
 import { slugifyName } from "./candidate";
 import { chunkForFilter, readAllPages } from "./query-chunks";
 import type { EntityCandidate } from "./schema";
@@ -101,6 +103,40 @@ export class PipelineRepositoryError extends Error {
   }
 }
 
+/** Supabase 가 돌려주는 오류 객체. 네트워크 실패도 throw 대신 이 모양으로 온다. */
+type SupabaseErrorLike = { message: string; details?: string | null; hint?: string | null; code?: string | null };
+
+/**
+ * 오류 메시지에 원인까지 담는다.
+ *
+ * 예전엔 `error.message` 만 던져서, fetch 실패가 전부 `TypeError: fetch failed` 한 줄로 올라왔다
+ * — ECONNRESET 인지 DNS 실패인지 요청 헤드 초과인지 구분할 수 없어 원인을 짚을 수 없었다.
+ * postgrest-js 는 `details` 에 `Caused by: ...` 와 원인 코드를 이미 채워 보내주므로 함께 남긴다.
+ */
+export function describeSupabaseError(error: SupabaseErrorLike): string {
+  const parts = [error.message];
+  if (error.code) parts.push(`code=${error.code}`);
+  // details 는 스택까지 포함할 수 있어 첫 줄들만 남긴다(로그가 스택으로 덮이는 것을 막는다).
+  const details = error.details?.split("\n").filter((line) => line.trim()).slice(0, 3).join(" / ");
+  if (details) parts.push(details);
+  return parts.join(" | ");
+}
+
+/**
+ * 다시 시도하면 결과가 달라질 수 있는 실패인지 판단한다.
+ *
+ * postgrest-js 는 GET·HEAD·OPTIONS 만 재시도한다(RETRYABLE_METHODS). POST·PATCH 는 일반적으로
+ * 비멱등이라 라이브러리가 손대지 않는데, 이 파이프라인의 쓰기는 전부 onConflict 를 지정한 upsert
+ * 이거나 id 지정 update 라 실제로는 멱등이다. 그래서 여기서 직접 재시도한다.
+ *
+ * 2026-08-25 07:11Z 실행이 metric_snapshots upsert 한 건의 `fetch failed` 로 죽으면서, 남은
+ * 후보의 점수 저장과 표시명 정정·리포트·검증 단계가 전부 건너뛰어졌다. 왕복 수천 회 중 한 번은
+ * 실패할 수 있다고 보고 그 한 번이 실행 전체를 끝내지 않게 한다.
+ */
+export function isRetryableWriteFailure(message: string): boolean {
+  return /fetch failed|network|socket hang up|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EPIPE|EAI_AGAIN|UND_ERR|timeout|too many connections|\b50[234]\b/iu.test(message);
+}
+
 export class SupabasePipelineRepository {
   private readonly client: SupabaseClient;
   private readonly sourceIds = new Map<SourceCode, string>();
@@ -111,6 +147,10 @@ export class SupabasePipelineRepository {
   private readonly entitiesByDomain = new Map<string, EntityRow>();
   private readonly entitiesBySlugBase = new Map<string, EntityRow>();
   private readonly usedSlugs = new Set<string>();
+  // 후보 루프에서 모아 두고 flushCandidateWrites() 에서 배치로 저장한다.
+  private readonly pendingAliases: Array<{ entity_id: string; alias: string; alias_type: string; source_id: string }> = [];
+  private readonly pendingMentions: Array<{ entity_id: string; raw_item_id: string; match_method: string; confidence: number }> = [];
+  private readonly pendingMetrics: Array<Record<string, unknown>> = [];
 
   constructor(client: SupabaseClient) {
     this.client = client;
@@ -125,6 +165,27 @@ export class SupabasePipelineRepository {
     return new SupabasePipelineRepository(createClient(url, secretKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     }));
+  }
+
+  /**
+   * 쓰기 한 건을 일시적 실패에 대해 재시도하며 실행한다.
+   *
+   * `build` 는 매 시도마다 쿼리를 새로 만들어야 한다 — Supabase 쿼리 빌더는 thenable 이라 한 번
+   * await 하면 재사용할 수 없다.
+   */
+  private async write<T>(
+    operation: string,
+    build: () => PromiseLike<{ data: T | null; error: SupabaseErrorLike | null }>,
+  ): Promise<T | null> {
+    return withRetry(async () => {
+      const { data, error } = await build();
+      if (error) throw new PipelineRepositoryError(describeSupabaseError(error), operation);
+      return data;
+    }, {
+      attempts: 3,
+      baseDelayMs: 500,
+      shouldRetry: (error) => error instanceof PipelineRepositoryError && isRetryableWriteFailure(error.message),
+    });
   }
 
   async initialize() {
@@ -255,7 +316,7 @@ export class SupabasePipelineRepository {
       const firstDetectedAt = new Date(existing.first_detected_at) <= new Date(candidate.firstDetectedAt)
         ? existing.first_detected_at
         : candidate.firstDetectedAt;
-      const { data, error } = await this.client.from("entities").update({
+      const data = await this.write("update_entity", () => this.client.from("entities").update({
         last_detected_at: candidate.lastDetectedAt,
         first_detected_at: firstDetectedAt,
         github_url: existing.github_url ?? candidate.githubUrl,
@@ -268,12 +329,11 @@ export class SupabasePipelineRepository {
         // 자동 정리된 후보가 다시 수집되면 검토 대기로 복구한다(수동 보류는 유지).
         ...revivedVisibilityPatch(existing),
         updated_at: candidate.lastDetectedAt,
-      }).eq("id", existing.id).select("id,name,slug,canonical_url,official_domain,github_url,description,category_id,pricing_type,is_open_source,visibility,first_detected_at,last_detected_at,source_codes,dismissed_as_stale_at").single();
-      if (error) throw new PipelineRepositoryError(error.message, "update_entity");
+      }).eq("id", existing.id).select("id,name,slug,canonical_url,official_domain,github_url,description,category_id,pricing_type,is_open_source,visibility,first_detected_at,last_detected_at,source_codes,dismissed_as_stale_at").single());
       entity = entitySchema.parse(data);
     } else {
       const slug = this.uniqueSlug(candidate.slugBase, candidate.canonicalUrl);
-      const { data, error } = await this.client.from("entities").insert({
+      const data = await this.write("insert_entity", () => this.client.from("entities").insert({
         name: candidate.name,
         slug,
         canonical_url: candidate.canonicalUrl,
@@ -288,40 +348,64 @@ export class SupabasePipelineRepository {
         source_codes: [candidate.source],
         status: "WATCH",
         visibility: "review",
-      }).select("id,name,slug,canonical_url,official_domain,github_url,description,category_id,pricing_type,is_open_source,visibility,first_detected_at,last_detected_at,source_codes,dismissed_as_stale_at").single();
-      if (error) throw new PipelineRepositoryError(error.message, "insert_entity");
+      }).select("id,name,slug,canonical_url,official_domain,github_url,description,category_id,pricing_type,is_open_source,visibility,first_detected_at,last_detected_at,source_codes,dismissed_as_stale_at").single());
       entity = entitySchema.parse(data);
     }
     this.indexEntity(entity);
-    await this.saveAliasMentionAndMetric(entity.id, candidate);
+    this.bufferAliasMentionAndMetric(entity.id, candidate);
     return entity;
   }
 
-  async saveScore(entityId: string, score: BootstrapScoreRecord, scoreDate: string) {
-    const { breakdown } = score;
-    const { error } = await this.client.from("trend_scores").upsert({
-      entity_id: entityId,
-      score_date: scoreDate,
-      total_score: score.totalScore,
-      cross_source_score: breakdown.crossSource,
-      velocity_score: breakdown.velocity,
-      product_growth_score: breakdown.productGrowth,
-      threads_score: breakdown.threads,
-      reddit_score: breakdown.reddit,
-      novelty_score: breakdown.novelty,
-      instagram_score: breakdown.instagram,
-      quality_score: breakdown.quality,
-      trust_score: score.trustScore,
-      status: score.status,
-      scoring_version: score.scoringVersion,
-      calculated_at: new Date().toISOString(),
-    }, { onConflict: "entity_id,score_date,scoring_version" });
-    if (error) throw new PipelineRepositoryError(error.message, "upsert_trend_score");
+  /**
+   * 여러 엔티티의 점수를 배치로 저장한다.
+   *
+   * 예전엔 엔티티당 두 번 왕복했다(trend_scores upsert → entities.status update). 엔티티 781건이면
+   * 1,562회다. 점수 행은 배치 upsert 로 묶고, 엔티티 상태는 상태값이 같은 것끼리 모아 한 번에
+   * update 한다 — 상태는 8종류뿐이라 왕복이 최대 8회로 줄어든다.
+   */
+  async saveScores(records: ReadonlyArray<{ entityId: string; score: BootstrapScoreRecord }>, scoreDate: string) {
+    if (records.length === 0) return { scores: 0, statusUpdates: 0 };
+    const calculatedAt = new Date().toISOString();
+    const rows = dedupeByKey(
+      records.map(({ entityId, score }) => ({
+        entity_id: entityId,
+        score_date: scoreDate,
+        total_score: score.totalScore,
+        cross_source_score: score.breakdown.crossSource,
+        velocity_score: score.breakdown.velocity,
+        product_growth_score: score.breakdown.productGrowth,
+        threads_score: score.breakdown.threads,
+        reddit_score: score.breakdown.reddit,
+        novelty_score: score.breakdown.novelty,
+        instagram_score: score.breakdown.instagram,
+        quality_score: score.breakdown.quality,
+        trust_score: score.trustScore,
+        status: score.status,
+        scoring_version: score.scoringVersion,
+        calculated_at: calculatedAt,
+      })),
+      (row) => `${row.entity_id} ${row.score_date} ${row.scoring_version}`,
+    );
+    await this.upsertBatched("trend_scores", "upsert_trend_score", "entity_id,score_date,scoring_version", rows);
 
-    const { error: entityError } = await this.client.from("entities")
-      .update({ status: score.status, updated_at: new Date().toISOString() })
-      .eq("id", entityId);
-    if (entityError) throw new PipelineRepositoryError(entityError.message, "update_entity_status");
+    // 상태별로 엔티티 id 를 모아 한 번씩만 update 한다.
+    const idsByStatus = new Map<string, string[]>();
+    for (const { entityId, score } of records) {
+      const ids = idsByStatus.get(score.status);
+      if (ids) ids.push(entityId);
+      else idsByStatus.set(score.status, [entityId]);
+    }
+    let statusUpdates = 0;
+    for (const [status, ids] of idsByStatus) {
+      // id 목록은 쿼리스트링으로 나가므로 길이 기준으로 청크를 나눈다(query-chunks.ts 참고).
+      for (const chunk of chunkForFilter([...new Set(ids)])) {
+        await this.write("update_entity_status", () => this.client.from("entities")
+          .update({ status, updated_at: calculatedAt })
+          .in("id", chunk));
+        statusUpdates += 1;
+      }
+    }
+    return { scores: rows.length, statusUpdates };
   }
 
   /**
@@ -477,36 +561,67 @@ export class SupabasePipelineRepository {
     return `${base.slice(0, 54)}-${suffix}`;
   }
 
-  private async saveAliasMentionAndMetric(entityId: string, candidate: EntityCandidate) {
+  /**
+   * 후보의 alias·mention·metric 을 버퍼에 담는다. 실제 저장은 flushCandidateWrites() 가 한다.
+   *
+   * 예전엔 후보마다 세 테이블에 바로 썼다(병렬 3건 = 순차 왕복 1회). 후보 828건이면 그 왕복만
+   * 828회다. 이 세 테이블은 실행 중에 아무도 다시 읽지 않으므로(읽는 곳은 실행이 끝난 뒤의
+   * verify CLI 와 관리자 화면뿐) 마지막에 한꺼번에 써도 결과가 같다.
+   */
+  private bufferAliasMentionAndMetric(entityId: string, candidate: EntityCandidate) {
     const sourceId = this.sourceIds.get(candidate.source);
     if (!sourceId) throw new PipelineRepositoryError(`source seed가 없습니다: ${candidate.source}`, "persist_candidate");
     const metric = candidate.metrics;
-    const [aliasResult, mentionResult, metricResult] = await Promise.all([
-      this.client.from("entity_aliases").upsert({
-        entity_id: entityId,
-        alias: candidate.alias,
-        alias_type: candidate.source === "github" ? "github_full_name" : "source_title",
-        source_id: sourceId,
-      }, { onConflict: "entity_id,alias" }),
-      this.client.from("entity_mentions").upsert({
-        entity_id: entityId,
-        raw_item_id: candidate.rawItem.id,
-        match_method: candidate.matchMethod,
-        confidence: candidate.confidence,
-      }, { onConflict: "entity_id,raw_item_id" }),
-      this.client.from("metric_snapshots").upsert({
-        entity_id: entityId,
-        source_id: sourceId,
-        stars: metric.stars ?? null,
-        forks: metric.forks ?? null,
-        score: metric.points ?? null,
-        comments: metric.comments ?? null,
-        measured_at: candidate.rawItem.collected_at,
-        raw_metrics_json: metric,
-      }, { onConflict: "entity_id,source_id,measured_at" }),
-    ]);
-    if (aliasResult.error) throw new PipelineRepositoryError(aliasResult.error.message, "upsert_alias");
-    if (mentionResult.error) throw new PipelineRepositoryError(mentionResult.error.message, "upsert_mention");
-    if (metricResult.error) throw new PipelineRepositoryError(metricResult.error.message, "upsert_metric");
+    this.pendingAliases.push({
+      entity_id: entityId,
+      alias: candidate.alias,
+      alias_type: candidate.source === "github" ? "github_full_name" : "source_title",
+      source_id: sourceId,
+    });
+    this.pendingMentions.push({
+      entity_id: entityId,
+      raw_item_id: candidate.rawItem.id,
+      match_method: candidate.matchMethod,
+      confidence: candidate.confidence,
+    });
+    this.pendingMetrics.push({
+      entity_id: entityId,
+      source_id: sourceId,
+      stars: metric.stars ?? null,
+      forks: metric.forks ?? null,
+      score: metric.points ?? null,
+      comments: metric.comments ?? null,
+      measured_at: candidate.rawItem.collected_at,
+      raw_metrics_json: metric,
+    });
+  }
+
+  /**
+   * 버퍼에 모인 alias·mention·metric 을 배치 upsert 한다.
+   *
+   * 후보 루프가 끝나면 반드시 호출해야 한다 — 호출하지 않으면 이번 실행의 mention·지표가 저장되지
+   * 않는다. 분석 단계보다 앞에서 호출한다(분석은 마감 시각에 걸려 중간에 끝날 수 있다).
+   */
+  async flushCandidateWrites() {
+    // 중복 제거는 선택이 아니다. Postgres 는 `ON CONFLICT DO UPDATE` 로 한 문장에서 같은 행을 두 번
+    // 건드리면 문장 전체를 거부한다. 실측(2026-08-25, 후보 832건)으로 별칭 21건·지표 1건이 겹쳤다.
+    const aliases = dedupeByKey(this.pendingAliases, (row) => `${row.entity_id}|${row.alias}`);
+    const mentions = dedupeByKey(this.pendingMentions, (row) => `${row.entity_id}|${row.raw_item_id}`);
+    const metrics = dedupeByKey(this.pendingMetrics, (row) => `${row.entity_id}|${row.source_id}|${row.measured_at}`);
+
+    await this.upsertBatched("entity_aliases", "upsert_alias", "entity_id,alias", aliases);
+    await this.upsertBatched("entity_mentions", "upsert_mention", "entity_id,raw_item_id", mentions);
+    await this.upsertBatched("metric_snapshots", "upsert_metric", "entity_id,source_id,measured_at", metrics);
+
+    this.pendingAliases.length = 0;
+    this.pendingMentions.length = 0;
+    this.pendingMetrics.length = 0;
+    return { aliases: aliases.length, mentions: mentions.length, metrics: metrics.length };
+  }
+
+  private async upsertBatched(table: string, operation: string, onConflict: string, rows: readonly unknown[]) {
+    for (const chunk of chunkRows(rows)) {
+      await this.write(operation, () => this.client.from(table).upsert(chunk, { onConflict }));
+    }
   }
 }

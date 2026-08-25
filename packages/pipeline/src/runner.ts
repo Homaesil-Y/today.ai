@@ -99,16 +99,26 @@ export async function runEntityPipeline(options: {
     candidates.map((candidate) => ({ source: candidate.source, value: engagementValue(candidate) })),
   );
 
+  // 후보 루프에서 모아둔 alias·mention·metric 을 배치로 저장한다. 분석 단계보다 앞에서 비워야
+  // 한다 — 분석은 마감 시각에 걸려 중간에 끝날 수 있고, 그때도 이번 수집분은 저장돼 있어야 한다.
+  const candidateWrites = await options.repository.flushCandidateWrites();
+
   const processed: ProcessedGroup[] = [];
   const scoreDate = now.toISOString().slice(0, 10);
   // 상태 판정(RISING/FALLING/PEAK 등)은 직전 스냅샷과 비교해야 한다.
   const scoreHistory = await options.repository.loadScoreHistory([...grouped.keys()], scoreDate);
   for (const group of grouped.values()) {
-    // 점수는 대기열 우선순위 정렬에 필요해 항상 계산하되, 분석 전용 실행에서는 저장하지 않는다
-    // (수집 워크플로가 이미 같은 날짜로 저장했다).
+    // 점수는 대기열 우선순위 정렬에 필요해 항상 계산한다(분석 대기열 정렬에 쓴다).
     const score = calculateInitialTrendScore(group.candidates, now, percentiles, scoreHistory.get(group.entity.id));
-    if (!options.analysisOnly) await options.repository.saveScore(group.entity.id, score, scoreDate);
     processed.push({ ...group, score });
+  }
+  // 점수 저장은 한 번에 묶는다. 분석 전용 실행에서는 저장하지 않는다(수집 워크플로가 이미 같은
+  // 날짜로 저장했다).
+  if (!options.analysisOnly) {
+    await options.repository.saveScores(
+      processed.map((group) => ({ entityId: group.entity.id, score: group.score })),
+      scoreDate,
+    );
   }
   processed.sort((a, b) => b.score.totalScore - a.score.totalScore || b.score.trustScore - a.score.trustScore);
 
@@ -229,6 +239,8 @@ export async function runEntityPipeline(options: {
     candidatesRejected: rawItems.length - candidates.length,
     // 분석 전용 실행에서 기존 엔티티에 매칭되지 않아 건너뛴 후보 수(생성은 수집 워크플로의 몫).
     candidatesUnmatched,
+    // 배치로 저장한 별칭·언급·지표 행 수(중복 제거 후).
+    candidateWrites,
     entitiesProcessed: processed.length,
     // 분석 전용 실행은 점수를 저장하지 않으므로 0으로 보고한다(계산은 정렬용으로만 썼다).
     scoresCreated: options.analysisOnly ? 0 : processed.length,
