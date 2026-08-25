@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { EngagementPercentiles } from "./engagement-percentile";
-import { calculateInitialTrendScore, velocityFromRank } from "./initial-score";
+import { calculateInitialTrendScore, recencyDecay, velocityFromRank } from "./initial-score";
 import type { EntityCandidate } from "./schema";
 
 const now = new Date("2026-07-20T00:00:00.000Z");
@@ -117,5 +117,66 @@ describe("velocityFromRank", () => {
   it("clamps out-of-range input", () => {
     expect(velocityFromRank(-1)).toBe(0);
     expect(velocityFromRank(2)).toBe(20);
+  });
+});
+
+describe("recencyDecay (반감기 감쇠)", () => {
+  /**
+   * 감쇠가 없으면 순위가 멈춘다. 반응 지표는 마지막 수집 시점 값에 얼어붙는데, 원본 대부분이
+   * 몇 주 전 수집분이라 매일 같은 점수가 나왔다(실측 8/24→8/25: 변화 중앙값 0, 66% 완전 동일,
+   * RISING·FALLING 0건). 자세한 근거는 initial-score.ts 의 ENGAGEMENT_HALF_LIFE_DAYS 참고.
+   */
+  it("반감기(7일)가 지나면 velocity 가 절반이 된다", () => {
+    const fresh = calculateInitialTrendScore(
+      [candidate({ source: "hacker_news", metrics: { points: 824 }, lastDetectedAt: now.toISOString() })],
+      now, samples,
+    );
+    const weekOld = calculateInitialTrendScore(
+      [candidate({
+        source: "hacker_news", metrics: { points: 824 },
+        lastDetectedAt: new Date(now.getTime() - 7 * 86_400_000).toISOString(),
+      })],
+      now, samples,
+    );
+    expect(weekOld.breakdown.velocity).toBeCloseTo(fresh.breakdown.velocity / 2, 1);
+  });
+
+  it("방금 수집된 항목은 감쇠하지 않는다", () => {
+    expect(recencyDecay(now.toISOString(), now)).toBe(1);
+  });
+
+  it("시각이 미래이거나 깨져 있으면 감쇠하지 않는다(원점수 유지)", () => {
+    expect(recencyDecay(new Date(now.getTime() + 3_600_000).toISOString(), now)).toBe(1);
+    expect(recencyDecay("not-a-date", now)).toBe(1);
+  });
+
+  it("신선하고 약한 언급이 오래되고 강한 언급을 이길 수 있다", () => {
+    // 3주 전 최상위(824점) 언급과 오늘의 중상위(40점) 언급이 함께 있으면 오늘 것이 velocity 를 정한다.
+    const staleTop = candidate({
+      source: "hacker_news", metrics: { points: 824 },
+      lastDetectedAt: new Date(now.getTime() - 21 * 86_400_000).toISOString(),
+    });
+    const freshMid = candidate({
+      source: "hacker_news", metrics: { points: 40 },
+      lastDetectedAt: now.toISOString(),
+    });
+    const merged = calculateInitialTrendScore([staleTop, freshMid], now, samples);
+    const freshAlone = calculateInitialTrendScore([freshMid], now, samples);
+    expect(merged.breakdown.velocity).toBe(freshAlone.breakdown.velocity);
+  });
+
+  it("GitHub 스타(productGrowth)도 같은 규칙으로 감쇠한다", () => {
+    const stale = calculateInitialTrendScore(
+      [candidate({
+        source: "github", metrics: { stars: 200 },
+        lastDetectedAt: new Date(now.getTime() - 14 * 86_400_000).toISOString(),
+      })],
+      now, samples,
+    );
+    const fresh = calculateInitialTrendScore(
+      [candidate({ source: "github", metrics: { stars: 200 }, lastDetectedAt: now.toISOString() })],
+      now, samples,
+    );
+    expect(stale.breakdown.productGrowth).toBeCloseTo(fresh.breakdown.productGrowth / 4, 1);
   });
 });

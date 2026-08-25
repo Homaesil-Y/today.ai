@@ -249,6 +249,9 @@ export class SupabasePipelineRepository {
           .in("entity_id", chunk)
           .lt("score_date", scoreDate)
           .order("score_date", { ascending: false })
+          // 같은 날짜가 수백 행이라 정렬이 이것만으로는 전순서가 아니다. 페이지 경계에서 순서가
+          // 흔들리면 행이 중복되거나 빠져 직전 점수를 잘못 고를 수 있으므로 고정 기준을 더한다.
+          .order("entity_id", { ascending: true })
           .range(from, to);
         if (error) throw new PipelineRepositoryError(error.message, "load_score_history");
         return data ?? [];
