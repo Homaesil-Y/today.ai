@@ -76,11 +76,16 @@ export default async function AdminOpsPage() {
   if (role !== "admin") redirect("/");
 
   const supabase = createAdminClient();
-  const [entitiesResult, analysesResult, sourcesResult, runsResult] = await Promise.all([
+  const scoreDate = new Date().toISOString().slice(0, 10);
+  const [entitiesResult, analysesResult, sourcesResult, runsResult, todayScoresResult] = await Promise.all([
     supabase.from("entities").select("id, visibility, ai_analyses(id)"),
     supabase.from("ai_analyses").select("generated_at").order("generated_at", { ascending: false }).limit(1),
     supabase.from("sources").select("id, code, name, enabled, last_collected_at"),
     supabase.from("collector_runs").select("source_id, status, started_at, finished_at, fetched_count, inserted_count, updated_count, error_count, rate_limit_remaining, error_log_json").order("started_at", { ascending: false }).limit(120),
+    // 오늘자 점수 스냅샷의 상태·순위 대상 분포. 개수 지표만으로는 "저장은 됐는데 결과가 말이
+    // 안 되는" 고장(전부 WATCH, 순위 절반이 동점)을 못 잡아서 관리자 화면에 분포를 노출한다.
+    // 최신 계산이 앞에 오도록 정렬한다 — 아래에서 첫 행의 scoring_version 을 현재 척도로 삼는다.
+    supabase.from("trend_scores").select("status, ranked, scoring_version").eq("score_date", scoreDate).order("calculated_at", { ascending: false }).limit(2000),
   ]);
 
   if (entitiesResult.error) throw new Error(`엔티티 집계 실패: ${entitiesResult.error.message}`);
@@ -95,6 +100,16 @@ export default async function AdminOpsPage() {
   const analyzedAwaitingApproval = reviewCount - unanalyzedCount;
   const totalAnalyses = entities.reduce((sum, entity) => sum + (entity.ai_analyses ?? []).length, 0);
   const lastAnalysisAt = analysesResult.data?.[0]?.generated_at ?? null;
+
+  // 점수 공식이 바뀐 날은 옛 척도 행이 함께 남는다. 최신 행이 쓰는 버전의 분포만 집계한다.
+  const todayScoreRows = (todayScoresResult.data ?? []) as Array<{ status: string; ranked: boolean | null; scoring_version: string }>;
+  const currentScoringVersion = todayScoreRows[0]?.scoring_version;
+  const currentScores = todayScoreRows.filter((row) => row.scoring_version === currentScoringVersion);
+  const statusCounts = new Map<string, number>();
+  for (const row of currentScores) statusCounts.set(row.status, (statusCounts.get(row.status) ?? 0) + 1);
+  const rankedCount = currentScores.filter((row) => row.ranked !== false).length;
+  // 화면에 항상 같은 순서로 보여준다(많이 나오는 순서가 매일 바뀌면 비교하기 어렵다).
+  const statusOrder = ["NEW", "SURGING", "RISING", "PEAK", "STABLE", "FALLING", "REVIVAL", "WATCH"] as const;
 
   const latestRunBySource = new Map<string, CollectorRun>();
   for (const run of (runsResult.data ?? []) as CollectorRun[]) {
@@ -162,6 +177,32 @@ export default async function AdminOpsPage() {
               </article>
             );
           })}
+        </div>
+      </section>
+
+      <section className="ops-section" aria-label="오늘 점수 분포">
+        <h2 className="ops-heading">오늘 점수 분포</h2>
+        <div className="ops-note">
+          {currentScores.length > 0 ? (
+            <>
+              <p>
+                <CheckCircle2 size={15} aria-hidden="true" />
+                오늘 <strong>{currentScores.length}건</strong> 채점(척도 {currentScoringVersion}) · 순위 노출 <strong>{rankedCount}건</strong> · 신호 부족으로 순위 제외 {currentScores.length - rankedCount}건
+                (제외돼도 검색·카테고리에는 표시됩니다)
+              </p>
+              <p className="ops-note-sub">
+                {statusOrder
+                  .filter((status) => statusCounts.has(status))
+                  .map((status) => `${status} ${statusCounts.get(status)}`)
+                  .join(" · ")}
+              </p>
+              {(statusCounts.get("WATCH") ?? 0) > currentScores.length / 2 && (
+                <p className="ops-channel-warning"><AlertTriangle size={13} aria-hidden="true" />절반 이상이 WATCH입니다 — 점수 척도가 바뀐 직후가 아니라면 상태 판정이 멈췄을 수 있습니다.</p>
+              )}
+            </>
+          ) : (
+            <p><AlertTriangle size={15} aria-hidden="true" />오늘 채점된 스냅샷이 없습니다. 3시간 주기 파이프라인이 아직 안 돌았거나 실패했을 수 있습니다 — GitHub Actions 로그를 확인하세요.</p>
+          )}
         </div>
       </section>
 
