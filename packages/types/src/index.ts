@@ -46,6 +46,8 @@ export interface SourceSignal {
 export interface TrendScoreBreakdown {
   crossSource: number;
   velocity: number;
+  /** 채널 내 댓글 수 백분위 기반 토론 깊이. 반응 크기(velocity)와 다른 신호다. */
+  comments: number;
   productGrowth: number;
   threads: number;
   reddit: number;
@@ -67,7 +69,15 @@ export interface TrendEntity {
   pricingType: PricingType;
   isOpenSource: boolean;
   status: TrendStatus;
+  /** 순위 번호. 순위 대상이 아니면(ranked=false) 0. */
   rank: number;
+  /**
+   * 순위표 노출 대상인지. false 면 검색·카테고리·상세에는 남고 순위표에서만 빠진다.
+   *
+   * 반응 신호(velocity·comments·productGrowth·crossSource)가 하한 미달이라 다른 항목과 구분할
+   * 근거가 없는 경우다. 근거와 하한 산출은 pipeline 의 RANKING_SIGNAL_FLOOR 참고.
+   */
+  ranked: boolean;
   rankChange: number;
   trendScore: number;
   trustScore: number;

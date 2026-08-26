@@ -11,6 +11,10 @@ export function RankingTable({ trends, savedEntityIds = new Set<string>(), start
   // select_content 이벤트의 position은 현재 화면에 실제로 나열된 순서(페이지네이션 오프셋 포함) 기준.
   const gaParamsFor = (trend: TrendEntity, index: number) =>
     JSON.stringify({ content_type: "ranking_row", service_slug: trend.slug, service_category: trend.category, position: startIndex + index + 1 });
+  // 순위 대상이 아니면(반응 신호 하한 미달) 번호를 붙이지 않는다. "00"으로 보이면 고장처럼 읽힌다.
+  const rankLabel = (trend: TrendEntity) => (trend.ranked ? String(trend.rank).padStart(2, "0") : "—");
+  const rankTitle = (trend: TrendEntity) =>
+    trend.ranked ? undefined : "아직 순위에 넣을 만한 반응 신호가 모이지 않은 서비스입니다. 검색과 카테고리에서는 계속 확인할 수 있습니다.";
   return (
     <div className="ranking-wrap">
       <table className="ranking-table">
@@ -18,7 +22,7 @@ export function RankingTable({ trends, savedEntityIds = new Set<string>(), start
         <tbody>
           {trends.map((trend, index) => (
             <tr key={trend.id}>
-              <td className="rank-cell"><strong>{String(trend.rank).padStart(2, "0")}</strong><span className={trend.rankChange < 0 ? "negative" : "positive"}>{trend.rankChange === 0 ? "—" : `${trend.rankChange > 0 ? "▲" : "▼"} ${Math.abs(trend.rankChange)}`}</span></td>
+              <td className="rank-cell" title={rankTitle(trend)}><strong>{rankLabel(trend)}</strong><span className={trend.rankChange < 0 ? "negative" : "positive"}>{trend.rankChange === 0 ? "—" : `${trend.rankChange > 0 ? "▲" : "▼"} ${Math.abs(trend.rankChange)}`}</span></td>
               <td><Link className="table-service" href={`/services/${trend.slug}`} data-ga-event="select_content" data-ga-params={gaParamsFor(trend, index)}><span><strong>{trend.name}</strong><small>{trend.category}</small></span></Link></td>
               <td><StatusBadge status={trend.status} /></td>
               <td className="numeric score-cell">{trend.trendScore}</td>
@@ -38,8 +42,8 @@ export function RankingTable({ trends, savedEntityIds = new Set<string>(), start
       <div className="mobile-ranking">
         {trends.map((trend, index) => (
           <Link href={`/services/${trend.slug}`} className="mobile-rank-card" key={trend.id} data-ga-event="select_content" data-ga-params={gaParamsFor(trend, index)}>
-            <span className="mobile-rank">
-              <strong>{String(trend.rank).padStart(2, "0")}</strong>
+            <span className="mobile-rank" title={rankTitle(trend)}>
+              <strong>{rankLabel(trend)}</strong>
               <em className={trend.rankChange === 0 ? "" : trend.rankChange > 0 ? "positive" : "negative"}>{trend.rankChange === 0 ? "—" : `${trend.rankChange > 0 ? "▲" : "▼"}${Math.abs(trend.rankChange)}`}</em>
             </span>
             <span className="mobile-service">

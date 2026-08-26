@@ -46,10 +46,11 @@ function fakeClient(options: { failFirst?: { times: number; message: string } } 
 
 function score(status: BootstrapScoreRecord["status"], total = 10): BootstrapScoreRecord {
   return {
-    breakdown: { crossSource: 1, velocity: 1, productGrowth: 1, threads: 0, reddit: 0, novelty: 1, instagram: 0, quality: 1 },
+    breakdown: { crossSource: 1, velocity: 1, comments: 1, productGrowth: 1, threads: 0, reddit: 0, novelty: 1, instagram: 0, quality: 1 },
     totalScore: total,
     status,
     trustScore: 80,
+    ranked: true,
     scoringVersion: "v1",
   };
 }

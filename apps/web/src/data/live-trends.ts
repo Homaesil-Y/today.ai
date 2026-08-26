@@ -45,6 +45,10 @@ const scoreSchema = z.object({
   total_score: z.coerce.number(),
   trust_score: z.coerce.number(),
   status: z.enum(["NEW", "RISING", "SURGING", "PEAK", "STABLE", "FALLING", "REVIVAL", "WATCH"]),
+  // 반응 신호가 하한 미달이면 false. 순위표에서만 빠지고 검색·카테고리·상세에는 그대로 남는다.
+  // 컬럼이 채워지기 전 행이나 예상 못한 값은 순위에 남기는 쪽(true)으로 둔다 — 배포 순서 때문에
+  // 순위표가 통째로 비는 일이 없어야 한다.
+  ranked: z.boolean().catch(true),
   calculated_at: z.string(),
 });
 
@@ -112,7 +116,7 @@ const loadPublishedTrends = unstable_cache(async (_bucket: number): Promise<Tren
     readAllByIds(ids, async (chunk, from, to) => {
       const { data, error } = await supabase
         .from("trend_scores")
-        .select("entity_id, total_score, trust_score, status, calculated_at")
+        .select("entity_id, total_score, trust_score, status, ranked, calculated_at")
         .in("entity_id", chunk)
         .order("calculated_at", { ascending: false })
         .range(from, to);
@@ -159,7 +163,7 @@ const loadPublishedTrends = unstable_cache(async (_bucket: number): Promise<Tren
     }
   }
 
-  return entities
+  const sorted = entities
     .map((entity) => {
       const score = scores.get(entity.id);
       const analysis = analyses.get(entity.id);
@@ -193,6 +197,8 @@ const loadPublishedTrends = unstable_cache(async (_bucket: number): Promise<Tren
         isOpenSource: entity.is_open_source,
         status,
         rank: 0,
+        // 순위 대상 여부. 컬럼이 없던 시절 행은 스키마 기본값(true)으로 순위에 남는다.
+        ranked: score?.ranked ?? true,
         rankChange: rankChangeByEntity.get(entity.id) ?? 0,
         trendScore: totalScore,
         trustScore: Math.round((score?.trust_score ?? 0) * 10) / 10,
@@ -219,8 +225,13 @@ const loadPublishedTrends = unstable_cache(async (_bucket: number): Promise<Tren
         sparkline: buildSparkline(scoreHistoryByEntity.get(entity.id), totalScore),
       } satisfies TrendEntity;
     })
-    .sort(compareByScore)
-    .map((trend, index) => ({ ...trend, rank: index + 1 }));
+    .sort(compareByScore);
+
+  // 순위 번호는 순위 대상에게만 매긴다. 제외된 항목은 rank 0 으로 두고 검색·카테고리·상세에는
+  // 그대로 남긴다 — 반응 신호가 없어 서로 구분할 근거가 없는 항목들이라(같은 점수 수십 건)
+  // 번호를 붙이면 임의 순서를 순위처럼 보여주게 된다. 배경은 pipeline 의 RANKING_SIGNAL_FLOOR.
+  let rank = 0;
+  return sorted.map((trend) => ({ ...trend, rank: trend.ranked ? (rank += 1) : 0 }));
 }, ["published-trends"], { revalidate: TRENDS_REVALIDATE_SECONDS, tags: ["trends"] });
 
 export const getPublishedTrends = cache(

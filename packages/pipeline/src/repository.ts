@@ -1,6 +1,6 @@
 import { withRetry } from "@ai-trend-radar/collectors";
 import type { TrendAnalysisResult } from "@ai-trend-radar/llm";
-import type { SourceCode } from "@ai-trend-radar/types";
+import type { SourceCode, TrendScoreBreakdown } from "@ai-trend-radar/types";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { chunkRows, dedupeByKey } from "./batch-write";
@@ -80,19 +80,14 @@ const entitySchema = z.object({
 type EntityRow = z.infer<typeof entitySchema>;
 
 export interface BootstrapScoreRecord {
-  breakdown: {
-    crossSource: number;
-    velocity: number;
-    productGrowth: number;
-    threads: number;
-    reddit: number;
-    novelty: number;
-    instagram: number;
-    quality: number;
-  };
+  // 축 목록을 여기서 다시 적으면 축이 늘 때 두 곳을 고쳐야 한다(실제로 comments 축 추가에서
+  // 이 사본이 어긋났다). 원본 한 곳만 유지한다.
+  breakdown: TrendScoreBreakdown;
   totalScore: number;
   status: "WATCH" | "NEW" | "RISING" | "SURGING" | "PEAK" | "STABLE" | "FALLING" | "REVIVAL";
   trustScore: number;
+  /** 순위 노출 대상 여부. false 면 검색·카테고리에는 남고 순위표에서만 빠진다. */
+  ranked: boolean;
   scoringVersion: string;
 }
 
@@ -236,8 +231,12 @@ export class SupabasePipelineRepository {
    * 상태 판정(RISING/FALLING/PEAK 등)은 직전 스냅샷과 비교해야 하는데, 예전엔 호출부가
    * previousScore/dataPoints 를 상수로 넘겨 모든 엔티티가 영구히 WATCH 였다. `scoreDate` 는
    * 이번 실행이 기록할 날짜라, 같은 날 재실행해도 직전 값이 자기 자신으로 덮이지 않게 제외한다.
+   *
+   * 같은 척도끼리만 비교한다. 예전엔 scoring_version 을 걸러내지 않아, 가중치를 바꾸는 순간 새
+   * 척도 점수가 옛 척도 점수와 비교돼 전 엔티티가 한꺼번에 RISING/FALLING 으로 뒤집혔다. 버전이
+   * 다른 이력은 없는 것으로 취급해 WATCH 로 두고, 하루가 지나면 자연히 같은 척도끼리 비교된다.
    */
-  async loadScoreHistory(entityIds: string[], scoreDate: string) {
+  async loadScoreHistory(entityIds: string[], scoreDate: string, scoringVersion: string) {
     const summary = new Map<string, { previousScore: number; dataPoints: number }>();
     if (entityIds.length === 0) return summary;
 
@@ -247,6 +246,7 @@ export class SupabasePipelineRepository {
           .from("trend_scores")
           .select("entity_id,total_score,score_date")
           .in("entity_id", chunk)
+          .eq("scoring_version", scoringVersion)
           .lt("score_date", scoreDate)
           .order("score_date", { ascending: false })
           // 같은 날짜가 수백 행이라 정렬이 이것만으로는 전순서가 아니다. 페이지 경계에서 순서가
@@ -376,6 +376,7 @@ export class SupabasePipelineRepository {
         total_score: score.totalScore,
         cross_source_score: score.breakdown.crossSource,
         velocity_score: score.breakdown.velocity,
+        comments_score: score.breakdown.comments,
         product_growth_score: score.breakdown.productGrowth,
         threads_score: score.breakdown.threads,
         reddit_score: score.breakdown.reddit,
@@ -384,6 +385,7 @@ export class SupabasePipelineRepository {
         quality_score: score.breakdown.quality,
         trust_score: score.trustScore,
         status: score.status,
+        ranked: score.ranked,
         scoring_version: score.scoringVersion,
         calculated_at: calculatedAt,
       })),

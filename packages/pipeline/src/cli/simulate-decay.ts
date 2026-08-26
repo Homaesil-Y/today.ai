@@ -10,8 +10,8 @@
 import { loadWorkspaceEnvironment } from "@ai-trend-radar/collectors";
 import { calculateStatus } from "@ai-trend-radar/scoring";
 import { extractEntityCandidate } from "../candidate";
-import { EngagementPercentiles } from "../engagement-percentile";
-import { calculateInitialTrendScore, engagementValue } from "../initial-score";
+import { ScoreDistributions } from "../engagement-percentile";
+import { calculateInitialTrendScore, commentValue, engagementValue } from "../initial-score";
 import { SupabasePipelineRepository } from "../repository";
 import type { EntityCandidate } from "../schema";
 
@@ -23,7 +23,7 @@ const candidates = rawItems.map(extractEntityCandidate).filter((c): c is EntityC
 
 function scoreAt(at: Date) {
   const usable = candidates.filter((c) => new Date(c.rawItem.collected_at) <= at);
-  const percentiles = new EngagementPercentiles(usable.map((c) => ({ source: c.source, value: engagementValue(c) })));
+  const distributions = new ScoreDistributions(usable.map((c) => ({ source: c.source, engagement: engagementValue(c), comments: commentValue(c) })));
   const grouped = new Map<string, EntityCandidate[]>();
   for (const c of usable) {
     const entity = repository.matchEntity(c);
@@ -33,7 +33,7 @@ function scoreAt(at: Date) {
   }
   const scores = new Map<string, { total: number; ageHours: number }>();
   for (const [id, cands] of grouped) {
-    const result = calculateInitialTrendScore(cands, at, percentiles);
+    const result = calculateInitialTrendScore(cands, at, distributions);
     const firstDetected = Math.min(...cands.map((c) => new Date(c.firstDetectedAt).getTime()));
     scores.set(id, { total: result.totalScore, ageHours: Math.max(0, (at.getTime() - firstDetected) / 3_600_000) });
   }

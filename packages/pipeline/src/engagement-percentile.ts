@@ -55,3 +55,19 @@ export class EngagementPercentiles {
     return low / values.length;
   }
 }
+
+/**
+ * 점수 계산에 필요한 채널별 분포 묶음.
+ *
+ * 축이 늘어날 때마다 calculateInitialTrendScore 의 인자를 하나씩 붙이면 호출부가 위치 인자
+ * 순서에 묶인다. 분포는 "이번 실행의 후보 전체"에서 한 번에 만들어지는 값이라 함께 다닌다.
+ */
+export class ScoreDistributions {
+  readonly engagement: EngagementPercentiles;
+  readonly comments: EngagementPercentiles;
+
+  constructor(samples: Array<{ source: SourceCode; engagement: number; comments: number }>) {
+    this.engagement = new EngagementPercentiles(samples.map(({ source, engagement }) => ({ source, value: engagement })));
+    this.comments = new EngagementPercentiles(samples.map(({ source, comments }) => ({ source, value: comments })));
+  }
+}

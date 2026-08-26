@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { classifyCategory, extractEntityCandidate, githubRepositoryUrl, looksLikeDescription, slugifyName } from "./candidate";
-import { calculateInitialTrendScore } from "./initial-score";
+import { BOOTSTRAP_SCORING_VERSION, calculateInitialTrendScore } from "./initial-score";
 import type { DatabaseRawItem } from "./schema";
 
 const githubItem: DatabaseRawItem = {
@@ -312,7 +312,7 @@ describe("candidate extraction", () => {
     const score = calculateInitialTrendScore([candidate!], new Date("2026-07-20T00:00:00.000Z"));
     expect(score.status).toBe("WATCH");
     expect(score.totalScore).toBeGreaterThan(0);
-    expect(score.scoringVersion).toBe("v1-bootstrap");
+    expect(score.scoringVersion).toBe(BOOTSTRAP_SCORING_VERSION);
   });
 
   it("uses a stable hash slug when a name has no latin characters", () => {

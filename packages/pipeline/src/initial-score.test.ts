@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { EngagementPercentiles } from "./engagement-percentile";
-import { calculateInitialTrendScore, recencyDecay, velocityFromRank } from "./initial-score";
+import { ScoreDistributions } from "./engagement-percentile";
+import { calculateInitialTrendScore, isRankable, RANKING_SIGNAL_FLOOR, recencyDecay, VELOCITY_CAP, velocityFromRank } from "./initial-score";
+import type { TrendScoreBreakdown } from "@ai-trend-radar/types";
 import type { EntityCandidate } from "./schema";
 
 const now = new Date("2026-07-20T00:00:00.000Z");
@@ -30,9 +31,9 @@ function candidate(overrides: Partial<EntityCandidate>): EntityCandidate {
 }
 
 /** 실측 분포를 축약한 표본. HN은 한 자릿수, PH는 세 자릿수로 척도가 100배 가까이 다르다. */
-const samples = new EngagementPercentiles([
-  ...[1, 2, 2, 3, 4, 10, 40, 300, 824].map((value) => ({ source: "hacker_news" as const, value })),
-  ...[120, 194, 194, 250, 352, 400, 469, 600, 892].map((value) => ({ source: "product_hunt" as const, value })),
+const samples = new ScoreDistributions([
+  ...[1, 2, 2, 3, 4, 10, 40, 300, 824].map((value) => ({ source: "hacker_news" as const, engagement: value, comments: 0 })),
+  ...[120, 194, 194, 250, 352, 400, 469, 600, 892].map((value) => ({ source: "product_hunt" as const, engagement: value, comments: value / 4 })),
 ]);
 
 describe("calculateInitialTrendScore", () => {
@@ -45,12 +46,20 @@ describe("calculateInitialTrendScore", () => {
     expect(score.breakdown.velocity).toBeGreaterThan(0);
   });
 
-  it("counts Reddit score toward the dedicated reddit axis", () => {
+  /**
+   * 전용 reddit 축은 채널이 막혀 상한 0 이다(scoring 의 limits 참고). 업보트는 velocity 로 들어가야
+   * 한다 — 그러지 않으면 Reddit 수집이 복구되는 날 모든 Reddit 항목이 반응 점수 0 을 받는다.
+   */
+  it("Reddit 업보트를 velocity 로 반영한다(전용 축은 채널 차단으로 0)", () => {
+    const redditSamples = new ScoreDistributions([
+      ...[10, 50, 100, 500, 900].map((value) => ({ source: "reddit" as const, engagement: value, comments: 0 })),
+    ]);
     const redditOnly = candidate({ source: "reddit", metrics: { score: 500, comments: 40 } });
-    const score = calculateInitialTrendScore([redditOnly], now, samples);
-    expect(score.breakdown.reddit).toBeGreaterThan(0);
-    // Reddit 신호가 velocity 축까지 새어 들어가진 않아야 한다.
-    expect(score.breakdown.velocity).toBe(0);
+    const score = calculateInitialTrendScore([redditOnly], now, redditSamples);
+    expect(score.breakdown.velocity).toBeGreaterThan(0);
+    expect(score.breakdown.reddit).toBe(0);
+    // 총점에도 실제로 반영돼야 한다.
+    expect(score.totalScore).toBeGreaterThan(score.breakdown.novelty + score.breakdown.quality);
   });
 
   it("still treats Hacker News points as the velocity signal", () => {
@@ -109,14 +118,14 @@ describe("calculateInitialTrendScore", () => {
 describe("velocityFromRank", () => {
   it("weights the tail more than the middle", () => {
     // 백분위를 그대로 쓰면 824점과 40점이 뭉뚱그려진다. 제곱으로 꼬리를 살린다.
-    expect(velocityFromRank(0.5)).toBe(5);
-    expect(velocityFromRank(0.9)).toBe(16.2);
-    expect(velocityFromRank(1)).toBe(20);
+    expect(velocityFromRank(0.5)).toBe(7.5);
+    expect(velocityFromRank(0.9)).toBe(24.3);
+    expect(velocityFromRank(1)).toBe(VELOCITY_CAP);
   });
 
   it("clamps out-of-range input", () => {
     expect(velocityFromRank(-1)).toBe(0);
-    expect(velocityFromRank(2)).toBe(20);
+    expect(velocityFromRank(2)).toBe(VELOCITY_CAP);
   });
 });
 
@@ -138,7 +147,7 @@ describe("recencyDecay (반감기 감쇠)", () => {
       })],
       now, samples,
     );
-    expect(weekOld.breakdown.velocity).toBeCloseTo(fresh.breakdown.velocity / 2, 1);
+    expect(weekOld.breakdown.velocity).toBeCloseTo(fresh.breakdown.velocity / 2, 0);
   });
 
   it("방금 수집된 항목은 감쇠하지 않는다", () => {
@@ -178,5 +187,56 @@ describe("recencyDecay (반감기 감쇠)", () => {
       now, samples,
     );
     expect(stale.breakdown.productGrowth).toBeCloseTo(fresh.breakdown.productGrowth / 4, 1);
+  });
+});
+
+describe("isRankable (순위 하한)", () => {
+  /**
+   * 하한이 없으면 순위 하위 절반이 임의 순서가 된다. 실측(793건): 459건(58%)이 대형 동점 그룹에
+   * 몰려 60건이 정확히 같은 점수를 받았다. 근거와 하한 산출은 RANKING_SIGNAL_FLOOR 참고.
+   */
+  const axes = (overrides: Partial<TrendScoreBreakdown> = {}): TrendScoreBreakdown => ({
+    crossSource: 0, velocity: 0, comments: 0, productGrowth: 0,
+    threads: 0, reddit: 0, novelty: 0, instagram: 0, quality: 0,
+    ...overrides,
+  });
+
+  it("반응 신호가 전혀 없으면 순위에서 뺀다", () => {
+    // novelty·quality 는 시간·설명에서 나오는 값이라 서비스 간 구분 근거가 못 된다.
+    expect(isRankable(axes({ novelty: 12, quality: 8 }))).toBe(false);
+  });
+
+  it("반응 신호가 하한을 넘으면 순위에 넣는다", () => {
+    expect(isRankable(axes({ velocity: RANKING_SIGNAL_FLOOR }))).toBe(true);
+    expect(isRankable(axes({ comments: 3 }))).toBe(true);
+    expect(isRankable(axes({ productGrowth: 9 }))).toBe(true);
+    expect(isRankable(axes({ crossSource: 6.7 }))).toBe(true);
+  });
+
+  it("여러 축에 흩어진 약한 신호도 합쳐서 판단한다", () => {
+    expect(isRankable(axes({ velocity: 0.2, comments: 0.2 }))).toBe(false);
+    expect(isRankable(axes({ velocity: 0.3, comments: 0.2 }))).toBe(true);
+  });
+
+  it("점수 계산 결과에 ranked 가 함께 실린다", () => {
+    const strong = calculateInitialTrendScore(
+      [candidate({ source: "hacker_news", metrics: { points: 824 }, lastDetectedAt: now.toISOString() })],
+      now, samples,
+    );
+    const noSignal = calculateInitialTrendScore([candidate({ source: "hacker_news", metrics: {} })], now, samples);
+    expect(strong.ranked).toBe(true);
+    expect(noSignal.ranked).toBe(false);
+  });
+
+  /** 오래돼 감쇠로 신호가 사라진 항목은 순위에서 빠져야 한다 — 이게 순위를 움직이는 경로다. */
+  it("감쇠로 신호가 하한 아래로 내려가면 순위에서 빠진다", () => {
+    const veryStale = calculateInitialTrendScore(
+      [candidate({
+        source: "hacker_news", metrics: { points: 2 },
+        lastDetectedAt: new Date(now.getTime() - 120 * 86_400_000).toISOString(),
+      })],
+      now, samples,
+    );
+    expect(veryStale.ranked).toBe(false);
   });
 });

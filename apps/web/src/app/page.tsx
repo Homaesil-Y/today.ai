@@ -24,7 +24,10 @@ const faqItems = (channels: string) => [
 
 export default async function DashboardPage() {
   const [allTrends, savedEntityIds] = await Promise.all([getPublishedTrends(), getSavedEntityIds()]);
-  const trends = allTrends.slice(0, 10);
+  // 순위표에는 반응 신호가 하한을 넘은 서비스만 올린다. 제외된 서비스도 검색·카테고리·상세에서는
+  // 그대로 볼 수 있다(근거는 pipeline 의 RANKING_SIGNAL_FLOOR).
+  const rankedTrends = allTrends.filter(({ ranked }) => ranked);
+  const trends = rankedTrends.slice(0, 10);
   const risingCount = allTrends.filter(({ status }) => ["RISING", "SURGING", "PEAK"].includes(status)).length;
   const crossChannelCount = allTrends.filter(({ sources }) => sources.length > 1).length;
   const categoryCount = new Set(allTrends.map(({ category }) => category)).size;

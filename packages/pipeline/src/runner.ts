@@ -7,8 +7,8 @@ import {
 } from "@ai-trend-radar/llm";
 import { selectPendingAnalyses } from "./analysis-queue";
 import { extractEntityCandidate } from "./candidate";
-import { EngagementPercentiles } from "./engagement-percentile";
-import { calculateInitialTrendScore, engagementValue } from "./initial-score";
+import { ScoreDistributions } from "./engagement-percentile";
+import { BOOTSTRAP_SCORING_VERSION, calculateInitialTrendScore, commentValue, engagementValue } from "./initial-score";
 import { planRateLimitWait } from "./rate-limit-wait";
 import type { SupabasePipelineRepository } from "./repository";
 import type { EntityCandidate } from "./schema";
@@ -95,8 +95,12 @@ export async function runEntityPipeline(options: {
 
   // 반응 지표는 채널별 척도가 달라(HN points 중앙값 2, PH votes 중앙값 194) 절대값을 비교할 수
   // 없다. 이번 실행에서 수집한 후보 전체로 채널별 분포를 만들어 상대 순위로 환산한다.
-  const percentiles = new EngagementPercentiles(
-    candidates.map((candidate) => ({ source: candidate.source, value: engagementValue(candidate) })),
+  const distributions = new ScoreDistributions(
+    candidates.map((candidate) => ({
+      source: candidate.source,
+      engagement: engagementValue(candidate),
+      comments: commentValue(candidate),
+    })),
   );
 
   // 후보 루프에서 모아둔 alias·mention·metric 을 배치로 저장한다. 분석 단계보다 앞에서 비워야
@@ -106,10 +110,10 @@ export async function runEntityPipeline(options: {
   const processed: ProcessedGroup[] = [];
   const scoreDate = now.toISOString().slice(0, 10);
   // 상태 판정(RISING/FALLING/PEAK 등)은 직전 스냅샷과 비교해야 한다.
-  const scoreHistory = await options.repository.loadScoreHistory([...grouped.keys()], scoreDate);
+  const scoreHistory = await options.repository.loadScoreHistory([...grouped.keys()], scoreDate, BOOTSTRAP_SCORING_VERSION);
   for (const group of grouped.values()) {
     // 점수는 대기열 우선순위 정렬에 필요해 항상 계산한다(분석 대기열 정렬에 쓴다).
-    const score = calculateInitialTrendScore(group.candidates, now, percentiles, scoreHistory.get(group.entity.id));
+    const score = calculateInitialTrendScore(group.candidates, now, distributions, scoreHistory.get(group.entity.id));
     processed.push({ ...group, score });
   }
   // 점수 저장은 한 번에 묶는다. 분석 전용 실행에서는 저장하지 않는다(수집 워크플로가 이미 같은
