@@ -7,6 +7,7 @@ import { readAllByIds, readAllPages } from "@/lib/supabase-paging";
 import { createPublicClient } from "@/lib/supabase/server";
 import { cleanDisplayName, logoTextFrom } from "./display-name";
 import { resolveSources, sourceSignalLabel } from "./entity-sources";
+import { keepLatestScoringVersion } from "./scoring-version";
 import { compareByScore } from "./trend-query";
 
 /**
@@ -49,6 +50,7 @@ const scoreSchema = z.object({
   // 컬럼이 채워지기 전 행이나 예상 못한 값은 순위에 남기는 쪽(true)으로 둔다 — 배포 순서 때문에
   // 순위표가 통째로 비는 일이 없어야 한다.
   ranked: z.boolean().catch(true),
+  scoring_version: z.string(),
   calculated_at: z.string(),
 });
 
@@ -116,7 +118,7 @@ const loadPublishedTrends = unstable_cache(async (_bucket: number): Promise<Tren
     readAllByIds(ids, async (chunk, from, to) => {
       const { data, error } = await supabase
         .from("trend_scores")
-        .select("entity_id, total_score, trust_score, status, ranked, calculated_at")
+        .select("entity_id, total_score, trust_score, status, ranked, scoring_version, calculated_at")
         .in("entity_id", chunk)
         .order("calculated_at", { ascending: false })
         .range(from, to);
@@ -136,7 +138,8 @@ const loadPublishedTrends = unstable_cache(async (_bucket: number): Promise<Tren
     }),
   ]);
 
-  const parsedScores = z.array(scoreSchema).parse(scoreData ?? []);
+  // 척도가 섞인 이력을 그대로 쓰면 24H 변화·스파크라인·순위 변동이 전부 가짜가 된다.
+  const parsedScores = keepLatestScoringVersion(z.array(scoreSchema).parse(scoreData ?? []));
   const scores = latestByEntity(parsedScores);
   const analyses = latestByEntity(z.array(listAnalysisSchema).parse(analysisData));
 
@@ -275,7 +278,7 @@ export const withTrendAnalysis = cache(async (trends: TrendEntity[]): Promise<Tr
   });
 });
 
-const historyRowSchema = z.object({ total_score: z.coerce.number(), calculated_at: z.string() });
+const historyRowSchema = z.object({ total_score: z.coerce.number(), scoring_version: z.string(), calculated_at: z.string() });
 
 export type TrendScoreHistoryPoint = { measuredAt: string; score: number };
 
@@ -285,14 +288,20 @@ const loadTrendScoreHistory = unstable_cache(async (entityId: string, _bucket: n
   const supabase = createPublicClient();
   const { data, error } = await supabase
     .from("trend_scores")
-    .select("total_score, calculated_at")
+    .select("total_score, scoring_version, calculated_at")
     .eq("entity_id", entityId)
     .order("calculated_at", { ascending: true });
   if (error) throw new Error(`트렌드 점수 이력 조회 실패: ${error.message}`);
-  return z.array(historyRowSchema).parse(data ?? []).map((row) => ({
-    measuredAt: row.calculated_at,
-    score: Math.round(row.total_score * 10) / 10,
-  }));
+  const rows = z.array(historyRowSchema).parse(data ?? []);
+  // 척도가 다른 구간을 한 그래프에 이어 붙이면 공식이 바뀐 날 가짜 계단이 생긴다.
+  // 가장 최근 척도의 구간만 그린다(오름차순이라 마지막 행이 현재 척도).
+  const currentVersion = rows[rows.length - 1]?.scoring_version;
+  return rows
+    .filter((row) => row.scoring_version === currentVersion)
+    .map((row) => ({
+      measuredAt: row.calculated_at,
+      score: Math.round(row.total_score * 10) / 10,
+    }));
 }, ["trend-score-history"], { revalidate: TRENDS_REVALIDATE_SECONDS, tags: ["trends"] });
 
 export const getTrendScoreHistory = cache(

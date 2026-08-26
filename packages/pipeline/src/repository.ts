@@ -624,6 +624,21 @@ export class SupabasePipelineRepository {
     return { aliases: aliases.length, mentions: mentions.length, metrics: metrics.length };
   }
 
+  /**
+   * 이미 만들어진 점수 스냅샷 행을 그대로 저장한다(척도 변경 후 직전 날짜 백필용).
+   *
+   * saveScores 와 달리 entities.status 를 건드리지 않는다 — 과거 날짜를 채우는 작업이 현재
+   * 상태를 덮으면 안 된다. 실패는 예외 대신 메시지로 돌려 호출부가 진행 상황을 출력하게 한다.
+   */
+  async upsertScoreSnapshots(rows: readonly Record<string, unknown>[]): Promise<{ error: string | null }> {
+    try {
+      await this.upsertBatched("trend_scores", "backfill_trend_score", "entity_id,score_date,scoring_version", rows);
+      return { error: null };
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
   private async upsertBatched(table: string, operation: string, onConflict: string, rows: readonly unknown[]) {
     for (const chunk of chunkRows(rows)) {
       await this.write(operation, () => this.client.from(table).upsert(chunk, { onConflict }));
