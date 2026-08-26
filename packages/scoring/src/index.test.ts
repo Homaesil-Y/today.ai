@@ -39,13 +39,31 @@ describe("calculateStatus", () => {
   it("uses WATCH when snapshot evidence is insufficient", () => {
     expect(
       calculateStatus({
-        firstDetectedHours: 2,
+        // 발견된 지 24시간이 지났고 비교할 스냅샷이 없으면 움직임을 말할 수 없다.
+        firstDetectedHours: 100,
         velocityDelta: 80,
         score: 91,
         previousScore: 20,
         dataPoints: 1,
       }),
     ).toBe("WATCH");
+  });
+
+  /**
+   * NEW 는 이력 없이도 판정할 수 있다. 검사 순서가 뒤집혀 있던 동안 갓 발견된 서비스가 첫날
+   * 반드시 WATCH 로 표시됐고, 감쇠로 신선한 항목이 상위를 차지하면서 순위 1~4위가 전부
+   * "관찰 대상"이 됐다(2026-08-26 실측: WATCH 103건 중 29건이 24시간 이내 발견분).
+   */
+  it("이력이 없어도 24시간 이내 발견이면 NEW 가 WATCH 보다 우선한다", () => {
+    expect(
+      calculateStatus({ firstDetectedHours: 12, velocityDelta: 0, score: 62, previousScore: 62, dataPoints: 1 }),
+    ).toBe("NEW");
+  });
+
+  it("이력이 있어도 24시간 이내면 NEW 를 유지한다", () => {
+    expect(
+      calculateStatus({ firstDetectedHours: 12, velocityDelta: 20, score: 62, previousScore: 40, dataPoints: 3 }),
+    ).toBe("NEW");
   });
 });
 

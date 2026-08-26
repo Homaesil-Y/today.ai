@@ -88,8 +88,14 @@ export function calculateStatus(params: {
   dataPoints: number;
 }): TrendStatus {
   const { firstDetectedHours, velocityDelta, score, previousScore, dataPoints } = params;
-  if (dataPoints < 2) return "WATCH";
+  // NEW 를 먼저 본다. 이력이 없어도 "언제 처음 발견됐는지"만으로 답할 수 있는 상태다.
+  // dataPoints 검사가 앞에 있던 동안은 갓 발견된 서비스가 첫날 반드시 WATCH 로 표시되고
+  // 이력이 쌓인 다음 날에야 NEW 가 됐다 — 순서가 뒤집혀 있었다. 실측(2026-08-26): WATCH 103건
+  // 중 29건이 24시간 이내 발견분이었고, 감쇠 때문에 그런 신선한 항목이 순위 최상위를 차지해
+  // 1~4위가 전부 "관찰 대상"으로 보였다.
   if (firstDetectedHours <= 24) return "NEW";
+  // 움직임으로 판정하는 아래 규칙들은 직전 스냅샷이 있어야 한다.
+  if (dataPoints < 2) return "WATCH";
   if (velocityDelta >= STATUS_THRESHOLDS.surgeDelta || score >= STATUS_THRESHOLDS.surgeScore) return "SURGING";
   if (score >= STATUS_THRESHOLDS.peakScore && Math.abs(score - previousScore) < STATUS_THRESHOLDS.peakStability) return "PEAK";
   if (score - previousScore >= STATUS_THRESHOLDS.rising) return "RISING";
