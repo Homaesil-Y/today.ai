@@ -9,9 +9,11 @@
  * 기존 버전의 행은 충돌 키에 scoring_version 이 들어 있어 건드리지 않는다. entities.status 도
  * 손대지 않는다 — 그건 오늘자 실행이 정하는 값이다.
  *
- * 정확도: 대상 시점까지 수집된 원본만으로 재구성한다. 그 뒤에 재수집된 항목은 collected_at 이
- * 갱신되어 이 재구성에서 빠지므로, 실제로 그날 계산했을 값보다 반응 신호가 과소평가된다
- * (상승 판정이 덜 나온다). 상태 판정의 "직전 점수" 한 번에만 쓰이는 값이라 근사로 충분하다.
+ * 정확도: 대상 시점까지 **게시된**(published_at) 원본으로 재구성한다. collected_at 으로 걸렀을 때는
+ * 그 뒤 재수집된 항목이 빠졌는데, 재수집되는 항목이 곧 가장 뜨거운 항목이라 순위 최상위가 첫날
+ * WATCH 로 남았다(2026-09-02 실측: 상위 10 중 6건). published_at 은 바뀌지 않으므로 재수집과
+ * 무관하게 "그날 존재했던 항목"을 고른다. 지표는 현재 값을 쓰고 감쇠는 기준 시각으로 계산하므로
+ * 여전히 근사지만, 상태 판정의 "직전 신호" 한 번에만 쓰이는 값이라 충분하다.
  *
  * 실행:
  *   pnpm --filter @ai-trend-radar/pipeline exec tsx src/cli/backfill-score-history.ts            # dry-run
@@ -41,11 +43,11 @@ const repository = SupabasePipelineRepository.fromEnvironment(env);
 await repository.initialize();
 const rawItems = await repository.loadRawItems();
 
-// 대상 시점까지 수집된 원본만 남긴다.
+// 대상 시점까지 게시된 원본만 남긴다(firstDetectedAt = published_at, 재수집돼도 바뀌지 않는다).
 const candidates = rawItems
   .map(extractEntityCandidate)
   .filter((candidate): candidate is EntityCandidate => candidate !== null)
-  .filter((candidate) => new Date(candidate.rawItem.collected_at) <= asOf);
+  .filter((candidate) => new Date(candidate.firstDetectedAt) <= asOf);
 
 const distributions = new ScoreDistributions(candidates.map((candidate) => ({
   source: candidate.source,

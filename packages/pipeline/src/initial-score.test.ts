@@ -100,12 +100,26 @@ describe("calculateInitialTrendScore", () => {
       .toBe(hnAlone.breakdown.velocity);
   });
 
-  it("leaves velocity and reddit at 0 when a product has neither signal (e.g. GitHub-only)", () => {
-    const githubOnly = candidate({ source: "github", metrics: { stars: 200, forks: 10 } });
-    const score = calculateInitialTrendScore([githubOnly], now, samples);
-    expect(score.breakdown.velocity).toBe(0);
+  /**
+   * v2 까지 GitHub 단독 엔티티는 velocity·comments 를 전혀 못 받고 productGrowth(상한 15)만으로
+   * ~35점에 묶여 상위 50위(커트라인 ~30)에 구조적으로 못 들어갔다. 스타를 GitHub 채널 내 백분위로
+   * velocity 에 넣어 다른 채널과 같은 규칙으로 경쟁시킨다. 이슈 수는 comments 축의 GitHub 대응이다.
+   */
+  it("GitHub 스타·이슈가 velocity·comments 로 반영된다(productGrowth 축은 0)", () => {
+    const githubSamples = new ScoreDistributions([
+      ...[50, 120, 423, 900, 2374, 5000, 10827, 60, 300, 1500, 700, 80].map((stars, i) => ({ source: "github" as const, engagement: stars, comments: i })),
+    ]);
+    const githubOnly = candidate({ source: "github", metrics: { stars: 5000, forks: 10, issues: 8 } });
+    const score = calculateInitialTrendScore([githubOnly], now, githubSamples);
+    expect(score.breakdown.velocity).toBeGreaterThan(0);
+    expect(score.breakdown.comments).toBeGreaterThan(0);
+    expect(score.breakdown.productGrowth).toBe(0);
     expect(score.breakdown.reddit).toBe(0);
-    expect(score.breakdown.productGrowth).toBeGreaterThan(0);
+  });
+
+  it("GitHub 표본이 없는 분포에서는 GitHub 항목도 velocity 0 (추측하지 않는다)", () => {
+    const githubOnly = candidate({ source: "github", metrics: { stars: 200, forks: 10 } });
+    expect(calculateInitialTrendScore([githubOnly], now, samples).breakdown.velocity).toBe(0);
   });
 
   it("gives no velocity when the distribution is unknown rather than guessing", () => {
@@ -118,8 +132,8 @@ describe("calculateInitialTrendScore", () => {
 describe("velocityFromRank", () => {
   it("weights the tail more than the middle", () => {
     // 백분위를 그대로 쓰면 824점과 40점이 뭉뚱그려진다. 제곱으로 꼬리를 살린다.
-    expect(velocityFromRank(0.5)).toBe(7.5);
-    expect(velocityFromRank(0.9)).toBe(24.3);
+    expect(velocityFromRank(0.5)).toBe(10);
+    expect(velocityFromRank(0.9)).toBe(32.4);
     expect(velocityFromRank(1)).toBe(VELOCITY_CAP);
   });
 
@@ -174,19 +188,17 @@ describe("recencyDecay (반감기 감쇠)", () => {
     expect(merged.breakdown.velocity).toBe(freshAlone.breakdown.velocity);
   });
 
-  it("GitHub 스타(productGrowth)도 같은 규칙으로 감쇠한다", () => {
-    const stale = calculateInitialTrendScore(
-      [candidate({
-        source: "github", metrics: { stars: 200 },
-        lastDetectedAt: new Date(now.getTime() - 14 * 86_400_000).toISOString(),
-      })],
-      now, samples,
-    );
-    const fresh = calculateInitialTrendScore(
-      [candidate({ source: "github", metrics: { stars: 200 }, lastDetectedAt: now.toISOString() })],
-      now, samples,
-    );
-    expect(stale.breakdown.productGrowth).toBeCloseTo(fresh.breakdown.productGrowth / 4, 1);
+  it("교차 채널(crossSource)도 감쇠한다 — 몇 주 전 교차 언급이 영구 점수가 되지 않는다", () => {
+    const hn = candidate({ source: "hacker_news", metrics: { points: 40 }, lastDetectedAt: now.toISOString() });
+    const freshPh = candidate({ source: "product_hunt", metrics: { votes: 300 }, lastDetectedAt: now.toISOString() });
+    const stalePh = candidate({
+      source: "product_hunt", metrics: { votes: 300 },
+      lastDetectedAt: new Date(now.getTime() - 14 * 86_400_000).toISOString(),
+    });
+    const fresh = calculateInitialTrendScore([hn, freshPh], now, samples).breakdown.crossSource;
+    const stale = calculateInitialTrendScore([hn, stalePh], now, samples).breakdown.crossSource;
+    expect(fresh).toBeCloseTo(20 / 3, 0);
+    expect(stale).toBeCloseTo(fresh / 4, 0);
   });
 });
 
@@ -209,8 +221,9 @@ describe("isRankable (순위 하한)", () => {
   it("반응 신호가 하한을 넘으면 순위에 넣는다", () => {
     expect(isRankable(axes({ velocity: RANKING_SIGNAL_FLOOR }))).toBe(true);
     expect(isRankable(axes({ comments: 3 }))).toBe(true);
-    expect(isRankable(axes({ productGrowth: 9 }))).toBe(true);
     expect(isRankable(axes({ crossSource: 6.7 }))).toBe(true);
+    // productGrowth 는 상한 0 이라 신호로 치지 않는다(GitHub 스타는 velocity 로 들어간다).
+    expect(isRankable(axes({ productGrowth: 9 }))).toBe(false);
   });
 
   it("여러 축에 흩어진 약한 신호도 합쳐서 판단한다", () => {

@@ -1,5 +1,6 @@
 import { withRetry } from "@ai-trend-radar/collectors";
 import type { TrendAnalysisResult } from "@ai-trend-radar/llm";
+import { engagementSignal } from "@ai-trend-radar/scoring";
 import type { SourceCode, TrendScoreBreakdown } from "@ai-trend-radar/types";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
@@ -237,14 +238,16 @@ export class SupabasePipelineRepository {
    * 다른 이력은 없는 것으로 취급해 WATCH 로 두고, 하루가 지나면 자연히 같은 척도끼리 비교된다.
    */
   async loadScoreHistory(entityIds: string[], scoreDate: string, scoringVersion: string) {
-    const summary = new Map<string, { previousScore: number; dataPoints: number }>();
+    const summary = new Map<string, { previousSignal: number; dataPoints: number }>();
     if (entityIds.length === 0) return summary;
 
     for (const chunk of chunkForFilter(entityIds)) {
       const rows = await readAllPages(async (from, to) => {
+        // 상태 판정은 총점이 아니라 반응 신호(engagementSignal)의 변화를 본다. 축 컬럼을 읽어
+        // 직전 신호를 복원한다 — 총점에는 달력 축(novelty)이 섞여 있어 판정에 쓰면 안 된다.
         const { data, error } = await this.client
           .from("trend_scores")
-          .select("entity_id,total_score,score_date")
+          .select("entity_id,score_date,velocity_score,comments_score,product_growth_score,cross_source_score")
           .in("entity_id", chunk)
           .eq("scoring_version", scoringVersion)
           .lt("score_date", scoreDate)
@@ -258,11 +261,18 @@ export class SupabasePipelineRepository {
       });
 
       for (const row of rows) {
-        if (typeof row.entity_id !== "string" || typeof row.total_score !== "number") continue;
+        if (typeof row.entity_id !== "string") continue;
         const current = summary.get(row.entity_id);
         // 내림차순이라 처음 만나는 행이 직전 스냅샷이다.
-        if (current) current.dataPoints += 1;
-        else summary.set(row.entity_id, { previousScore: row.total_score, dataPoints: 1 });
+        if (current) { current.dataPoints += 1; continue; }
+        const previousSignal = engagementSignal({
+          velocity: Number(row.velocity_score) || 0,
+          comments: Number(row.comments_score) || 0,
+          productGrowth: Number(row.product_growth_score) || 0,
+          crossSource: Number(row.cross_source_score) || 0,
+          threads: 0, reddit: 0, novelty: 0, instagram: 0, quality: 0,
+        });
+        summary.set(row.entity_id, { previousSignal, dataPoints: 1 });
       }
     }
     // dataPoints 는 이번에 기록할 스냅샷까지 포함해야 calculateStatus 의 "2건 이상" 조건과 맞는다.
@@ -275,6 +285,26 @@ export class SupabasePipelineRepository {
    * 행이 없거나(마이그레이션 전) 조회에 실패해도 null만 반환한다 — 이 설정은 부가 기능이라
    * 읽기에 실패했다고 파이프라인 전체가 멈추면 안 된다. 호출부에서 기본값(Gemini)으로 대체한다.
    */
+  /**
+   * 해당 날짜·척도의 가장 최근 채점 시각. 없으면 null.
+   *
+   * 예약 실행이 두 개(90분 간격)라 둘 다 돌 수 있다. 채점은 멱등이지만 원본 전량 읽기(약 2.3MB)와
+   * 3분가량의 러너 시간을 쓰므로, 최근에 채점했으면 건너뛰는 판단에 쓴다(cli/process.ts).
+   */
+  async latestSnapshotAt(scoreDate: string, scoringVersion: string): Promise<Date | null> {
+    const { data, error } = await this.client
+      .from("trend_scores")
+      .select("calculated_at")
+      .eq("score_date", scoreDate)
+      .eq("scoring_version", scoringVersion)
+      .order("calculated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error || !data || typeof data.calculated_at !== "string") return null;
+    const at = new Date(data.calculated_at);
+    return Number.isNaN(at.getTime()) ? null : at;
+  }
+
   async loadAppSetting(key: string): Promise<unknown> {
     const { data, error } = await this.client.from("app_settings").select("value").eq("key", key).maybeSingle();
     if (error || !data) return null;

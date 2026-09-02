@@ -15,6 +15,9 @@ import type { SourceCode } from "@ai-trend-radar/types";
  * 때문이다. 그래서 절대 수치가 아니라 "같은 채널 안에서 얼마나 상위인가"로 환산한다.
  * 이러면 채널별 분포가 달라져도 재보정이 필요 없고, 새 채널을 붙여도 규칙이 그대로 성립한다.
  */
+/** 이 개수 이상이면 채널 1위가 백분위 1.0(상한)에 닿게 한다. 그 미만은 보수적으로 n 으로 나눈다. */
+export const MIN_SAMPLES_FOR_FULL_RANGE = 10;
+
 export class EngagementPercentiles {
   /** 채널별 지표값 오름차순 목록. */
   private readonly sorted = new Map<SourceCode, number[]>();
@@ -38,6 +41,11 @@ export class EngagementPercentiles {
   /**
    * 해당 채널 안에서 value 보다 작은 표본의 비율(0~1). 표본이 없으면 판단할 근거가 없으므로 0.
    * 값이 0 이하면(반응 없음) 0을 돌려 velocity 를 주지 않는다.
+   *
+   * 분모는 표본이 충분하면 n-1 이다. n 으로 나누면 최댓값이 (n-1)/n 이라 채널의 1위조차 상한에
+   * 닿지 못하고, 표본이 적은 채널일수록 손해가 커진다(표본 5개면 1위가 0.8 → 제곱 후 상한의 64%).
+   * 표본이 적을 때(MIN_SAMPLES_FOR_FULL_RANGE 미만)는 반대로 보수적으로 n 을 쓴다 — 항목 몇 개짜리
+   * 채널의 1위가 다른 채널 최상위와 같은 velocity 를 받으면 안 되기 때문이다.
    */
   rank(source: SourceCode, value: number): number {
     if (!Number.isFinite(value) || value <= 0) return 0;
@@ -52,7 +60,8 @@ export class EngagementPercentiles {
       if ((values[mid] as number) < value) low = mid + 1;
       else high = mid;
     }
-    return low / values.length;
+    const denominator = values.length >= MIN_SAMPLES_FOR_FULL_RANGE ? values.length - 1 : values.length;
+    return Math.min(1, low / denominator);
   }
 }
 

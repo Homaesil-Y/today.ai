@@ -8,7 +8,7 @@
  * 실행: pnpm --filter @ai-trend-radar/pipeline exec tsx src/cli/simulate-decay.ts
  */
 import { loadWorkspaceEnvironment } from "@ai-trend-radar/collectors";
-import { calculateStatus } from "@ai-trend-radar/scoring";
+import { calculateStatus, engagementSignal } from "@ai-trend-radar/scoring";
 import { extractEntityCandidate } from "../candidate";
 import { ScoreDistributions } from "../engagement-percentile";
 import { calculateInitialTrendScore, commentValue, engagementValue } from "../initial-score";
@@ -22,7 +22,9 @@ const rawItems = await repository.loadRawItems();
 const candidates = rawItems.map(extractEntityCandidate).filter((c): c is EntityCandidate => c !== null);
 
 function scoreAt(at: Date) {
-  const usable = candidates.filter((c) => new Date(c.rawItem.collected_at) <= at);
+  // 게시 시각(불변) 기준으로 "그 시점에 존재했던 항목"을 고른다. collected_at 으로 거르면 재수집된
+  // (= 가장 뜨거운) 항목이 과거 시점에서 빠져 상승·정점이 과소평가된다(backfill-score-history.ts 참고).
+  const usable = candidates.filter((c) => new Date(c.firstDetectedAt) <= at);
   const distributions = new ScoreDistributions(usable.map((c) => ({ source: c.source, engagement: engagementValue(c), comments: commentValue(c) })));
   const grouped = new Map<string, EntityCandidate[]>();
   for (const c of usable) {
@@ -31,11 +33,15 @@ function scoreAt(at: Date) {
     const list = grouped.get(entity.id);
     if (list) list.push(c); else grouped.set(entity.id, [c]);
   }
-  const scores = new Map<string, { total: number; ageHours: number }>();
+  const scores = new Map<string, { total: number; signal: number; ageHours: number }>();
   for (const [id, cands] of grouped) {
     const result = calculateInitialTrendScore(cands, at, distributions);
     const firstDetected = Math.min(...cands.map((c) => new Date(c.firstDetectedAt).getTime()));
-    scores.set(id, { total: result.totalScore, ageHours: Math.max(0, (at.getTime() - firstDetected) / 3_600_000) });
+    scores.set(id, {
+      total: result.totalScore,
+      signal: engagementSignal(result.breakdown),
+      ageHours: Math.max(0, (at.getTime() - firstDetected) / 3_600_000),
+    });
   }
   return scores;
 }
@@ -48,11 +54,11 @@ const statusCounts: Record<string, number> = {};
 const deltas: number[] = [];
 for (const [id, s] of today) {
   const prev = prior.get(id);
+  // 상태는 총점이 아니라 반응 신호의 변화로 판정한다(scoring 의 engagementSignal 참고).
   const status = calculateStatus({
     firstDetectedHours: s.ageHours,
-    velocityDelta: prev ? s.total - prev.total : 0,
-    score: s.total,
-    previousScore: prev?.total ?? s.total,
+    signal: s.signal,
+    previousSignal: prev?.signal ?? s.signal,
     dataPoints: prev ? 2 : 1,
   });
   statusCounts[status] = (statusCounts[status] ?? 0) + 1;

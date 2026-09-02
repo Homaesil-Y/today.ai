@@ -154,7 +154,10 @@ const loadPublishedTrends = unstable_cache(async (_bucket: number): Promise<Tren
   // 순위 변동(▲▼): 스냅샷이 2개 이상 쌓인 엔티티들만 대상으로 현재 점수 순위와 직전 스냅샷 점수 순위를 비교한다.
   // 이력이 부족한 엔티티는 0(“—”/“초기 집계”)으로 두어 데이터가 없을 때 가짜 변동을 보이지 않는다.
   const rankChangeByEntity = new Map<string, number>();
-  const eligible = [...scoreHistoryByEntity.entries()].filter(([, list]) => list.length >= 2);
+  // 순위 대상만 놓고 비교한다. 제외 엔티티까지 넣으면 "▲3"이 화면의 순위 번호(순위 대상만 매김)와
+  // 어긋난 칸수를 가리킨다.
+  const eligible = [...scoreHistoryByEntity.entries()]
+    .filter(([id, list]) => list.length >= 2 && (scores.get(id)?.ranked ?? true));
   if (eligible.length >= 2) {
     const currentRank = new Map<string, number>();
     const previousRank = new Map<string, number>();
