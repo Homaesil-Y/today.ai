@@ -1,6 +1,8 @@
 import { loadWorkspaceEnvironment } from "@ai-trend-radar/collectors";
+import { TREND_ANALYSIS_PROMPT_VERSION } from "@ai-trend-radar/llm";
 import { createClient } from "@supabase/supabase-js";
 import { BOOTSTRAP_SCORING_VERSION } from "../initial-score";
+import { REANALYSIS_INTERVAL_HOURS } from "../runner";
 
 const env = loadWorkspaceEnvironment();
 const url = env.NEXT_PUBLIC_SUPABASE_URL;
@@ -71,6 +73,26 @@ const rankedResult = await client
   .eq("ranked", true);
 if (rankedResult.error) throw new Error(`Failed to count ranked: ${rankedResult.error.message}`);
 
+/**
+ * 분석 백로그 — 실행 결과가 success 여도 여기서 막혀 있으면 상세 페이지 내용이 낡는다.
+ *
+ * 2026-09-15 에 실제로 놓친 것: 실행은 전부 success 인데 Gemini 무료 한도(분당 15회)에 매번 걸려
+ * 실행마다 50건 상한을 못 채우고, 재분석 대기가 573 → 663 으로 늘고 있었다. 오류가 파이프라인
+ * 결과의 analysisErrors 로 삼켜져 실행 결론에는 드러나지 않았다. 그래서 여기서 대기열을 세어
+ * 매 실행 로그에 남긴다 — 하루 16회 실행이므로 로그 자체가 추세 기록이 된다.
+ */
+const staleBefore = new Date(Date.now() - REANALYSIS_INTERVAL_HOURS * 3_600_000).toISOString();
+const publicCount = await client.from("entities").select("id", { count: "exact", head: true }).eq("visibility", "public");
+const analyzedFresh = await client
+  .from("ai_analyses")
+  .select("entity_id", { count: "exact", head: true })
+  .eq("prompt_version", TREND_ANALYSIS_PROMPT_VERSION)
+  .gte("generated_at", staleBefore);
+const unanalyzedReview = await client
+  .from("entities")
+  .select("id, ai_analyses(id)", { count: "exact", head: true })
+  .eq("visibility", "review");
+
 const totalToday = Object.values(todayScores).reduce((sum, value) => sum + value, 0);
 process.stdout.write(`${JSON.stringify({
   ...counts,
@@ -81,5 +103,15 @@ process.stdout.write(`${JSON.stringify({
     ranked: rankedResult.count ?? 0,
     unranked: totalToday - (rankedResult.count ?? 0),
     status: todayScores,
+  },
+  // 분석이 따라잡고 있는지. freshAnalyses 가 publicEntities 에 한참 못 미치면 백로그가 쌓이는 중이다.
+  analysisBacklog: {
+    promptVersion: TREND_ANALYSIS_PROMPT_VERSION,
+    publicEntities: publicCount.count ?? 0,
+    freshAnalysesInWindow: analyzedFresh.count ?? 0,
+    windowHours: REANALYSIS_INTERVAL_HOURS,
+    reviewCandidates: unanalyzedReview.count ?? 0,
+    // 재분석 주기(runner.ts 의 REANALYSIS_INTERVAL_HOURS) 안에 분석된 비율. 100%에 가까울수록 건강하다.
+    coveragePercent: publicCount.count ? Math.round(((analyzedFresh.count ?? 0) / publicCount.count) * 100) : 0,
   },
 }, null, 2)}\n`);

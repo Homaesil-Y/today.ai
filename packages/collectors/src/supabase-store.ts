@@ -1,6 +1,7 @@
 import type { CollectorResult, RawItem, SourceCode } from "@ai-trend-radar/types";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { withRetry } from "./retry";
 
 const sourceRowSchema = z.object({ id: z.uuid() });
 const existingRawItemSchema = z.object({ source_item_id: z.string() });
@@ -51,8 +52,40 @@ export function toRawItemRows(sourceId: string, items: RawItem[]) {
   }));
 }
 
+/**
+ * 다시 시도하면 결과가 달라질 수 있는 Supabase 실패인지 판단한다.
+ *
+ * pipeline 의 isRetryableSupabaseFailure 와 같은 규칙이다. 패키지 의존 방향(collectors →
+ * pipeline)이 없어 여기서 한 번 더 정의한다 — 규칙을 바꾸면 양쪽을 함께 고친다.
+ */
+export function isRetryableStorageFailure(message: string): boolean {
+  return /fetch failed|network|socket hang up|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EPIPE|EAI_AGAIN|UND_ERR|timeout|gateway|too many connections|\b50[234]\b/iu.test(message);
+}
+
 export class SupabaseCollectorStore {
   private readonly client: SupabaseClient;
+
+  /**
+   * Supabase 왕복 한 번을 일시적 실패에 대해 재시도한다.
+   *
+   * 2026-09-12·13 수집 실행 2건이 여기서 죽었다. GitHub·HN·PH 수집은 성공했는데 raw_items
+   * 저장이 504 Gateway Timeout 을 받았고, 재시도가 없어 채널 하나가 통째로 실패 처리됐다.
+   * 이 저장은 전부 onConflict upsert 이거나 id 지정 update 라 멱등이므로 재시도가 안전하다.
+   */
+  private async request<T>(
+    operation: string,
+    build: () => PromiseLike<{ data: T | null; error: { message: string } | null }>,
+  ): Promise<T | null> {
+    return withRetry(async () => {
+      const { data, error } = await build();
+      if (error) throw new CollectorStorageError(error.message, operation);
+      return data;
+    }, {
+      attempts: 3,
+      baseDelayMs: 500,
+      shouldRetry: (error) => error instanceof CollectorStorageError && isRetryableStorageFailure(error.message),
+    });
+  }
 
   constructor(config: SupabaseCollectorStoreConfig) {
     if (!config.url.trim() || !config.secretKey.trim()) {
@@ -83,16 +116,15 @@ export class SupabaseCollectorStore {
     const rows = toRawItemRows(sourceId, result.items);
 
     if (rows.length > 0) {
-      const { error } = await this.client
+      await this.request("upsert_raw_items", () => this.client
         .from("raw_items")
-        .upsert(rows, { onConflict: "source_id,source_item_id" });
-      if (error) throw new CollectorStorageError(error.message, "upsert_raw_items");
+        .upsert(rows, { onConflict: "source_id,source_item_id" }));
     }
 
     const insertedCount = sourceItemIds.filter((id) => !existing.has(id)).length;
     const updatedCount = sourceItemIds.length - insertedCount;
     const status = result.warnings.length > 0 ? "partial" as const : "succeeded" as const;
-    const { error: runError } = await this.client.from("collector_runs").insert({
+    await this.request("insert_collector_run", () => this.client.from("collector_runs").insert({
       source_id: sourceId,
       started_at: result.startedAt,
       finished_at: result.finishedAt,
@@ -104,14 +136,12 @@ export class SupabaseCollectorStore {
       api_calls: 1,
       rate_limit_remaining: result.rateLimit?.remaining ?? null,
       error_log_json: result.warnings,
-    });
-    if (runError) throw new CollectorStorageError(runError.message, "insert_collector_run");
+    }));
 
-    const { error: sourceError } = await this.client
+    await this.request("update_source", () => this.client
       .from("sources")
       .update({ last_collected_at: result.finishedAt, updated_at: result.finishedAt })
-      .eq("id", sourceId);
-    if (sourceError) throw new CollectorStorageError(sourceError.message, "update_source");
+      .eq("id", sourceId));
 
     return {
       source: result.source,
@@ -139,22 +169,20 @@ export class SupabaseCollectorStore {
   }
 
   private async getSourceId(source: SourceCode) {
-    const { data, error } = await this.client
+    const data = await this.request("select_source", () => this.client
       .from("sources")
       .select("id")
       .eq("code", source)
-      .single();
-    if (error) throw new CollectorStorageError(error.message, "select_source");
+      .single());
     return sourceRowSchema.parse(data).id;
   }
 
   private async getExistingSourceItemIds(sourceId: string, ids: string[]) {
-    const { data, error } = await this.client
+    const data = await this.request("select_existing_raw_items", () => this.client
       .from("raw_items")
       .select("source_item_id")
       .eq("source_id", sourceId)
-      .in("source_item_id", ids);
-    if (error) throw new CollectorStorageError(error.message, "select_existing_raw_items");
+      .in("source_item_id", ids));
     const parsed = z.array(existingRawItemSchema).parse(data ?? []);
     return new Set(parsed.map((row) => row.source_item_id));
   }

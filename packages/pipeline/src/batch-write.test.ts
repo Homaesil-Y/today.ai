@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { chunkRows, dedupeByKey, DEFAULT_BATCH_ROWS } from "./batch-write";
-import { describeSupabaseError, isRetryableWriteFailure } from "./repository";
+import { describeSupabaseError, isRetryableSupabaseFailure } from "./repository";
 
 describe("chunkRows", () => {
   it("빈 배열은 요청을 만들지 않는다", () => {
@@ -62,7 +62,7 @@ describe("dedupeByKey", () => {
   });
 });
 
-describe("isRetryableWriteFailure", () => {
+describe("isRetryableSupabaseFailure", () => {
   /**
    * 2026-08-25 07:11Z 실행을 죽인 실제 메시지. postgrest-js 는 POST·PATCH 를 비멱등으로 보고
    * 재시도하지 않는데, 이 파이프라인의 쓰기는 전부 onConflict upsert 라 멱등이다.
@@ -77,7 +77,7 @@ describe("isRetryableWriteFailure", () => {
     "remaining connection slots are reserved / too many connections",
     "503 Service Unavailable",
   ])("일시적 실패로 본다: %s", (message) => {
-    expect(isRetryableWriteFailure(message)).toBe(true);
+    expect(isRetryableSupabaseFailure(message)).toBe(true);
   });
 
   /** 재시도해도 결과가 같은 오류는 즉시 포기해야 한다 — 안 그러면 같은 실패를 3배로 기다린다. */
@@ -88,7 +88,7 @@ describe("isRetryableWriteFailure", () => {
     'invalid input syntax for type uuid: "nope"',
     "ON CONFLICT DO UPDATE command cannot affect row a second time",
   ])("영구 실패로 본다: %s", (message) => {
-    expect(isRetryableWriteFailure(message)).toBe(false);
+    expect(isRetryableSupabaseFailure(message)).toBe(false);
   });
 });
 
@@ -120,5 +120,25 @@ describe("describeSupabaseError", () => {
   it("부가 정보가 없으면 메시지만 남긴다", () => {
     expect(describeSupabaseError({ message: "boom" })).toBe("boom");
     expect(describeSupabaseError({ message: "boom", code: null, details: null, hint: null })).toBe("boom");
+  });
+});
+
+describe("isRetryableSupabaseFailure — 504 회귀", () => {
+  /**
+   * 2026-09-12~13 실행 5건을 죽인 실제 메시지. postgrest-js 의 재시도 대상 상태코드는
+   * `[520, 503]` 뿐이라 504 는 읽기에서도 재시도되지 않는다 — 그래서 우리가 직접 판정한다.
+   */
+  it.each([
+    "Gateway Timeout",
+    "gateway timeout",
+    "504 Gateway Timeout",
+  ])("Supabase 504 를 일시적 실패로 본다: %s", (message) => {
+    expect(isRetryableSupabaseFailure(message)).toBe(true);
+  });
+
+  /** 읽기에서도 같은 판정을 써야 한다. 쓰기 전용으로 읽히던 옛 이름이 배선을 좁혔다. */
+  it("읽기·쓰기 구분 없이 같은 판정을 쓴다", () => {
+    expect(isRetryableSupabaseFailure("TypeError: fetch failed")).toBe(true);
+    expect(isRetryableSupabaseFailure('duplicate key value violates unique constraint')).toBe(false);
   });
 });

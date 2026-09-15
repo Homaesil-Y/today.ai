@@ -25,6 +25,24 @@ export function toEvidenceExcerpt(body: string | null, fallback: string) {
 
 const sleep = (ms: number) => new Promise<void>((resolve) => { setTimeout(resolve, ms); });
 
+/**
+ * 재분석 주기(시간). verify:live 의 백로그 지표도 이 값을 기준으로 삼는다.
+ */
+export const REANALYSIS_INTERVAL_HOURS = 120;
+
+/**
+ * 분석 요청 사이 최소 간격(ms).
+ *
+ * Gemini 무료 등급은 분당 15회다(`generate_content_free_tier_requests, limit: 15`). 예전엔 간격
+ * 없이 최대한 빨리 쏘다가 한도에 부딪히면 서버가 알려준 만큼(30~55초) 기다렸다. 2026-09-15 실측:
+ * 실행마다 rateLimitWaitedMs 가 54초였고 상한 50건을 못 채워 39~46건에서 끝났다.
+ *
+ * 4.2초 간격이면 분당 14.3회로 한도 아래에 머물러 대기가 발생하지 않는다. 상한 50건을 다 채워도
+ * 210초라 분석 예산(11분) 안에 넉넉히 들어간다. 한도에 부딪힌 뒤 기다리는 기존 경로는 그대로
+ * 남겨둔다 — 다른 워크플로와 겹쳐 실행되는 등 예측 못 한 상황의 안전망이다.
+ */
+export const ANALYSIS_MIN_INTERVAL_MS = 4_200;
+
 function toEvidence(group: ProcessedGroup, now: Date): TrendEvidence {
   // 스키마 상한(<=20)에 맞춰 자른다. mention이 많은 엔티티는 dedup 후에도 20개를 넘을 수 있어
   // 자르지 않으면 분석 입력 검증이 매번 실패해 해당 후보가 영영 분석되지 않는다.
@@ -140,9 +158,14 @@ export async function runEntityPipeline(options: {
     const limit = Math.max(0, options.analysisLimit ?? 50);
     // 재분석 주기. 24시간이었을 때는 공개 엔티티 수(458건, 하루 +20~26 증가)만큼이 매일 대기열로
     // 되돌아와 자연 처리량(하루 76~145건)으로는 영구히 따라잡을 수 없었다. 재분석이 갱신하는 건
-    // 상세 페이지의 요약·인사이트 텍스트뿐이고 순위·점수는 LLM 없이 매 실행 갱신되므로, 72시간이면
-    // 제품상 충분하면서 필요 처리량(~153건/일)이 처리 능력 범위에 들어온다.
-    const staleThreshold = now.getTime() - 72 * 3_600_000;
+    // 상세 페이지의 요약·인사이트 텍스트뿐이고 순위·점수는 LLM 없이 매 실행 갱신된다.
+    //
+    // 72시간이던 것을 120시간으로 늘린다. 엔티티가 458 → 1,168건으로 늘면서 72시간 주기의 필요
+    // 처리량이 하루 390건이 됐는데, 분석 실행은 하루 8회(cron 47 */3)이고 실행당 상한이 50건이라
+    // 능력은 하루 400건이다. 여유가 없어 백로그가 쌓였고 2026-09-15 실측으로 최근 72시간 안에
+    // 분석된 공개 엔티티가 1,168건 중 503건(43%)뿐이었다. 120시간이면 필요 처리량이 하루 234건으로
+    // 내려가 실제 여유가 생기고 밀린 분량도 소진된다.
+    const staleThreshold = now.getTime() - REANALYSIS_INTERVAL_HOURS * 3_600_000;
     const latestAnalysisAt = await options.repository.loadLatestAnalysisAt(
       processed.map((group) => group.entity.id),
       TREND_ANALYSIS_PROMPT_VERSION,
@@ -168,6 +191,7 @@ export async function runEntityPipeline(options: {
     const deadlineMs = options.analysisDeadline?.getTime() ?? Number.POSITIVE_INFINITY;
     const remainingMs = () => deadlineMs - Date.now();
 
+    let lastRequestAt = 0;
     for (const group of queue.pending) {
       // 마감을 넘겼으면 남은 후보는 다음 주기에 맡긴다. 여기서 멈춰야 자동 승인이 실행된다.
       if (remainingMs() <= 0) {
@@ -175,6 +199,20 @@ export async function runEntityPipeline(options: {
         stoppedEarly = true;
         break;
       }
+      // 분당 한도 아래로 간격을 둔다(ANALYSIS_MIN_INTERVAL_MS 참고). 한도에 부딪힌 뒤 30~55초
+      // 기다리는 것보다 미리 4.2초씩 띄우는 쪽이 같은 예산에서 더 많이 처리한다.
+      const sinceLast = Date.now() - lastRequestAt;
+      if (lastRequestAt > 0 && sinceLast < ANALYSIS_MIN_INTERVAL_MS) {
+        const pause = ANALYSIS_MIN_INTERVAL_MS - sinceLast;
+        // 마감을 넘겨가며 기다리지는 않는다.
+        if (pause >= remainingMs()) {
+          analysisStoppedReason = "DEADLINE";
+          stoppedEarly = true;
+          break;
+        }
+        await sleep(pause);
+      }
+      lastRequestAt = Date.now();
       // 분당 한도에 걸리면 서버가 알려준 만큼 기다렸다 같은 후보를 한 번 더 시도한다.
       // 마감까지 기다릴 여유가 없으면 이번 실행을 끝내고 다음 주기에 맡긴다.
       let attempted = false;

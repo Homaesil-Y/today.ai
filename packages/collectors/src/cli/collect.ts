@@ -85,5 +85,26 @@ for (const job of jobs) {
   }
 }
 
-process.stdout.write(`${JSON.stringify({ mode, stored: Boolean(store), results: summaries }, null, 2)}\n`);
-if (failed) process.exitCode = 1;
+/**
+ * 채널 하나가 실패해도 나머지가 수집됐으면 성공으로 끝낸다.
+ *
+ * 예전엔 채널 하나라도 실패하면 exitCode 1 이었다. 2026-09-12·13 실행 2건이 그렇게 죽었는데,
+ * 로그를 보면 GitHub 저장만 504 로 실패하고 Hacker News·Product Hunt 는 수집·저장까지 정상
+ * 완료한 상태였다. 그런데도 수집 단계가 실패로 끝나 뒤따르는 점수 계산·표시명 정정·리포트·검증이
+ * 전부 건너뛰어졌다 — 데이터는 들어왔는데 그 데이터를 쓰는 단계가 통째로 사라진 셈이다.
+ *
+ * 채널은 서로 독립적이고 각 채널은 3시간 뒤 다음 주기에 다시 시도된다. 그래서 "하나라도
+ * 성공했으면 파이프라인을 계속 진행"이 맞다. 전 채널이 실패했을 때만(= 공통 원인이 있을 때만)
+ * 실행을 실패로 표시해 알림이 가게 한다.
+ */
+const succeededCount = summaries.filter((summary) => summary.error === undefined).length;
+const failedSources = summaries.filter((summary) => summary.error !== undefined).map((summary) => summary.source);
+process.stdout.write(`${JSON.stringify({
+  mode,
+  stored: Boolean(store),
+  succeededCount,
+  failedCount: failedSources.length,
+  failedSources,
+  results: summaries,
+}, null, 2)}\n`);
+if (failed && succeededCount === 0) process.exitCode = 1;

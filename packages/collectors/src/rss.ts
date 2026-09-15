@@ -102,6 +102,54 @@ export interface FetchNewsOptions {
   fetchImpl?: typeof fetch;
 }
 
+/**
+ * 피드가 HTTP 오류를 돌려줬을 때의 오류. 상태코드를 보존해 재시도 여부를 판단할 수 있게 한다.
+ *
+ * 예전엔 `new Error("VentureBeat HTTP 429")` 처럼 문자열로만 던져서, 재시도 정책이 429(잠시 뒤
+ * 풀림)와 404(영원히 안 풀림)를 구분하지 못했다. 게다가 기본 백오프가 250·500ms 라 429 는 세 번
+ * 모두 같은 응답을 받고 끝났다 — 2026-09-15 뉴스 실행에서 VentureBeat 가 매번 누락된 이유다.
+ */
+export class FeedHttpError extends Error {
+  constructor(readonly source: string, readonly status: number, readonly retryAfter: string | null) {
+    super(`${source} HTTP ${status}`);
+    this.name = "FeedHttpError";
+  }
+
+  /** Retry-After 헤더가 지시한 대기(ms). 초 단위 숫자와 HTTP-date 를 모두 받는다. */
+  get retryAfterMs(): number | null {
+    if (!this.retryAfter) return null;
+    const seconds = Number(this.retryAfter);
+    if (Number.isFinite(seconds)) return Math.max(0, seconds * 1_000);
+    const at = Date.parse(this.retryAfter);
+    return Number.isNaN(at) ? null : Math.max(0, at - Date.now());
+  }
+}
+
+/** 429 는 기다리면 풀리므로 기본 백오프보다 넉넉히 잡는다. */
+const FEED_RETRY_BASE_MS = 5_000;
+
+/**
+ * 피드당 최대 시도 횟수.
+ *
+ * 2회다. 3회로 두면 지속 차단된 피드 하나가 5초+10초를 버리고, 피드는 순차로 가져오므로 그만큼
+ * 뒤 피드가 밀린다. 실측(2026-09-15) VentureBeat 는 브라우저 User-Agent 로도 429 를 돌려주고
+ * Retry-After 도 주지 않는다 — 요청 폭주가 아니라 소스 쪽의 지속 차단이라, 몇 번을 더 시도해도
+ * 같은 답이 온다. 진짜 일시적인 429·5xx 는 한 번의 재시도로 대부분 회복된다.
+ */
+const FEED_RETRY_ATTEMPTS = 2;
+
+/**
+ * 다시 시도할 가치가 있는 피드 오류인지.
+ *
+ * 429(요청 과다)와 5xx(서버 문제)만 재시도한다. 404·403 같은 영구 오류는 세 번 시도해도 같은
+ * 답이 오고 그만큼 다른 피드 수집이 늦어질 뿐이다.
+ */
+export function isRetryableFeedError(error: unknown): boolean {
+  if (error instanceof FeedHttpError) return error.status === 429 || error.status >= 500;
+  // 네트워크 계층 실패(fetch failed 등)는 재시도한다.
+  return true;
+}
+
 export async function fetchNewsFromFeeds(options: FetchNewsOptions = {}): Promise<{ items: RawNewsItem[]; warnings: string[] }> {
   const { now = new Date(), signal, feeds = NEWS_FEEDS, maxPerFeed = 12, fetchImpl = fetch } = options;
   const collected: RawNewsItem[] = [];
@@ -118,10 +166,20 @@ export async function fetchNewsFromFeeds(options: FetchNewsOptions = {}): Promis
             },
             ...(signal ? { signal } : {}),
           });
-          if (!response.ok) throw new Error(`${feed.source} HTTP ${response.status}`);
+          if (!response.ok) {
+            throw new FeedHttpError(feed.source, response.status, response.headers.get("retry-after"));
+          }
           return response.text();
         },
-        signal ? { signal } : {},
+        {
+          ...(signal ? { signal } : {}),
+          // 429 는 기본 백오프(250ms)로는 절대 풀리지 않는다. 서버가 Retry-After 를 주면 그만큼,
+          // 안 주면 고정 대기 후 다시 시도한다.
+          attempts: FEED_RETRY_ATTEMPTS,
+          baseDelayMs: FEED_RETRY_BASE_MS,
+          shouldRetry: isRetryableFeedError,
+          retryAfterMs: (error) => (error instanceof FeedHttpError ? error.retryAfterMs : null),
+        },
       );
       const parsed = parseFeed(xml, feed.source)
         .slice(0, maxPerFeed)

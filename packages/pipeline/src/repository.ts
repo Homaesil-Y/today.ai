@@ -119,18 +119,19 @@ export function describeSupabaseError(error: SupabaseErrorLike): string {
 }
 
 /**
- * 다시 시도하면 결과가 달라질 수 있는 실패인지 판단한다.
+ * 다시 시도하면 결과가 달라질 수 있는 실패인지 판단한다. 읽기·쓰기 모두에 쓴다.
  *
- * postgrest-js 는 GET·HEAD·OPTIONS 만 재시도한다(RETRYABLE_METHODS). POST·PATCH 는 일반적으로
- * 비멱등이라 라이브러리가 손대지 않는데, 이 파이프라인의 쓰기는 전부 onConflict 를 지정한 upsert
- * 이거나 id 지정 update 라 실제로는 멱등이다. 그래서 여기서 직접 재시도한다.
+ * postgrest-js 가 스스로 재시도하는 범위는 좁다. 메서드는 GET·HEAD·OPTIONS 만(RETRYABLE_METHODS),
+ * 상태코드는 `[520, 503]` 만이다(RETRYABLE_STATUS_CODES). 즉 **504 Gateway Timeout 은 읽기에서도
+ * 재시도되지 않는다.** 쓰기는 비멱등이라 아예 제외되는데, 이 프로젝트의 쓰기는 전부 onConflict
+ * upsert 이거나 id 지정 update 라 실제로는 멱등이다. 그래서 양쪽 다 여기서 직접 재시도한다.
  *
- * 2026-08-25 07:11Z 실행이 metric_snapshots upsert 한 건의 `fetch failed` 로 죽으면서, 남은
- * 후보의 점수 저장과 표시명 정정·리포트·검증 단계가 전부 건너뛰어졌다. 왕복 수천 회 중 한 번은
- * 실패할 수 있다고 보고 그 한 번이 실행 전체를 끝내지 않게 한다.
+ * 함수 이름이 한때 isRetryableWriteFailure 였다. 그 이름 때문에 2026-08-25 에 쓰기에만 배선하고
+ * 읽기를 빼놓았고, 2026-09-12~13 에 Supabase 가 504 를 간헐 반환하자 load_categories(응답 1.2KB,
+ * 평소 0.12초)·load_raw_items 한 번의 실패로 실행 5건이 통째로 죽었다. 이름이 배선 범위를 좁혔다.
  */
-export function isRetryableWriteFailure(message: string): boolean {
-  return /fetch failed|network|socket hang up|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EPIPE|EAI_AGAIN|UND_ERR|timeout|too many connections|\b50[234]\b/iu.test(message);
+export function isRetryableSupabaseFailure(message: string): boolean {
+  return /fetch failed|network|socket hang up|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EPIPE|EAI_AGAIN|UND_ERR|timeout|gateway|too many connections|\b50[234]\b/iu.test(message);
 }
 
 export class SupabasePipelineRepository {
@@ -173,6 +174,20 @@ export class SupabasePipelineRepository {
     operation: string,
     build: () => PromiseLike<{ data: T | null; error: SupabaseErrorLike | null }>,
   ): Promise<T | null> {
+    return this.request(operation, build);
+  }
+
+  /**
+   * Supabase 왕복 한 번을 일시적 실패에 대해 재시도하며 실행한다. 읽기·쓰기 공통이다.
+   *
+   * `build` 는 매 시도마다 쿼리를 새로 만들어야 한다 — Supabase 쿼리 빌더는 thenable 이라 한 번
+   * await 하면 재사용할 수 없다. 읽기도 여기를 거쳐야 한다: postgrest-js 는 504 를 재시도하지
+   * 않으므로(isRetryableSupabaseFailure 주석 참고) 읽기 역시 무방비다.
+   */
+  private async request<T>(
+    operation: string,
+    build: () => PromiseLike<{ data: T | null; error: SupabaseErrorLike | null }>,
+  ): Promise<T | null> {
     return withRetry(async () => {
       const { data, error } = await build();
       if (error) throw new PipelineRepositoryError(describeSupabaseError(error), operation);
@@ -180,8 +195,20 @@ export class SupabasePipelineRepository {
     }, {
       attempts: 3,
       baseDelayMs: 500,
-      shouldRetry: (error) => error instanceof PipelineRepositoryError && isRetryableWriteFailure(error.message),
+      shouldRetry: (error) => error instanceof PipelineRepositoryError && isRetryableSupabaseFailure(error.message),
     });
+  }
+
+  /**
+   * 페이지네이션 읽기 한 페이지를 재시도로 감싼다. readAllPages 의 fetchPage 에서 쓴다.
+   *
+   * 반환 타입이 배열이라 write() 와 달리 null 을 걸러준다 — 호출부가 `?? []` 를 반복하지 않게 한다.
+   */
+  private async readPage<Row>(
+    operation: string,
+    build: () => PromiseLike<{ data: Row[] | null; error: SupabaseErrorLike | null }>,
+  ): Promise<Row[]> {
+    return (await this.request(operation, build)) ?? [];
   }
 
   async initialize() {
@@ -189,28 +216,22 @@ export class SupabasePipelineRepository {
     // 그냥 select() 하면 1000건을 넘는 순간 뒷부분이 조용히 잘린다 — findEntity 가 기존
     // 엔티티를 못 찾아 같은 제품이 중복 생성되기 시작한다(현재 466건, 하루 +20~26건 증가라
     // 몇 주 안에 도달할 수순이었다).
-    const [sourcesResult, categoriesResult, entityRows] = await Promise.all([
-      this.client.from("sources").select("id,code"),
-      this.client.from("categories").select("id,slug,name").eq("enabled", true).order("sort_order"),
-      readAllPages(async (from, to) => {
-        const { data, error } = await this.client
-          .from("entities")
-          .select("id,name,slug,canonical_url,official_domain,github_url,description,category_id,pricing_type,is_open_source,visibility,first_detected_at,last_detected_at,source_codes,dismissed_as_stale_at")
-          .order("id")
-          .range(from, to);
-        if (error) throw new PipelineRepositoryError(error.message, "load_entities");
-        return data ?? [];
-      }),
+    const [sourceRows, categoryRows, entityRows] = await Promise.all([
+      this.request("load_sources", () => this.client.from("sources").select("id,code")),
+      this.request("load_categories", () => this.client.from("categories").select("id,slug,name").eq("enabled", true).order("sort_order")),
+      readAllPages((from, to) => this.readPage("load_entities", () => this.client
+        .from("entities")
+        .select("id,name,slug,canonical_url,official_domain,github_url,description,category_id,pricing_type,is_open_source,visibility,first_detected_at,last_detected_at,source_codes,dismissed_as_stale_at")
+        .order("id")
+        .range(from, to))),
     ]);
-    if (sourcesResult.error) throw new PipelineRepositoryError(sourcesResult.error.message, "load_sources");
-    if (categoriesResult.error) throw new PipelineRepositoryError(categoriesResult.error.message, "load_categories");
 
-    for (const source of z.array(sourceSchema).parse(sourcesResult.data ?? [])) {
+    for (const source of z.array(sourceSchema).parse(sourceRows ?? [])) {
       if (INGESTED_SOURCES.includes(source.code as IngestedSource)) {
         this.sourceIds.set(source.code as SourceCode, source.id);
       }
     }
-    for (const category of z.array(categorySchema).parse(categoriesResult.data ?? [])) {
+    for (const category of z.array(categorySchema).parse(categoryRows ?? [])) {
       this.categoryIds.set(category.slug, category.id);
       this.categoryTaxonomy.push({ slug: category.slug, label: category.name });
     }
@@ -245,7 +266,7 @@ export class SupabasePipelineRepository {
       const rows = await readAllPages(async (from, to) => {
         // 상태 판정은 총점이 아니라 반응 신호(engagementSignal)의 변화를 본다. 축 컬럼을 읽어
         // 직전 신호를 복원한다 — 총점에는 달력 축(novelty)이 섞여 있어 판정에 쓰면 안 된다.
-        const { data, error } = await this.client
+        return this.readPage("load_score_history", () => this.client
           .from("trend_scores")
           .select("entity_id,score_date,velocity_score,comments_score,product_growth_score,cross_source_score")
           .in("entity_id", chunk)
@@ -255,9 +276,7 @@ export class SupabasePipelineRepository {
           // 같은 날짜가 수백 행이라 정렬이 이것만으로는 전순서가 아니다. 페이지 경계에서 순서가
           // 흔들리면 행이 중복되거나 빠져 직전 점수를 잘못 고를 수 있으므로 고정 기준을 더한다.
           .order("entity_id", { ascending: true })
-          .range(from, to);
-        if (error) throw new PipelineRepositoryError(error.message, "load_score_history");
-        return data ?? [];
+          .range(from, to));
       });
 
       for (const row of rows) {
@@ -325,16 +344,12 @@ export class SupabasePipelineRepository {
     for (const source of INGESTED_SOURCES) {
       const sourceId = this.sourceIds.get(source);
       if (!sourceId) throw new PipelineRepositoryError(`source seed가 없습니다: ${source}`, "load_raw_items");
-      const rows = await readAllPages(async (from, to) => {
-        const { data, error } = await this.client
-          .from("raw_items")
-          .select("id,source_id,source_item_id,title,body,url,canonical_url,author_name,published_at,collected_at,raw_metrics_json,raw_payload_json")
-          .eq("source_id", sourceId)
-          .order("published_at", { ascending: false })
-          .range(from, to);
-        if (error) throw new PipelineRepositoryError(error.message, "load_raw_items");
-        return data ?? [];
-      });
+      const rows = await readAllPages((from, to) => this.readPage("load_raw_items", () => this.client
+        .from("raw_items")
+        .select("id,source_id,source_item_id,title,body,url,canonical_url,author_name,published_at,collected_at,raw_metrics_json,raw_payload_json")
+        .eq("source_id", sourceId)
+        .order("published_at", { ascending: false })
+        .range(from, to)));
       for (const row of rows) output.push(databaseRawItemSchema.parse({ ...row, source }));
     }
     return output;
@@ -460,15 +475,12 @@ export class SupabasePipelineRepository {
     if (entityIds.length === 0) return latest;
 
     for (const chunk of chunkForFilter(entityIds)) {
-      const rows = await readAllPages(async (from, to) => {
-        const { data, error } = await this.client.from("ai_analyses")
-          .select("entity_id,generated_at")
-          .in("entity_id", chunk)
-          .eq("prompt_version", promptVersion)
-          .range(from, to);
-        if (error) throw new PipelineRepositoryError(error.message, "load_latest_analysis");
-        return data ?? [];
-      });
+      const rows = await readAllPages((from, to) => this.readPage("load_latest_analysis", () => this.client
+        .from("ai_analyses")
+        .select("entity_id,generated_at")
+        .in("entity_id", chunk)
+        .eq("prompt_version", promptVersion)
+        .range(from, to)));
 
       for (const row of rows) {
         if (typeof row.entity_id !== "string" || typeof row.generated_at !== "string") continue;
@@ -483,7 +495,7 @@ export class SupabasePipelineRepository {
 
   async saveAnalysis(entityId: string, result: TrendAnalysisResult) {
     const { analysis } = result;
-    const { error } = await this.client.from("ai_analyses").insert({
+    await this.write("insert_analysis", () => this.client.from("ai_analyses").insert({
       entity_id: entityId,
       summary: analysis.summary,
       why_trending_json: analysis.whyTrending,
@@ -499,8 +511,7 @@ export class SupabasePipelineRepository {
       model_name: result.model,
       prompt_version: result.promptVersion,
       generated_at: result.generatedAt,
-    });
-    if (error) throw new PipelineRepositoryError(error.message, "insert_analysis");
+    }));
   }
 
   // 분류기에 넘길 현재 활성 카테고리 목록(slug+라벨). DB 기반이라 승인된 신규 카테고리도 포함된다.
@@ -512,11 +523,10 @@ export class SupabasePipelineRepository {
   async assignCategoryBySlug(entityId: string, slug: string): Promise<boolean> {
     const categoryId = this.categoryIds.get(slug);
     if (!categoryId) return false;
-    const { error } = await this.client
+    await this.write("assign_category", () => this.client
       .from("entities")
       .update({ category_id: categoryId, updated_at: new Date().toISOString() })
-      .eq("id", entityId);
-    if (error) throw new PipelineRepositoryError(error.message, "assign_category");
+      .eq("id", entityId));
     return true;
   }
 
@@ -526,25 +536,20 @@ export class SupabasePipelineRepository {
     // 1000번째 행 이후에 분석된 엔티티는 review 상태에서 조용히 빠져나오지 못했다(실측: review
     // 84건 중 16건이 이미 분석 완료 상태로 갇혀 있었다). review 후보 수는 분석 대기열 크기라
     // 훨씬 작고, 승인·48시간 정리로 계속 소진되므로 이 조회는 1000행 상한에 걸리지 않는다.
-    const { data: reviewRows, error: reviewError } = await this.client
+    const reviewRows = await this.request("load_review_candidates", () => this.client
       .from("entities")
       .select("id")
-      .eq("visibility", "review");
-    if (reviewError) throw new PipelineRepositoryError(reviewError.message, "load_review_candidates");
+      .eq("visibility", "review"));
     const reviewIds = (reviewRows ?? []).map((row) => row.id as string);
     if (reviewIds.length === 0) return 0;
 
     const analysisRows: Array<{ entity_id?: unknown }> = [];
     for (const chunk of chunkForFilter(reviewIds)) {
-      analysisRows.push(...await readAllPages(async (from, to) => {
-        const { data, error } = await this.client
-          .from("ai_analyses")
-          .select("entity_id")
-          .in("entity_id", chunk)
-          .range(from, to);
-        if (error) throw new PipelineRepositoryError(error.message, "load_analyzed_candidates");
-        return data ?? [];
-      }));
+      analysisRows.push(...await readAllPages((from, to) => this.readPage("load_analyzed_candidates", () => this.client
+        .from("ai_analyses")
+        .select("entity_id")
+        .in("entity_id", chunk)
+        .range(from, to))));
     }
 
     const entityIds = [...new Set(analysisRows.map((row) => row.entity_id).filter((id): id is string => typeof id === "string"))];
@@ -553,13 +558,12 @@ export class SupabasePipelineRepository {
     const approvedAt = new Date().toISOString();
     let approved = 0;
     for (const chunk of chunkForFilter(entityIds)) {
-      const { data, error } = await this.client
+      const data = await this.write("auto_approve_analyzed_candidates", () => this.client
         .from("entities")
         .update({ visibility: "public", updated_at: approvedAt })
         .in("id", chunk)
         .eq("visibility", "review")
-        .select("id");
-      if (error) throw new PipelineRepositoryError(error.message, "auto_approve_analyzed_candidates");
+        .select("id"));
       approved += data?.length ?? 0;
     }
     return approved;
