@@ -83,11 +83,17 @@ if (rankedResult.error) throw new Error(`Failed to count ranked: ${rankedResult.
  */
 const staleBefore = new Date(Date.now() - REANALYSIS_INTERVAL_HOURS * 3_600_000).toISOString();
 const publicCount = await client.from("entities").select("id", { count: "exact", head: true }).eq("visibility", "public");
+// 분자는 "재분석 주기 안에 최신 분석이 있는 공개 엔티티 수"다. 엔티티당 1행인 latest_ai_analyses 뷰를
+// 공개 엔티티와 inner join 해서 센다. 예전엔 ai_analyses 행을 셌는데, 주기 안에 두 번 분석된 엔티티를
+// 두 번 세고 비공개 엔티티까지 넣어 커버리지가 100%를 넘었다(2026-10-04 실측 103% — 실제 99.8%).
+// 재분석이 몰리는 시기엔 실제로는 밀려 있는데 100%로 보이게 만드는 오류라 고쳤다.
 const analyzedFresh = await client
-  .from("ai_analyses")
-  .select("entity_id", { count: "exact", head: true })
+  .from("latest_ai_analyses")
+  .select("entity_id, entities!inner(visibility)", { count: "exact", head: true })
+  .eq("entities.visibility", "public")
   .eq("prompt_version", TREND_ANALYSIS_PROMPT_VERSION)
   .gte("generated_at", staleBefore);
+if (analyzedFresh.error) throw new Error(`Failed to count fresh analyses: ${analyzedFresh.error.message}`);
 const unanalyzedReview = await client
   .from("entities")
   .select("id, ai_analyses(id)", { count: "exact", head: true })
@@ -112,6 +118,12 @@ process.stdout.write(`${JSON.stringify({
     windowHours: REANALYSIS_INTERVAL_HOURS,
     reviewCandidates: unanalyzedReview.count ?? 0,
     // 재분석 주기(runner.ts 의 REANALYSIS_INTERVAL_HOURS) 안에 분석된 비율. 100%에 가까울수록 건강하다.
-    coveragePercent: publicCount.count ? Math.round(((analyzedFresh.count ?? 0) / publicCount.count) * 100) : 0,
+    // 소수 첫째 자리까지 낸다 — 정수 반올림이면 99.6% 와 100% 가 구분되지 않는다.
+    coveragePercent: publicCount.count ? Math.round(((analyzedFresh.count ?? 0) / publicCount.count) * 1000) / 10 : 0,
+    // 분자는 분모의 부분집합이라 넘을 수 없다. 넘으면 집계 쿼리가 다시 틀어진 것이다(2026-09-15 에 만든
+    // 지표가 행 수를 세어 103% 가 나왔고, 3주 동안 아무도 몰랐다). 로그에서 눈에 띄도록 표시한다.
+    ...((analyzedFresh.count ?? 0) > (publicCount.count ?? 0)
+      ? { anomaly: "freshAnalysesInWindow > publicEntities — 커버리지 집계 쿼리를 확인하세요" }
+      : {}),
   },
 }, null, 2)}\n`);
