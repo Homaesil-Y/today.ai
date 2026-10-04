@@ -43,6 +43,24 @@ export const REANALYSIS_INTERVAL_HOURS = 120;
  */
 export const ANALYSIS_MIN_INTERVAL_MS = 4_200;
 
+/** 일시적 공급자 오류 후 같은 후보를 다시 시도하기 전 대기(ms). */
+export const UPSTREAM_RETRY_DELAY_MS = 5_000;
+
+/**
+ * 공급자 오류 뒤 같은 후보를 한 번 더 시도할지.
+ *
+ * UPSTREAM 이면서 retryable 인 것만(503 high demand·타임아웃·연결 실패). RATE_LIMIT 은 서버가 알려준
+ * 대기 시간을 따르는 별도 경로가 있고, AUTH·CONFIG·INVALID_OUTPUT 은 다시 해도 같다. 후보당 한 번만,
+ * 그리고 대기 후에도 예산이 남을 때만.
+ */
+export function planUpstreamRetry(params: { error: unknown; alreadyRetried: boolean; remainingMs: number }): boolean {
+  const { error, alreadyRetried, remainingMs } = params;
+  if (alreadyRetried) return false;
+  if (!(error instanceof LlmProviderError)) return false;
+  if (error.code !== "UPSTREAM" || !error.retryable) return false;
+  return remainingMs > UPSTREAM_RETRY_DELAY_MS + ANALYSIS_MIN_INTERVAL_MS;
+}
+
 function toEvidence(group: ProcessedGroup, now: Date): TrendEvidence {
   // 스키마 상한(<=20)에 맞춰 자른다. mention이 많은 엔티티는 dedup 후에도 20개를 넘을 수 있어
   // 자르지 않으면 분석 입력 검증이 매번 실패해 해당 후보가 영영 분석되지 않는다.
@@ -153,6 +171,7 @@ export async function runEntityPipeline(options: {
   // 이번 실행에서 분석에 성공한 엔티티 목록. 분석 후 한 번의 배치 호출로 카테고리를 재분류한다.
   const analyzedForCategory: { entityId: string; name: string; description: string }[] = [];
   let rateLimitWaitedMs = 0;
+  let upstreamRetries = 0;
   let stoppedEarly = false;
   if (options.analysisProvider) {
     const limit = Math.max(0, options.analysisLimit ?? 50);
@@ -216,6 +235,7 @@ export async function runEntityPipeline(options: {
       // 분당 한도에 걸리면 서버가 알려준 만큼 기다렸다 같은 후보를 한 번 더 시도한다.
       // 마감까지 기다릴 여유가 없으면 이번 실행을 끝내고 다음 주기에 맡긴다.
       let attempted = false;
+      let upstreamRetried = false;
       while (!attempted) {
         attempted = true;
         try {
@@ -225,6 +245,18 @@ export async function runEntityPipeline(options: {
           // 한국어 요약은 카테고리 분류에 좋은 신호라 분류 입력으로 쓴다.
           analyzedForCategory.push({ entityId: group.entity.id, name: group.entity.name, description: result.analysis.summary });
         } catch (error) {
+          // 공급자가 "다시 하면 될 수도 있다"고 표시한 일시 오류(Gemini 503 high demand·요청 타임아웃)는
+          // 같은 후보를 한 번 더 시도한다. 공급자는 retryable 플래그를 처음부터 붙여 왔는데 runner 가
+          // RATE_LIMIT 만 보고 나머지를 버렸다 — 2026-10-03~04 분석 실행에서 50건 중 5~21건이 이렇게
+          // 사라졌다(analysisErrors 로 삼켜져 실행은 success). 후보당 한 번만 재시도해, 모델이 계속
+          // 과부하면 예산을 다 태우지 않고 다음 후보로 넘어간다.
+          if (planUpstreamRetry({ error, alreadyRetried: upstreamRetried, remainingMs: remainingMs() })) {
+            upstreamRetried = true;
+            upstreamRetries += 1;
+            await sleep(UPSTREAM_RETRY_DELAY_MS);
+            attempted = false;
+            continue;
+          }
           analysisErrors.push({
             entity: group.entity.slug,
             error: error instanceof Error ? error.message : "Unknown analysis failure",
@@ -294,6 +326,8 @@ export async function runEntityPipeline(options: {
     lastRateLimitAt,
     // 분당 한도에 걸려 기다린 누적 시간. 0보다 크면 즉시 중단 대신 기다려서 더 처리했다는 뜻이다.
     rateLimitWaitedMs,
+    // 일시 오류(503 high demand·타임아웃)로 같은 후보를 다시 시도한 횟수.
+    upstreamRetries,
     analysisQueue,
     autoApproved,
     leaders: processed.slice(0, 10).map((group) => ({

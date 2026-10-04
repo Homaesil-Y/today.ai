@@ -10,7 +10,11 @@ export interface NewsFeed {
 // 엄선한 글로벌 AI 뉴스/공식 블로그 RSS·Atom 피드. 개별 피드 실패는 경고로 처리하고 계속 진행한다.
 export const NEWS_FEEDS: NewsFeed[] = [
   { source: "TechCrunch", url: "https://techcrunch.com/category/artificial-intelligence/feed/" },
-  { source: "VentureBeat", url: "https://venturebeat.com/category/ai/feed/" },
+  // VentureBeat 는 뺐다(2026-10-04). 9월 중순부터 모든 수집 실행에서 HTTP 429 였고(브라우저 User-Agent 로도
+  // 429, Retry-After 없음), 같은 사이트의 /feed/ 전체 피드도 429 다. FeedBurner 미러는 200 을 주지만
+  // 최신 항목이 2026-09-03 에 멈춘 캐시라, 쓰면 한 달 묵은 기사를 새 뉴스로 넣게 된다. 막혀 있는 동안
+  // 매 실행이 재시도에 5초를 쓰고 경고만 남겼다. 이미 저장된 VentureBeat 기사는 그대로 남는다.
+  // 다시 넣으려면 `curl -sI https://venturebeat.com/category/ai/feed/` 가 200 인지 먼저 확인한다.
   { source: "Ars Technica", url: "https://arstechnica.com/ai/feed/" },
   { source: "The Verge", url: "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml" },
   { source: "MIT Technology Review", url: "https://www.technologyreview.com/topic/artificial-intelligence/feed/" },

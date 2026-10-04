@@ -88,3 +88,22 @@ describe("withRetry — Retry-After 존중", () => {
     expect(attempts).toBe(1);
   });
 });
+
+describe("shouldRetryStorageError — 상태코드 우선", () => {
+  /** pipeline 과 같은 규칙. 2026-10-04 "Internal server error."(500)를 문구 판정이 놓쳤다. */
+  it("문구에 숫자가 없어도 500 이면 재시도한다", async () => {
+    const { CollectorStorageError, shouldRetryStorageError } = await import("./supabase-store");
+    expect(shouldRetryStorageError(new CollectorStorageError("Internal server error.", "upsert_raw_items", 500))).toBe(true);
+    expect(shouldRetryStorageError(new CollectorStorageError("timeout", "upsert_raw_items", 409))).toBe(false);
+    expect(shouldRetryStorageError(new CollectorStorageError("TypeError: fetch failed", "upsert_raw_items"))).toBe(true);
+  });
+});
+
+describe("NEWS_FEEDS", () => {
+  /** 9월 중순부터 전 클라이언트에 429, 미러는 9/3 에서 멈춘 캐시라 뺐다(rss.ts 주석 참고). */
+  it("막힌 VentureBeat 피드를 포함하지 않는다", async () => {
+    const { NEWS_FEEDS } = await import("./rss");
+    expect(NEWS_FEEDS.some((feed) => feed.source === "VentureBeat")).toBe(false);
+    expect(NEWS_FEEDS.length).toBeGreaterThanOrEqual(5);
+  });
+});

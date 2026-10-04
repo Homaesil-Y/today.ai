@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { chunkRows, dedupeByKey, DEFAULT_BATCH_ROWS } from "./batch-write";
-import { describeSupabaseError, isRetryableSupabaseFailure } from "./repository";
+import { describeSupabaseError, isRetryableSupabaseFailure, PipelineRepositoryError, shouldRetrySupabaseError } from "./repository";
 
 describe("chunkRows", () => {
   it("빈 배열은 요청을 만들지 않는다", () => {
@@ -140,5 +140,39 @@ describe("isRetryableSupabaseFailure — 504 회귀", () => {
   it("읽기·쓰기 구분 없이 같은 판정을 쓴다", () => {
     expect(isRetryableSupabaseFailure("TypeError: fetch failed")).toBe(true);
     expect(isRetryableSupabaseFailure('duplicate key value violates unique constraint')).toBe(false);
+  });
+});
+
+describe("shouldRetrySupabaseError — 상태코드 우선 판정", () => {
+  /**
+   * 2026-10-04 06:59Z 실행을 죽인 실제 오류: update_entity 에서 "Internal server error."(HTTP 500).
+   * 문구에 상태 숫자가 없어 메시지 정규식(`\b50[234]\b`)에 걸리지 않았고, 재시도 래퍼를 거쳤는데도
+   * 1회 만에 포기했다. 9/12~13 의 "Gateway Timeout"(504)과 같은 방식으로 뚫렸다.
+   */
+  it("문구에 숫자가 없어도 상태코드 500 이면 재시도한다", () => {
+    expect(shouldRetrySupabaseError(new PipelineRepositoryError("Internal server error.", "update_entity", 500))).toBe(true);
+  });
+
+  it.each([502, 503, 504, 520, 408, 429])("상태 %i 는 재시도한다", (status) => {
+    expect(shouldRetrySupabaseError(new PipelineRepositoryError("anything", "op", status))).toBe(true);
+  });
+
+  /** 4xx 는 문구가 무엇이든 재시도하지 않는다 — 제약 위반·권한·잘못된 컬럼은 다시 해도 같다. */
+  it.each([400, 401, 403, 404, 409, 422])("상태 %i 는 재시도하지 않는다", (status) => {
+    expect(shouldRetrySupabaseError(new PipelineRepositoryError("timeout-looking text", "op", status))).toBe(false);
+  });
+
+  it("상태코드가 없으면(응답 전 네트워크 실패) 메시지로 판정한다", () => {
+    expect(shouldRetrySupabaseError(new PipelineRepositoryError("TypeError: fetch failed", "op"))).toBe(true);
+    expect(shouldRetrySupabaseError(new PipelineRepositoryError("duplicate key value", "op"))).toBe(false);
+  });
+
+  it("메시지 판정도 숫자 없는 서버 오류 문구를 잡는다", () => {
+    expect(isRetryableSupabaseFailure("Internal server error.")).toBe(true);
+    expect(isRetryableSupabaseFailure("Service Unavailable")).toBe(true);
+  });
+
+  it("다른 종류의 오류는 재시도하지 않는다", () => {
+    expect(shouldRetrySupabaseError(new Error("Internal server error."))).toBe(false);
   });
 });

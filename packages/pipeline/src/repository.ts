@@ -93,10 +93,31 @@ export interface BootstrapScoreRecord {
 }
 
 export class PipelineRepositoryError extends Error {
-  constructor(message: string, readonly operation: string) {
+  /**
+   * @param status Supabase 응답의 HTTP 상태코드. 네트워크 계층 실패처럼 응답이 없으면 undefined.
+   *   재시도 판정은 메시지 문구가 아니라 이 값을 우선 본다(isRetryableSupabaseStatus 참고).
+   */
+  constructor(message: string, readonly operation: string, readonly status?: number) {
     super(message);
     this.name = "PipelineRepositoryError";
   }
+}
+
+/**
+ * HTTP 상태코드로 Supabase 실패의 재시도 여부를 판정한다. 응답이 없었으면(undefined) null.
+ *
+ * 메시지 문구로 판정하던 방식이 두 번 뚫렸다. 2026-09-12~13 에는 "Gateway Timeout"(504)이, 그 문구를
+ * 정규식에 추가한 뒤인 2026-10-04 에는 "Internal server error."(500)가 빠져나가 실행을 죽였다 — 둘 다
+ * 문구에 상태 숫자가 없어 `\b50[234]\b` 에 걸리지 않았다. 서버 쪽 오류 문구는 계층(Cloudflare·Kong·
+ * PostgREST)마다 다르고 예고 없이 바뀌므로 목록을 늘리는 방식은 끝이 없다. 상태코드는 그렇지 않다.
+ *
+ * 5xx·408·429 는 재시도한다. 이 파이프라인의 쓰기는 전부 onConflict upsert 이거나 id 지정 update 라
+ * 멱등이므로, 결정적인 500 이었더라도 세 번 시도 후 같은 오류를 던질 뿐 데이터가 꼬이지 않는다.
+ * 4xx(제약 위반·권한·잘못된 컬럼)는 다시 해도 같으므로 즉시 포기한다.
+ */
+export function isRetryableSupabaseStatus(status: number | undefined): boolean | null {
+  if (status === undefined || status === 0) return null;
+  return status >= 500 || status === 408 || status === 429;
 }
 
 /** Supabase 가 돌려주는 오류 객체. 네트워크 실패도 throw 대신 이 모양으로 온다. */
@@ -131,7 +152,15 @@ export function describeSupabaseError(error: SupabaseErrorLike): string {
  * 평소 0.12초)·load_raw_items 한 번의 실패로 실행 5건이 통째로 죽었다. 이름이 배선 범위를 좁혔다.
  */
 export function isRetryableSupabaseFailure(message: string): boolean {
-  return /fetch failed|network|socket hang up|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EPIPE|EAI_AGAIN|UND_ERR|timeout|gateway|too many connections|\b50[234]\b/iu.test(message);
+  return /fetch failed|network|socket hang up|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EPIPE|EAI_AGAIN|UND_ERR|timeout|gateway|internal server error|service unavailable|too many connections|\b50\d\b/iu.test(message);
+}
+
+/**
+ * withRetry 의 shouldRetry. 상태코드가 있으면 그것으로, 없으면(응답 전 네트워크 실패) 메시지로 판정한다.
+ */
+export function shouldRetrySupabaseError(error: unknown): boolean {
+  if (!(error instanceof PipelineRepositoryError)) return false;
+  return isRetryableSupabaseStatus(error.status) ?? isRetryableSupabaseFailure(error.message);
 }
 
 export class SupabasePipelineRepository {
@@ -186,16 +215,16 @@ export class SupabasePipelineRepository {
    */
   private async request<T>(
     operation: string,
-    build: () => PromiseLike<{ data: T | null; error: SupabaseErrorLike | null }>,
+    build: () => PromiseLike<{ data: T | null; error: SupabaseErrorLike | null; status?: number }>,
   ): Promise<T | null> {
     return withRetry(async () => {
-      const { data, error } = await build();
-      if (error) throw new PipelineRepositoryError(describeSupabaseError(error), operation);
+      const { data, error, status } = await build();
+      if (error) throw new PipelineRepositoryError(describeSupabaseError(error), operation, status);
       return data;
     }, {
       attempts: 3,
       baseDelayMs: 500,
-      shouldRetry: (error) => error instanceof PipelineRepositoryError && isRetryableSupabaseFailure(error.message),
+      shouldRetry: shouldRetrySupabaseError,
     });
   }
 

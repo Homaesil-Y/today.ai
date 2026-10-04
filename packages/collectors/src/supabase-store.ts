@@ -21,7 +21,8 @@ export interface SupabaseCollectorStoreConfig {
 }
 
 export class CollectorStorageError extends Error {
-  constructor(message: string, readonly operation: string) {
+  /** status: Supabase 응답의 HTTP 상태코드. 응답이 없었으면 undefined. 재시도 판정이 우선 본다. */
+  constructor(message: string, readonly operation: string, readonly status?: number) {
     super(message);
     this.name = "CollectorStorageError";
   }
@@ -59,7 +60,20 @@ export function toRawItemRows(sourceId: string, items: RawItem[]) {
  * pipeline)이 없어 여기서 한 번 더 정의한다 — 규칙을 바꾸면 양쪽을 함께 고친다.
  */
 export function isRetryableStorageFailure(message: string): boolean {
-  return /fetch failed|network|socket hang up|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EPIPE|EAI_AGAIN|UND_ERR|timeout|gateway|too many connections|\b50[234]\b/iu.test(message);
+  return /fetch failed|network|socket hang up|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EPIPE|EAI_AGAIN|UND_ERR|timeout|gateway|internal server error|service unavailable|too many connections|\b50\d\b/iu.test(message);
+}
+
+/**
+ * 상태코드가 있으면 그것으로(5xx·408·429 재시도), 없으면 메시지로 판정한다.
+ *
+ * 메시지 문구 판정은 2026-10-04 에 "Internal server error."(500)를 놓쳤다 — 문구에 상태 숫자가 없었다.
+ * pipeline 의 shouldRetrySupabaseError 와 같은 규칙이다(패키지 의존 방향 때문에 따로 둔다).
+ */
+export function shouldRetryStorageError(error: unknown): boolean {
+  if (!(error instanceof CollectorStorageError)) return false;
+  const { status } = error;
+  if (status !== undefined && status !== 0) return status >= 500 || status === 408 || status === 429;
+  return isRetryableStorageFailure(error.message);
 }
 
 export class SupabaseCollectorStore {
@@ -74,16 +88,16 @@ export class SupabaseCollectorStore {
    */
   private async request<T>(
     operation: string,
-    build: () => PromiseLike<{ data: T | null; error: { message: string } | null }>,
+    build: () => PromiseLike<{ data: T | null; error: { message: string } | null; status?: number }>,
   ): Promise<T | null> {
     return withRetry(async () => {
-      const { data, error } = await build();
-      if (error) throw new CollectorStorageError(error.message, operation);
+      const { data, error, status } = await build();
+      if (error) throw new CollectorStorageError(error.message, operation, status);
       return data;
     }, {
       attempts: 3,
       baseDelayMs: 500,
-      shouldRetry: (error) => error instanceof CollectorStorageError && isRetryableStorageFailure(error.message),
+      shouldRetry: shouldRetryStorageError,
     });
   }
 
