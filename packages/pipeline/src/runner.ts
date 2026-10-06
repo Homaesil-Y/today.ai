@@ -146,7 +146,12 @@ export async function runEntityPipeline(options: {
   const processed: ProcessedGroup[] = [];
   const scoreDate = now.toISOString().slice(0, 10);
   // 상태 판정(RISING/FALLING/PEAK 등)은 직전 스냅샷과 비교해야 한다.
-  const scoreHistory = await options.repository.loadScoreHistory([...grouped.keys()], scoreDate, BOOTSTRAP_SCORING_VERSION);
+  // 분석 전용 실행은 점수를 저장하지 않고, 대기열 정렬은 총점만 쓰므로 상태가 필요 없다. 그래서 이력을
+  // 읽지 않는다 — 하루 8회 이상 도는 분석 실행이 매번 점수 이력 전체를 받아 egress 를 태웠다
+  // (2026-10-06 Supabase egress 한도 초과로 프로젝트 차단). 이 경우 로그의 leaders.status 는 WATCH 로 나온다.
+  const scoreHistory = options.analysisOnly
+    ? new Map<string, { previousSignal: number; dataPoints: number }>()
+    : await options.repository.loadScoreHistory([...grouped.keys()], scoreDate, BOOTSTRAP_SCORING_VERSION);
   for (const group of grouped.values()) {
     // 점수는 대기열 우선순위 정렬에 필요해 항상 계산한다(분석 대기열 정렬에 쓴다).
     const score = calculateInitialTrendScore(group.candidates, now, distributions, scoreHistory.get(group.entity.id));

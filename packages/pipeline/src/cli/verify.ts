@@ -99,6 +99,27 @@ const unanalyzedReview = await client
   .select("id, ai_analyses(id)", { count: "exact", head: true })
   .eq("visibility", "review");
 
+/**
+ * 읽기량 — 사이트 목록이 캐시 갱신마다 읽는 점수 행 수.
+ *
+ * 2026-10-06 22:36Z 에 Supabase 가 egress 한도 초과로 프로젝트를 차단했다. 목록이 점수 이력 전체
+ * (7만 행)를 30분마다 읽었고, 이 양이 매일 약 1,600행씩 커지는데 아무 로그에도 드러나지 않았다.
+ * Supabase 는 egress 계량 API 가 없어 대시보드 말고는 볼 수 없으므로, 대신 원인 쿼리의 행 수를 여기
+ * 남긴다. 기간 창(apps/web 의 LIST_SCORE_WINDOW_DAYS = 13)이 살아 있으면 공개 엔티티 수 × 약 13 에서
+ * 멈추고, 창이 빠지면 trend_scores 전체와 같아진다.
+ */
+const WEB_LIST_SCORE_WINDOW_DAYS = 13; // apps/web/src/data/trend-cache.ts 와 같게 유지
+const latestScore = await client.from("trend_scores").select("calculated_at").order("calculated_at", { ascending: false }).limit(1).maybeSingle();
+if (latestScore.error) throw new Error(`Failed to read latest score: ${latestScore.error.message}`);
+const latestCalculatedAt = typeof latestScore.data?.calculated_at === "string" ? latestScore.data.calculated_at : null;
+const webListScoreRows = latestCalculatedAt
+  ? await client
+    .from("trend_scores")
+    .select("id", { count: "exact", head: true })
+    .gte("calculated_at", new Date(Date.parse(latestCalculatedAt) - WEB_LIST_SCORE_WINDOW_DAYS * 86_400_000).toISOString())
+  : null;
+if (webListScoreRows?.error) throw new Error(`Failed to count web list score rows: ${webListScoreRows.error.message}`);
+
 const totalToday = Object.values(todayScores).reduce((sum, value) => sum + value, 0);
 process.stdout.write(`${JSON.stringify({
   ...counts,
@@ -124,6 +145,14 @@ process.stdout.write(`${JSON.stringify({
     // 지표가 행 수를 세어 103% 가 나왔고, 3주 동안 아무도 몰랐다). 로그에서 눈에 띄도록 표시한다.
     ...((analyzedFresh.count ?? 0) > (publicCount.count ?? 0)
       ? { anomaly: "freshAnalysesInWindow > publicEntities — 커버리지 집계 쿼리를 확인하세요" }
+      : {}),
+  },
+  // 사이트 목록이 캐시 갱신(30분)마다 읽는 점수 행 수. 공개 엔티티 × 약 13 근처가 정상이다.
+  readVolume: {
+    webListScoreRows: webListScoreRows?.count ?? 0,
+    windowDays: WEB_LIST_SCORE_WINDOW_DAYS,
+    ...((webListScoreRows?.count ?? 0) > (publicCount.count ?? 0) * (WEB_LIST_SCORE_WINDOW_DAYS + 3)
+      ? { anomaly: "webListScoreRows 가 공개 엔티티 × 창 일수를 넘었습니다 — 하루 스냅샷이 여러 건 쌓이는지 확인하세요" }
       : {}),
   },
 }, null, 2)}\n`);

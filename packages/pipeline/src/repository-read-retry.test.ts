@@ -19,7 +19,7 @@ function fakeClient(plan: { failures: number; message: string }) {
   };
   const chain = (table: string): Record<string, unknown> => {
     const self: Record<string, unknown> = {};
-    for (const m of ["select", "eq", "in", "lt", "order", "range", "limit"]) {
+    for (const m of ["select", "eq", "in", "lt", "gte", "order", "range", "limit", "maybeSingle"]) {
       self[m] = () => self;
     }
     self.then = (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>

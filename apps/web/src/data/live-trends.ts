@@ -8,6 +8,18 @@ import { createPublicClient } from "@/lib/supabase/server";
 import { cleanDisplayName, logoTextFrom } from "./display-name";
 import { resolveSources, sourceSignalLabel } from "./entity-sources";
 import { keepLatestScoringVersion } from "./scoring-version";
+import {
+  CACHE_WARN_RATIO,
+  type CompactTrend,
+  cachePayloadUsage,
+  expandTrend,
+  mergeSlices,
+  type PublishedTrendsBuild,
+  type PublishedTrendsSlice,
+  scoreWindowStart,
+  sliceTrends,
+  toCompactTrend,
+} from "./trend-cache";
 import { compareByScore } from "./trend-query";
 
 /**
@@ -92,9 +104,8 @@ function latestByEntity<T extends { entity_id: string }>(rows: T[]) {
   return map;
 }
 
-// `_bucket` 은 캐시 키를 주기적으로 회전시키기 위한 인자다. 값 자체는 쓰지 않는다 —
-// unstable_cache 의 revalidate 가 갱신되지 않는 문제를 우회한다(lib/cache-bucket.ts 참고).
-const loadPublishedTrends = unstable_cache(async (_bucket: number): Promise<TrendEntity[]> => {
+// 공개 목록 전체를 Supabase 에서 만든다. 캐시는 아래 loadPublishedTrendsSlice 가 조각 단위로 맡는다.
+async function buildPublishedTrends(): Promise<CompactTrend[]> {
   const supabase = createPublicClient();
   // 공개 엔티티는 하루 20~26건씩 늘어난다(2026-08-12 기준 577건). 상한 없이 읽으면 1000건을
   // 넘는 순간 뒷부분이 조용히 사라져 목록에서 서비스가 누락된다.
@@ -114,12 +125,24 @@ const loadPublishedTrends = unstable_cache(async (_bucket: number): Promise<Tren
   // id 목록을 청크로 나눠 각 청크를 끝까지 읽는다. 한 번에 넣으면 (1) 1000행 상한에서 이력이
   // 조용히 잘리고 (2) URL 이 요청 헤드 한도를 넘는다. 배경은 lib/supabase-paging.ts 참고.
   const ids = entities.map(({ id }) => id);
+  // 점수 이력은 최근 LIST_SCORE_WINDOW_DAYS 일만 읽는다(trend-cache.ts 참고). 전체 이력을 읽던 동안
+  // 이 쿼리가 매일 커져 Supabase egress 한도를 넘겼다(2026-10-06 프로젝트 차단).
+  const latestScore = await supabase
+    .from("trend_scores")
+    .select("calculated_at")
+    .order("calculated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (latestScore.error) throw new Error(`최근 채점 시각 조회 실패: ${latestScore.error.message}`);
+  const windowStart = scoreWindowStart(latestScore.data?.calculated_at);
   const [scoreData, analysisData] = await Promise.all([
     readAllByIds(ids, async (chunk, from, to) => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("trend_scores")
         .select("entity_id, total_score, trust_score, status, ranked, scoring_version, calculated_at")
-        .in("entity_id", chunk)
+        .in("entity_id", chunk);
+      if (windowStart) query = query.gte("calculated_at", windowStart);
+      const { data, error } = await query
         .order("calculated_at", { ascending: false })
         .range(from, to);
       if (error) throw new Error(`트렌드 점수 조회 실패: ${error.message}`);
@@ -237,12 +260,47 @@ const loadPublishedTrends = unstable_cache(async (_bucket: number): Promise<Tren
   // 그대로 남긴다 — 반응 신호가 없어 서로 구분할 근거가 없는 항목들이라(같은 점수 수십 건)
   // 번호를 붙이면 임의 순서를 순위처럼 보여주게 된다. 배경은 pipeline 의 RANKING_SIGNAL_FLOOR.
   let rank = 0;
-  return sorted.map((trend) => ({ ...trend, rank: trend.ranked ? (rank += 1) : 0 }));
-}, ["published-trends"], { revalidate: TRENDS_REVALIDATE_SECONDS, tags: ["trends"] });
+  return sorted.map((trend) => toCompactTrend({ ...trend, rank: trend.ranked ? (rank += 1) : 0 }));
+}
 
-export const getPublishedTrends = cache(
-  (): Promise<TrendEntity[]> => loadPublishedTrends(cacheBucket(TRENDS_REVALIDATE_SECONDS)),
-);
+/**
+ * 같은 캐시 구간 안에서 목록을 한 번만 만든다(인스턴스 단위). 조각 여러 개가 동시에 미스 나도
+ * Supabase 읽기는 한 번이고, 모든 조각이 같은 빌드(builtAt)에서 잘린다.
+ */
+const buildsByBucket = new Map<number, Promise<PublishedTrendsBuild>>();
+function buildOnce(bucket: number): Promise<PublishedTrendsBuild> {
+  const existing = buildsByBucket.get(bucket);
+  if (existing) return existing;
+  buildsByBucket.clear(); // 지난 구간 결과는 버린다
+  const pending = buildPublishedTrends().then((trends) => ({ builtAt: new Date().toISOString(), trends }));
+  pending.catch(() => buildsByBucket.delete(bucket));
+  buildsByBucket.set(bucket, pending);
+  return pending;
+}
+
+// 목록을 TREND_CACHE_SLICE_SIZE 건씩 나눠 캐시한다. 한 덩어리로 두면 공개 엔티티가 늘어 2MB 를
+// 넘는 순간 Next 가 저장을 거부하고, 모든 요청이 Supabase 를 다시 읽는다(trend-cache.ts 참고).
+// `bucket` 은 캐시 키를 주기적으로 회전시키는 인자다(lib/cache-bucket.ts 참고).
+const loadPublishedTrendsSlice = unstable_cache(async (bucket: number, index: number): Promise<PublishedTrendsSlice> => {
+  const slice = sliceTrends(await buildOnce(bucket), index);
+  const usage = cachePayloadUsage(slice);
+  if (usage.ratio >= CACHE_WARN_RATIO) {
+    console.error(`[published-trends] 조각 ${index} 이 ${usage.size}자 — Next 데이터 캐시 상한의 ${Math.round(usage.ratio * 100)}%. TREND_CACHE_SLICE_SIZE 를 줄여야 한다.`);
+  }
+  return slice;
+}, ["published-trends-slice"], { revalidate: TRENDS_REVALIDATE_SECONDS, tags: ["trends"] });
+
+export const getPublishedTrends = cache(async (): Promise<TrendEntity[]> => {
+  const bucket = cacheBucket(TRENDS_REVALIDATE_SECONDS);
+  const first = await loadPublishedTrendsSlice(bucket, 0);
+  const rest = await Promise.all(
+    Array.from({ length: Math.max(0, first.sliceCount - 1) }, (_, i) => loadPublishedTrendsSlice(bucket, i + 1)),
+  );
+  // 조각이 서로 다른 빌드에서 왔으면(인스턴스 두 곳이 동시에 미스) 이어 붙이지 않고 이 인스턴스의
+  // 빌드를 쓴다 — 순위·정렬이 섞이는 것보다 한 번 더 읽는 편이 낫다.
+  const merged = mergeSlices([first, ...rest]) ?? (await buildOnce(bucket)).trends;
+  return merged.map(expandTrend);
+});
 
 export const getPublishedTrend = cache(async (slug: string) => {
   const trends = await getPublishedTrends();

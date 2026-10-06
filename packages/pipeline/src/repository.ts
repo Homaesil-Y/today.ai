@@ -104,6 +104,20 @@ export class PipelineRepositoryError extends Error {
 }
 
 /**
+ * 점수 이력 창의 길이(일). 기준은 "오늘 이전 마지막 채점일"이다(loadScoreHistory 참고).
+ * 직전 스냅샷만 있으면 되므로 1일이면 충분하지만, 어떤 엔티티가 마지막 채점일에만 빠졌을 때도
+ * 직전 값을 찾도록 며칠 여유를 둔다. 창 밖으로 밀려난 엔티티는 이력 없음(WATCH)으로 하루 표시된다.
+ */
+export const SCORE_HISTORY_LOOKBACK_DAYS = 3;
+
+/** 마지막 채점일(YYYY-MM-DD)에서 창 시작일(포함)을 구한다. */
+export function scoreHistoryWindowStart(lastScoreDate: string, lookbackDays = SCORE_HISTORY_LOOKBACK_DAYS): string {
+  const time = Date.parse(`${lastScoreDate}T00:00:00Z`);
+  if (Number.isNaN(time)) throw new RangeError(`잘못된 채점일: ${lastScoreDate}`);
+  return new Date(time - lookbackDays * 86_400_000).toISOString().slice(0, 10);
+}
+
+/**
  * HTTP 상태코드로 Supabase 실패의 재시도 여부를 판정한다. 응답이 없었으면(undefined) null.
  *
  * 메시지 문구로 판정하던 방식이 두 번 뚫렸다. 2026-09-12~13 에는 "Gateway Timeout"(504)이, 그 문구를
@@ -277,7 +291,7 @@ export class SupabasePipelineRepository {
   }
 
   /**
-   * 엔티티별 과거 점수 요약(직전 총점, 누적 스냅샷 수)을 가져온다.
+   * 엔티티별 과거 점수 요약(직전 신호, 창 안의 스냅샷 수)을 가져온다.
    *
    * 상태 판정(RISING/FALLING/PEAK 등)은 직전 스냅샷과 비교해야 하는데, 예전엔 호출부가
    * previousScore/dataPoints 를 상수로 넘겨 모든 엔티티가 영구히 WATCH 였다. `scoreDate` 는
@@ -291,6 +305,24 @@ export class SupabasePipelineRepository {
     const summary = new Map<string, { previousSignal: number; dataPoints: number }>();
     if (entityIds.length === 0) return summary;
 
+    // 기간 창. 예전엔 같은 척도의 이력 전체를 읽었다 — 하루 약 1,600행씩 쌓여 10/06 기준 실행당
+    // 약 5.8만 행(압축 후 약 1.8MB)이었고, 이 읽기가 매일 커지며 Supabase egress 한도(월 5GB)를
+    // 넘겨 프로젝트가 차단됐다. 실제로 필요한 건 "직전 스냅샷 1건"과 "2건 이상인지"뿐이다
+    // (calculateStatus 는 dataPoints < 2 만 본다).
+    // 창의 기준은 오늘이 아니라 "오늘 이전 마지막 채점일"이다. 파이프라인이 며칠 멈췄다 재개돼도
+    // 직전 스냅샷을 잃지 않는다(오늘 기준이면 공백이 창보다 길 때 전 엔티티가 WATCH 로 떨어진다).
+    const anchor = await this.request("load_score_history_anchor", () => this.client
+      .from("trend_scores")
+      .select("score_date")
+      .eq("scoring_version", scoringVersion)
+      .lt("score_date", scoreDate)
+      .order("score_date", { ascending: false })
+      .limit(1)
+      .maybeSingle());
+    const lastScoreDate = z.object({ score_date: z.string() }).nullable().catch(null).parse(anchor)?.score_date ?? null;
+    if (!lastScoreDate) return summary;
+    const windowStart = scoreHistoryWindowStart(lastScoreDate);
+
     for (const chunk of chunkForFilter(entityIds)) {
       const rows = await readAllPages(async (from, to) => {
         // 상태 판정은 총점이 아니라 반응 신호(engagementSignal)의 변화를 본다. 축 컬럼을 읽어
@@ -300,6 +332,7 @@ export class SupabasePipelineRepository {
           .select("entity_id,score_date,velocity_score,comments_score,product_growth_score,cross_source_score")
           .in("entity_id", chunk)
           .eq("scoring_version", scoringVersion)
+          .gte("score_date", windowStart)
           .lt("score_date", scoreDate)
           .order("score_date", { ascending: false })
           // 같은 날짜가 수백 행이라 정렬이 이것만으로는 전순서가 아니다. 페이지 경계에서 순서가
