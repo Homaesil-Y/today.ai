@@ -21,7 +21,27 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Supabase 가 프로젝트를 제한(402) 중이면 본 작업을 건너뛴다(건너뛴 실행은 성공으로 끝나 실패 메일이 가지 않는다).
+  # 2026-10-06 egress 한도 초과로 제한된 동안 모든 실행이 실패해 실패 메일이 하루 20통 가까이 쌓였다. 제한은
+  # 결제 주기가 바뀌면 Supabase 가 스스로 풀고, 그 뒤 실행부터 자동으로 다시 돈다. 확인 요청은 1건(1KB 미만).
+  supabase-status:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      available: ${{ steps.check.outputs.available }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/actions
+      - id: check
+        uses: ./.github/actions/supabase-status
+        with:
+          url: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          key: ${{ secrets.SUPABASE_SECRET_KEY }}
+
   collect-news:
+    needs: supabase-status
+    if: needs.supabase-status.outputs.available == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:

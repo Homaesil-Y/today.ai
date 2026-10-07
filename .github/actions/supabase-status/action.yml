@@ -1,0 +1,22 @@
+name: Supabase 상태 확인
+description: Supabase 가 프로젝트를 제한(402) 중인지 확인한다. 제한 중이면 available=false (배경은 check.sh).
+inputs:
+  url:
+    description: Supabase 프로젝트 URL
+    required: true
+  key:
+    description: 서버 비밀키. 확인 요청 1건의 헤더에만 쓰고 로그에 남기지 않는다.
+    required: true
+outputs:
+  available:
+    description: "true = 정상(또는 판단 불가), false = 제한 중"
+    value: ${{ steps.check.outputs.available }}
+runs:
+  using: composite
+  steps:
+    - id: check
+      shell: bash
+      env:
+        SUPABASE_URL: ${{ inputs.url }}
+        SUPABASE_KEY: ${{ inputs.key }}
+      run: bash "${{ github.action_path }}/check.sh"
