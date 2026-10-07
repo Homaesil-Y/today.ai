@@ -2,6 +2,7 @@ import { unstable_cache } from "next/cache";
 import { cache } from "react";
 import { z } from "zod";
 import { cacheBucket } from "@/lib/cache-bucket";
+import { withEgressMeter } from "@/lib/egress-meter";
 import { createPublicClient } from "@/lib/supabase/server";
 
 // 뉴스는 3시간 주기 수집으로만 바뀐다. 300초는 불필요하게 잦아 egress 만 태웠다(무료 한도 5GB/월 초과 원인).
@@ -47,20 +48,22 @@ const loadNewsPage = unstable_cache(async (params: { q: string; page: number; pa
   const { page, pageSize } = params;
   const q = sanitizeQuery(params.q);
   try {
-    const supabase = createPublicClient();
-    let query = supabase
-      .from("news_items")
-      .select("id, source, url, ko_title, ko_summary, published_at", { count: "exact" })
-      .eq("is_published", true);
-    if (q) {
-      query = query.or(`ko_title.ilike.%${q}%,ko_summary.ilike.%${q}%,source.ilike.%${q}%`);
-    }
-    const from = Math.max(0, (page - 1) * pageSize);
-    const { data, error, count } = await query
-      .order("published_at", { ascending: false })
-      .range(from, from + pageSize - 1);
-    if (error) return { items: [], total: 0 };
-    return { items: z.array(rowSchema).parse(data ?? []).map(mapRow), total: count ?? 0 };
+    return await withEgressMeter("news", async (fetchImpl) => {
+      const supabase = createPublicClient({ fetch: fetchImpl });
+      let query = supabase
+        .from("news_items")
+        .select("id, source, url, ko_title, ko_summary, published_at", { count: "exact" })
+        .eq("is_published", true);
+      if (q) {
+        query = query.or(`ko_title.ilike.%${q}%,ko_summary.ilike.%${q}%,source.ilike.%${q}%`);
+      }
+      const from = Math.max(0, (page - 1) * pageSize);
+      const { data, error, count } = await query
+        .order("published_at", { ascending: false })
+        .range(from, from + pageSize - 1);
+      if (error) return { items: [], total: 0 };
+      return { items: z.array(rowSchema).parse(data ?? []).map(mapRow), total: count ?? 0 };
+    });
   } catch {
     return { items: [], total: 0 };
   }

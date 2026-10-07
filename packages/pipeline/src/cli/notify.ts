@@ -1,5 +1,5 @@
 import { createHmac } from "node:crypto";
-import { loadWorkspaceEnvironment, withRetry } from "@ai-trend-radar/collectors";
+import { loadWorkspaceEnvironment, meteredClientOptions, withRetry } from "@ai-trend-radar/collectors";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { chunkForFilter } from "../query-chunks";
@@ -23,7 +23,7 @@ const resendApiKey = env.RESEND_API_KEY;
 const provider: "gmail" | "resend" | null =
   gmailClientId && gmailClientSecret && gmailRefreshToken ? "gmail" : resendApiKey ? "resend" : null;
 
-const client = createClient(url, secretKey, { auth: { persistSession: false, autoRefreshToken: false } });
+const client = createClient(url, secretKey, { auth: { persistSession: false, autoRefreshToken: false }, ...meteredClientOptions("notify") });
 
 const now = new Date();
 const reportDate = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(now);

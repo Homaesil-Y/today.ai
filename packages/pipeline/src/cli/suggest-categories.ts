@@ -1,4 +1,4 @@
-import { loadWorkspaceEnvironment } from "@ai-trend-radar/collectors";
+import { loadWorkspaceEnvironment, meteredClientOptions } from "@ai-trend-radar/collectors";
 import { createCategorySuggesterFromEnv } from "@ai-trend-radar/llm";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
@@ -17,7 +17,7 @@ if (!url || !key) {
   process.stderr.write("Supabase URL과 서버 비밀키가 필요합니다.\n");
   process.exit(1);
 }
-const supabase = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+const supabase = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false }, ...meteredClientOptions("suggest") });
 
 const cats = z.array(z.object({ id: z.string(), slug: z.string(), name: z.string() })).parse(
   (await supabase.from("categories").select("id,slug,name").eq("enabled", true).order("sort_order")).data ?? [],

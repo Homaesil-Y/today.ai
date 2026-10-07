@@ -25,9 +25,11 @@ export async function createClient() {
   });
 }
 
-export function createPublicClient() {
+/** fetch 를 넘기면 그걸로 요청한다 — 전송량 계량(lib/egress-meter.ts)에 쓴다. */
+export function createPublicClient(options: { fetch?: typeof fetch } = {}) {
   const { url, publishableKey } = getSupabasePublicEnv();
   return createSupabaseClient(url, publishableKey, {
     auth: { persistSession: false, autoRefreshToken: false },
+    ...(options.fetch ? { global: { fetch: options.fetch } } : {}),
   });
 }

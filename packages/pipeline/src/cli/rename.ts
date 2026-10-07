@@ -1,9 +1,9 @@
-import { loadWorkspaceEnvironment } from "@ai-trend-radar/collectors";
+import { loadWorkspaceEnvironment, meteredClientOptions } from "@ai-trend-radar/collectors";
 import { createNameExtractorFromEnv } from "@ai-trend-radar/llm";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { looksLikeDescription } from "../candidate";
-import { readAllPages } from "../query-chunks";
+import { chunkForFilter, readAllPages } from "../query-chunks";
 
 // 공개 엔티티의 표시명을 LLM으로 정정한다. 커뮤니티 게시글 제목을 기계적으로 잘라 만든 이름은
 // 제품명이 아니라 문장·설명인 경우가 많아(예: "What should the GUI for AI agents look like?" → "MarbleOS")
@@ -30,21 +30,21 @@ if (!url || !key) {
   process.exit(1);
 }
 
-const supabase = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+const supabase = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false }, ...meteredClientOptions("rename") });
 
+// 1단계: 대상 고르기에 필요한 이름만 읽는다. 이 CLI 는 파이프라인·분석 실행마다(하루 12회 안팎) 도는데,
+// 예전엔 공개 엔티티 전부를 설명 본문까지 받아 대부분 버렸다(대상은 보통 0~몇 건). Supabase egress
+// 한도 초과(2026-10-06 프로젝트 차단) 뒤 읽기량을 줄이면서 두 단계로 나눴다.
 const entityRows = z.array(z.object({
   id: z.string(),
   name: z.string(),
   slug: z.string(),
-  description: z.string().nullable(),
-  canonical_url: z.string(),
-  github_url: z.string().nullable(),
 })).parse(
   // 공개 엔티티는 1000건을 넘으면 상한에서 조용히 잘려 뒷부분 표시명이 영구 미정정으로 남는다.
   await readAllPages(async (from, to) => {
     const { data, error } = await supabase
       .from("entities")
-      .select("id,name,slug,description,canonical_url,github_url")
+      .select("id,name,slug")
       .eq("visibility", "public")
       .order("id")
       .range(from, to);
@@ -56,9 +56,33 @@ const entityRows = z.array(z.object({
 // 특정 서비스만 다시 검토한다. 문장형이 아닌 잘못된 이름(예: 제품이 쓰는 도구명을 제품명으로
 // 뽑은 "Claude Code")은 기본 필터에 걸리지 않아, 전체를 LLM에 다시 돌리지 않고 지목해서 고칠
 // 수단이 필요하다.
-const targets = onlySlugs.length > 0
+const targetIds = (onlySlugs.length > 0
   ? entityRows.filter((entity) => onlySlugs.includes(entity.slug))
-  : checkAll ? entityRows : entityRows.filter((entity) => looksLikeDescription(entity.name));
+  : checkAll ? entityRows : entityRows.filter((entity) => looksLikeDescription(entity.name))
+).map((entity) => entity.id);
+
+// 2단계: 고른 대상만 설명·URL 까지 읽는다. 원래 순서(id 순)를 지킨다.
+const targetRowSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  slug: z.string(),
+  description: z.string().nullable(),
+  canonical_url: z.string(),
+  github_url: z.string().nullable(),
+});
+const targetById = new Map<string, z.infer<typeof targetRowSchema>>();
+for (const chunk of chunkForFilter(targetIds)) {
+  const { data, error } = await supabase
+    .from("entities")
+    .select("id,name,slug,description,canonical_url,github_url")
+    .in("id", chunk);
+  if (error) throw new Error(`정정 대상 조회 실패: ${error.message}`);
+  for (const row of z.array(targetRowSchema).parse(data ?? [])) targetById.set(row.id, row);
+}
+const targets = targetIds.flatMap((id) => {
+  const row = targetById.get(id);
+  return row ? [row] : [];
+});
 if (onlySlugs.length > 0) {
   const missing = onlySlugs.filter((slug) => !entityRows.some((entity) => entity.slug === slug));
   if (missing.length > 0) process.stderr.write(`공개 엔티티에서 찾지 못한 slug: ${missing.join(", ")}\n`);

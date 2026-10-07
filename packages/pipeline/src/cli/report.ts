@@ -1,7 +1,6 @@
-import { loadWorkspaceEnvironment } from "@ai-trend-radar/collectors";
+import { loadWorkspaceEnvironment, meteredClientOptions } from "@ai-trend-radar/collectors";
 import { createClient } from "@supabase/supabase-js";
-import { z } from "zod";
-import { readAllPages } from "../query-chunks";
+import { loadDailyReportTop } from "../daily-report";
 
 const env = loadWorkspaceEnvironment();
 const url = env.NEXT_PUBLIC_SUPABASE_URL;
@@ -11,56 +10,13 @@ if (!url || !secretKey) throw new Error("NEXT_PUBLIC_SUPABASE_URL and SUPABASE_S
 const TOP_N = 10;
 const timeZone = env.APP_TIMEZONE ?? "Asia/Seoul";
 
-const client = createClient(url, secretKey, { auth: { persistSession: false, autoRefreshToken: false } });
+const client = createClient(url, secretKey, { auth: { persistSession: false, autoRefreshToken: false }, ...meteredClientOptions("report") });
 
-const rowSchema = z.object({
-  id: z.string(),
-  slug: z.string(),
-  name: z.string(),
-  categories: z.object({ name: z.string() }).nullable(),
-  trend_scores: z.array(z.object({
-    total_score: z.coerce.number(),
-    trust_score: z.coerce.number(),
-    status: z.string(),
-    calculated_at: z.string(),
-  })).default([]),
-  ai_analyses: z.array(z.object({ summary: z.string(), generated_at: z.string() })).default([]),
-});
-
-// 상한 없이 읽으면 1000건을 넘는 순간 뒷부분이 일간 리포트 순위 집계에서 조용히 빠진다.
-const data = await readAllPages(async (from, to) => {
-  const { data: page, error } = await client
-    .from("entities")
-    .select("id,slug,name,categories(name),trend_scores(total_score,trust_score,status,calculated_at),ai_analyses(summary,generated_at)")
-    .eq("visibility", "public")
-    .order("id")
-    .range(from, to);
-  if (error) throw new Error(`공개 엔티티 조회 실패: ${error.message}`);
-  return page ?? [];
-});
-
-const rows = z.array(rowSchema).parse(data);
-const ranked = rows
-  .map((row) => {
-    const score = [...row.trend_scores].sort((a, b) => b.calculated_at.localeCompare(a.calculated_at))[0];
-    const analysis = [...row.ai_analyses].sort((a, b) => b.generated_at.localeCompare(a.generated_at))[0];
-    return {
-      slug: row.slug,
-      name: row.name,
-      category: row.categories?.name ?? "기타",
-      trendScore: Number(score?.total_score ?? 0),
-      trustScore: Number(score?.trust_score ?? 0),
-      status: score?.status ?? "WATCH",
-      summary: analysis?.summary ?? null,
-    };
-  })
-  .sort((a, b) => b.trendScore - a.trendScore || b.trustScore - a.trustScore)
-  .slice(0, TOP_N)
-  .map((item, index) => ({ rank: index + 1, ...item }));
+// 가장 최근 채점일의 상위 N건만 읽는다(이력 전체를 읽던 방식의 문제는 daily-report.ts 참고).
+const { totalPublic, scoreDate, topServices: ranked } = await loadDailyReportTop(client, TOP_N);
 
 const now = new Date();
 const reportDate = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
-const totalPublic = rows.length;
 
 const contentJson = {
   generatedAt: now.toISOString(),
@@ -86,4 +42,4 @@ const { error: upsertError } = await client.from("reports").upsert({
 }, { onConflict: "report_type,report_date" });
 if (upsertError) throw new Error(`리포트 저장 실패: ${upsertError.message}`);
 
-process.stdout.write(`${JSON.stringify({ reportDate, totalPublic, topCount: ranked.length, status: "published" }, null, 2)}\n`);
+process.stdout.write(`${JSON.stringify({ reportDate, scoreDate, totalPublic, topCount: ranked.length, status: "published" }, null, 2)}\n`);

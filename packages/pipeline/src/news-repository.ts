@@ -1,3 +1,4 @@
+import { meteredClientOptions } from "@ai-trend-radar/collectors";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { chunkForFilter } from "./query-chunks";
@@ -32,6 +33,7 @@ export class NewsRepository {
     }
     return new NewsRepository(createClient(url, secretKey, {
       auth: { persistSession: false, autoRefreshToken: false },
+      ...meteredClientOptions("news"),
     }));
   }
 

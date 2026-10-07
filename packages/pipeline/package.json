@@ -22,7 +22,8 @@
     "publish:reviewed": "tsx src/cli/publish-reviewed.ts",
     "bootstrap:owner": "tsx src/cli/bootstrap-owner.ts",
     "preview:live": "tsx src/cli/preview.ts",
-    "hide": "tsx src/cli/hide.ts"
+    "hide": "tsx src/cli/hide.ts",
+    "egress:report": "tsx src/cli/egress-report.ts"
   },
   "dependencies": {
     "@ai-trend-radar/collectors": "workspace:*",

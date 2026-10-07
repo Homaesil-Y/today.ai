@@ -428,6 +428,23 @@ button { color: inherit; }
 .ops-note p { display: flex; align-items: flex-start; gap: 8px; margin: 0; line-height: 1.55; }
 .ops-note p svg { flex: 0 0 auto; margin-top: 3px; color: #067647; }
 .ops-note-sub { margin-top: 10px !important; padding-left: 23px; color: var(--text-secondary); font-size: 13px; }
+/* Supabase 전송량 카드(/admin/ops). 2026-10-06 egress 한도 초과 차단 뒤 추가. */
+.ops-heading-note { margin-left: 6px; color: var(--text-tertiary); font-size: 12.5px; font-weight: 550; }
+.ops-note p.ops-egress-warn { color: var(--warning-text); }
+.ops-note p.ops-egress-warn svg { color: var(--warning-text); }
+.ops-note p.ops-egress-alert { color: var(--danger-text); }
+.ops-note p.ops-egress-alert svg { color: var(--danger-text); }
+.ops-egress-gauge { position: relative; height: 10px; margin: 14px 0 4px 23px; border-radius: var(--radius-pill); background: var(--bg-surface-subtle); }
+.ops-egress-gauge > span { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: var(--brand-primary); }
+.ops-egress-gauge > span.ops-egress-fill-warn { background: #f79009; }
+.ops-egress-gauge > span.ops-egress-fill-alert { background: var(--danger-text); }
+.ops-egress-gauge > i { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--text-primary); }
+.ops-egress-days { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(4px, 1fr); align-items: end; gap: 3px; height: 76px; margin: 18px 0 0 23px; border-bottom: 1px solid var(--border-default); }
+.ops-egress-days > span { display: block; border-radius: 3px 3px 0 0; background: color-mix(in srgb, var(--brand-primary) 60%, white); }
+.ops-egress-days > span.today { background: color-mix(in srgb, var(--brand-primary) 28%, white); }
+.ops-egress-days > span.over { background: var(--danger-text); }
+.ops-egress-budget-line { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--text-tertiary); pointer-events: none; }
+.ops-egress-legend { display: flex; justify-content: space-between; gap: 8px; margin: 5px 0 0 23px; color: var(--text-tertiary); font-size: 11.5px; font-variant-numeric: tabular-nums; }
 
 .report-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
 .report-card { display: flex; flex-direction: column; gap: 8px; padding: 18px 20px; border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--bg-surface); box-shadow: var(--shadow-xs); }

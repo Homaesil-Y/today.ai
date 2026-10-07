@@ -4,7 +4,11 @@ import { AlertTriangle, CheckCircle2, Clock, Database, Gauge, Layers } from "luc
 import { redirect } from "next/navigation";
 import { getCurrentUserRole } from "@/lib/auth";
 import { SourceBrandIcon, getSourceLabel } from "@/components/source-brand-icon";
+import { withEgressMeter } from "@/lib/egress-meter";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { billingCycleStart, parseBillingCycleDay } from "@ai-trend-radar/types/egress";
+import { EgressCard } from "./egress-card";
+import { summarizeEgress } from "./egress-summary";
 
 export const dynamic = "force-dynamic";
 
@@ -75,31 +79,45 @@ export default async function AdminOpsPage() {
   if (!user) redirect("/login?next=/admin/ops");
   if (role !== "admin") redirect("/");
 
-  const supabase = createAdminClient();
-  const scoreDate = new Date().toISOString().slice(0, 10);
-  const [entitiesResult, analysesResult, sourcesResult, runsResult, todayScoresResult] = await Promise.all([
-    supabase.from("entities").select("id, visibility, ai_analyses(id)"),
-    supabase.from("ai_analyses").select("generated_at").order("generated_at", { ascending: false }).limit(1),
-    supabase.from("sources").select("id, code, name, enabled, last_collected_at"),
-    supabase.from("collector_runs").select("source_id, status, started_at, finished_at, fetched_count, inserted_count, updated_count, error_count, rate_limit_remaining, error_log_json").order("started_at", { ascending: false }).limit(120),
-    // 오늘자 점수 스냅샷의 상태·순위 대상 분포. 개수 지표만으로는 "저장은 됐는데 결과가 말이
-    // 안 되는" 고장(전부 WATCH, 순위 절반이 동점)을 못 잡아서 관리자 화면에 분포를 노출한다.
-    // 최신 계산이 앞에 오도록 정렬한다 — 아래에서 첫 행의 scoring_version 을 현재 척도로 삼는다.
-    supabase.from("trend_scores").select("status, ranked, scoring_version").eq("score_date", scoreDate).order("calculated_at", { ascending: false }).limit(2000),
-  ]);
+  const now = new Date();
+  const scoreDate = now.toISOString().slice(0, 10);
+  const cycleDay = parseBillingCycleDay(process.env.SUPABASE_BILLING_CYCLE_DAY);
+  // 최근 하루 평균을 재려면 주기 시작 전 며칠도 필요하다(evaluateEgressBudget 참고).
+  const meterFrom = new Date(billingCycleStart(now, cycleDay).getTime() - 3 * 86_400_000).toISOString().slice(0, 10);
+  const [publicResult, reviewResult, analysisCountResult, analysesResult, sourcesResult, runsResult, todayScoresResult, egressResult] = await withEgressMeter("admin-ops", (fetchImpl) => {
+    const supabase = createAdminClient({ fetch: fetchImpl });
+    return Promise.all([
+      // 개수는 행을 받지 않고 센다. 예전엔 엔티티 전부를 분석 id 까지 붙여 받아 셌는데, PostgREST 기본
+      // 상한(1000행)에 걸려 엔티티가 1000건을 넘은 뒤로 공개 수가 실제보다 적게 나왔고 전송량도 컸다.
+      supabase.from("entities").select("id", { count: "exact", head: true }).eq("visibility", "public"),
+      supabase.from("entities").select("id, ai_analyses(id)", { count: "exact" }).eq("visibility", "review"),
+      supabase.from("ai_analyses").select("id", { count: "exact", head: true }),
+      supabase.from("ai_analyses").select("generated_at").order("generated_at", { ascending: false }).limit(1),
+      supabase.from("sources").select("id, code, name, enabled, last_collected_at"),
+      supabase.from("collector_runs").select("source_id, status, started_at, finished_at, fetched_count, inserted_count, updated_count, error_count, rate_limit_remaining, error_log_json").order("started_at", { ascending: false }).limit(120),
+      // 오늘자 점수 스냅샷의 상태·순위 대상 분포. 개수 지표만으로는 "저장은 됐는데 결과가 말이
+      // 안 되는" 고장(전부 WATCH, 순위 절반이 동점)을 못 잡아서 관리자 화면에 분포를 노출한다.
+      // 최신 계산이 앞에 오도록 정렬한다 — 아래에서 첫 행의 scoring_version 을 현재 척도로 삼는다.
+      supabase.from("trend_scores").select("status, ranked, scoring_version").eq("score_date", scoreDate).order("calculated_at", { ascending: false }).limit(2000),
+      // Supabase 전송량 계량(2026-10-06 egress 한도 초과 차단 뒤 추가). 한 주기 최대 34일 × 출처 수 행.
+      supabase.from("egress_meter_daily").select("day, source, requests, bytes").gte("day", meterFrom).limit(1000),
+    ]);
+  });
 
-  if (entitiesResult.error) throw new Error(`엔티티 집계 실패: ${entitiesResult.error.message}`);
+  if (publicResult.error) throw new Error(`공개 엔티티 집계 실패: ${publicResult.error.message}`);
+  if (reviewResult.error) throw new Error(`검토 대기 집계 실패: ${reviewResult.error.message}`);
   if (sourcesResult.error) throw new Error(`채널 조회 실패: ${sourcesResult.error.message}`);
   if (runsResult.error) throw new Error(`수집 이력 조회 실패: ${runsResult.error.message}`);
 
-  const entities = entitiesResult.data ?? [];
-  const publicCount = entities.filter((entity) => entity.visibility === "public").length;
-  const reviewEntities = entities.filter((entity) => entity.visibility === "review");
-  const reviewCount = reviewEntities.length;
+  const publicCount = publicResult.count ?? 0;
+  const reviewEntities = reviewResult.data ?? [];
+  const reviewCount = reviewResult.count ?? reviewEntities.length;
   const unanalyzedCount = reviewEntities.filter((entity) => (entity.ai_analyses ?? []).length === 0).length;
   const analyzedAwaitingApproval = reviewCount - unanalyzedCount;
-  const totalAnalyses = entities.reduce((sum, entity) => sum + (entity.ai_analyses ?? []).length, 0);
+  const totalAnalyses = analysisCountResult.count ?? 0;
   const lastAnalysisAt = analysesResult.data?.[0]?.generated_at ?? null;
+
+  const egress = summarizeEgress(egressResult, now, cycleDay);
 
   // 점수 공식이 바뀐 날은 옛 척도 행이 함께 남는다. 최신 행이 쓰는 버전의 분포만 집계한다.
   const todayScoreRows = (todayScoresResult.data ?? []) as Array<{ status: string; ranked: boolean | null; scoring_version: string }>;
@@ -147,6 +165,8 @@ export default async function AdminOpsPage() {
           </article>
         ))}
       </section>
+
+      <EgressCard egress={egress} />
 
       <section className="ops-section" aria-label="수집 채널 상태">
         <h2 className="ops-heading">수집 채널</h2>

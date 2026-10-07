@@ -4,6 +4,7 @@ import { cache } from "react";
 import { z } from "zod";
 import { cacheBucket } from "@/lib/cache-bucket";
 import { readAllByIds, readAllPages } from "@/lib/supabase-paging";
+import { withEgressMeter } from "@/lib/egress-meter";
 import { createPublicClient } from "@/lib/supabase/server";
 import { cleanDisplayName, logoTextFrom } from "./display-name";
 import { resolveSources, sourceSignalLabel } from "./entity-sources";
@@ -31,8 +32,15 @@ import { compareByScore } from "./trend-query";
  * 프로젝트가 한도 초과(7.09GB) 상태가 됐다. 초과 상태에서는 응답이 제한돼 사이트가 느려진다.
  *
  * 30분이면 3시간 파이프라인 기준 충분히 신선하고, 하루 48회 미스로 내려간다.
+ *
+ * 2026-10-06 egress 한도 초과로 프로젝트가 다시 차단된 뒤 60분으로 늘렸다(하루 24회). 목록 갱신이
+ * 사이트 전송량의 대부분이라 이것만으로 그 몫이 절반이 된다. 데이터는 분석·채점 실행(약 3시간 간격)
+ * 때만 바뀌므로 반영이 최대 1시간 늦는 정도다. 실제 사용량은 /admin/ops 의 전송량 카드로 본다.
  */
-const TRENDS_REVALIDATE_SECONDS = 1_800;
+const TRENDS_REVALIDATE_SECONDS = 3_600;
+
+/** 상세 점수 그래프의 가장 긴 기간 탭(90D)보다 하루 넉넉하게. 그보다 오래된 이력은 읽지 않는다. */
+const DETAIL_HISTORY_DAYS = 91;
 
 const entitySchema = z.object({
   id: z.string(),
@@ -105,8 +113,8 @@ function latestByEntity<T extends { entity_id: string }>(rows: T[]) {
 }
 
 // 공개 목록 전체를 Supabase 에서 만든다. 캐시는 아래 loadPublishedTrendsSlice 가 조각 단위로 맡는다.
-async function buildPublishedTrends(): Promise<CompactTrend[]> {
-  const supabase = createPublicClient();
+async function buildPublishedTrends(fetchImpl: typeof fetch): Promise<CompactTrend[]> {
+  const supabase = createPublicClient({ fetch: fetchImpl });
   // 공개 엔티티는 하루 20~26건씩 늘어난다(2026-08-12 기준 577건). 상한 없이 읽으면 1000건을
   // 넘는 순간 뒷부분이 조용히 사라져 목록에서 서비스가 누락된다.
   const entityData = await readAllPages(async (from, to) => {
@@ -272,7 +280,8 @@ function buildOnce(bucket: number): Promise<PublishedTrendsBuild> {
   const existing = buildsByBucket.get(bucket);
   if (existing) return existing;
   buildsByBucket.clear(); // 지난 구간 결과는 버린다
-  const pending = buildPublishedTrends().then((trends) => ({ builtAt: new Date().toISOString(), trends }));
+  // 목록 갱신은 사이트 전송량의 대부분이라 따로 계량한다(출처 web:trends-list).
+  const pending = withEgressMeter("trends-list", buildPublishedTrends).then((trends) => ({ builtAt: new Date().toISOString(), trends }));
   pending.catch(() => buildsByBucket.delete(bucket));
   buildsByBucket.set(bucket, pending);
   return pending;
@@ -313,13 +322,15 @@ export const getPublishedTrend = cache(async (slug: string) => {
  */
 const loadTrendAnalyses = unstable_cache(async (entityIds: string[], _bucket: number) => {
   if (entityIds.length === 0) return [];
-  const supabase = createPublicClient();
-  const { data, error } = await supabase
-    .from("latest_ai_analyses")
-    .select("entity_id, summary, why_trending_json, target_users_json, strengths_json, weaknesses_json, use_cases_json, korea_opportunity, generated_at")
-    .in("entity_id", entityIds);
-  if (error) throw new Error(`AI 분석 상세 조회 실패: ${error.message}`);
-  return z.array(analysisSchema).parse(data ?? []);
+  return withEgressMeter("trend-detail", async (fetchImpl) => {
+    const supabase = createPublicClient({ fetch: fetchImpl });
+    const { data, error } = await supabase
+      .from("latest_ai_analyses")
+      .select("entity_id, summary, why_trending_json, target_users_json, strengths_json, weaknesses_json, use_cases_json, korea_opportunity, generated_at")
+      .in("entity_id", entityIds);
+    if (error) throw new Error(`AI 분석 상세 조회 실패: ${error.message}`);
+    return z.array(analysisSchema).parse(data ?? []);
+  });
 }, ["trend-analysis-detail"], { revalidate: TRENDS_REVALIDATE_SECONDS, tags: ["trends"] });
 
 export const withTrendAnalysis = cache(async (trends: TrendEntity[]): Promise<TrendEntity[]> => {
@@ -346,14 +357,19 @@ export type TrendScoreHistoryPoint = { measuredAt: string; score: number };
 // 파이프라인이 실행될 때마다 쌓이는 실제 스냅샷(trend_scores) 이력을 시간순으로 반환한다.
 // 기간 탭(24H/7D/30D/90D)이 실제 데이터로 동작하도록 상세 페이지에서 사용한다.
 const loadTrendScoreHistory = unstable_cache(async (entityId: string, _bucket: number): Promise<TrendScoreHistoryPoint[]> => {
-  const supabase = createPublicClient();
-  const { data, error } = await supabase
-    .from("trend_scores")
-    .select("total_score, scoring_version, calculated_at")
-    .eq("entity_id", entityId)
-    .order("calculated_at", { ascending: true });
-  if (error) throw new Error(`트렌드 점수 이력 조회 실패: ${error.message}`);
-  const rows = z.array(historyRowSchema).parse(data ?? []);
+  const rows = await withEgressMeter("trend-history", async (fetchImpl) => {
+    const supabase = createPublicClient({ fetch: fetchImpl });
+    // 그래프가 보여주는 기간(최대 90일)만 읽는다. 엔티티가 오래될수록 이력이 하루 1행씩 늘어난다.
+    const since = new Date(Date.now() - DETAIL_HISTORY_DAYS * 86_400_000).toISOString();
+    const { data, error } = await supabase
+      .from("trend_scores")
+      .select("total_score, scoring_version, calculated_at")
+      .eq("entity_id", entityId)
+      .gte("calculated_at", since)
+      .order("calculated_at", { ascending: true });
+    if (error) throw new Error(`트렌드 점수 이력 조회 실패: ${error.message}`);
+    return z.array(historyRowSchema).parse(data ?? []);
+  });
   // 척도가 다른 구간을 한 그래프에 이어 붙이면 공식이 바뀐 날 가짜 계단이 생긴다.
   // 가장 최근 척도의 구간만 그린다(오름차순이라 마지막 행이 현재 척도).
   const currentVersion = rows[rows.length - 1]?.scoring_version;

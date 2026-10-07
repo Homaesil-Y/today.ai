@@ -36,6 +36,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
+      # Supabase 전송량 계량 파일. 각 단계가 받은 응답 크기를 덧붙이고, 마지막 단계(egress:report)가 합쳐 기록한다.
+      EGRESS_METER_FILE: ${{ github.workspace }}/.egress-meter.jsonl
+      # Supabase 결제 주기 시작일(매월). 비어 있으면 23. 다르면 저장소 Settings → Variables 에 넣는다.
+      SUPABASE_BILLING_CYCLE_DAY: ${{ vars.SUPABASE_BILLING_CYCLE_DAY }}
+      # 전송량이 위험 단계면 마지막 단계를 실패시켜 실패 메일로 알린다(다른 워크플로는 기록만 해서 메일이 몰리지 않게).
+      EGRESS_FAIL_ON_ALERT: "true"
       COLLECTOR_MODE: live
       APP_TIMEZONE: Asia/Seoul
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
@@ -82,3 +88,8 @@ jobs:
         run: pnpm report:daily
       - name: 저장 결과 검증
         run: pnpm verify:live
+      # 이번 실행의 Supabase 전송량을 기록하고 결제 주기 한도를 점검한다(2026-10-06 egress 한도 초과로
+      # 프로젝트가 차단된 뒤 추가). 앞 단계가 실패해도 기록은 남도록 항상 실행한다.
+      - name: Supabase 전송량 기록·점검
+        if: always()
+        run: pnpm egress:report

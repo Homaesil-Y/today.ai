@@ -1,6 +1,7 @@
 import type { CollectorResult, RawItem, SourceCode } from "@ai-trend-radar/types";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { meteredClientOptions } from "./egress-meter";
 import { withRetry } from "./retry";
 
 const sourceRowSchema = z.object({ id: z.uuid() });
@@ -110,6 +111,7 @@ export class SupabaseCollectorStore {
     }
     this.client = config.client ?? createClient(config.url, config.secretKey, {
       auth: { persistSession: false, autoRefreshToken: false },
+      ...meteredClientOptions("collect"),
     });
   }
 

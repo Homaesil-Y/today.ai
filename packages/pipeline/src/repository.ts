@@ -1,4 +1,4 @@
-import { withRetry } from "@ai-trend-radar/collectors";
+import { meteredClientOptions, withRetry } from "@ai-trend-radar/collectors";
 import type { TrendAnalysisResult } from "@ai-trend-radar/llm";
 import { engagementSignal } from "@ai-trend-radar/scoring";
 import type { SourceCode, TrendScoreBreakdown } from "@ai-trend-radar/types";
@@ -204,6 +204,7 @@ export class SupabasePipelineRepository {
     }
     return new SupabasePipelineRepository(createClient(url, secretKey, {
       auth: { persistSession: false, autoRefreshToken: false },
+      ...meteredClientOptions("pipeline"),
     }));
   }
 
@@ -537,8 +538,12 @@ export class SupabasePipelineRepository {
     if (entityIds.length === 0) return latest;
 
     for (const chunk of chunkForFilter(entityIds)) {
+      // 엔티티별 최신 1행 뷰를 읽는다. ai_analyses 를 직접 읽으면 재분석 이력 전체(10/06 기준 1.6만 행,
+      // 하루 수백 행씩 증가)가 분석 실행마다 와서 Supabase egress 를 태웠다(2026-10-06 프로젝트 차단).
+      // 뷰의 최신 행이 다른 프롬프트 버전이면 그 엔티티는 "이 버전으로 분석된 적 없음"이 되어 다시
+      // 분석 대기열에 오른다 — 버전을 올린 직후의 동작과 같다.
       const rows = await readAllPages((from, to) => this.readPage("load_latest_analysis", () => this.client
-        .from("ai_analyses")
+        .from("latest_ai_analyses")
         .select("entity_id,generated_at")
         .in("entity_id", chunk)
         .eq("prompt_version", promptVersion)

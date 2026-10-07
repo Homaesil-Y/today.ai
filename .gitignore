@@ -13,3 +13,6 @@ pnpm-debug.log*
 .codex/
 .agents/
 .codex-dev.*.log
+
+# Supabase 전송량 계량 임시 파일(워크플로 실행 중에만 쓰인다)
+.egress-meter.jsonl

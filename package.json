@@ -25,6 +25,7 @@
     "rename": "pnpm --filter @ai-trend-radar/pipeline rename",
     "hide": "pnpm --filter @ai-trend-radar/pipeline hide",
     "suggest:categories": "pnpm --filter @ai-trend-radar/pipeline suggest:categories",
-    "preview:live": "pnpm --filter @ai-trend-radar/pipeline preview:live"
+    "preview:live": "pnpm --filter @ai-trend-radar/pipeline preview:live",
+    "egress:report": "pnpm --filter @ai-trend-radar/pipeline egress:report"
   }
 }

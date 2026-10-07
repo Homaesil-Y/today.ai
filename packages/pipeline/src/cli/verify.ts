@@ -1,4 +1,4 @@
-import { loadWorkspaceEnvironment } from "@ai-trend-radar/collectors";
+import { loadWorkspaceEnvironment, meteredClientOptions } from "@ai-trend-radar/collectors";
 import { TREND_ANALYSIS_PROMPT_VERSION } from "@ai-trend-radar/llm";
 import { createClient } from "@supabase/supabase-js";
 import { BOOTSTRAP_SCORING_VERSION } from "../initial-score";
@@ -14,6 +14,7 @@ if (!url || !secretKey) {
 
 const client = createClient(url, secretKey, {
   auth: { persistSession: false, autoRefreshToken: false },
+  ...meteredClientOptions("verify"),
 });
 
 const tables = [
