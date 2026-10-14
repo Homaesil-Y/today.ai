@@ -1,5 +1,5 @@
 name: Supabase 상태 확인
-description: Supabase 가 프로젝트를 제한(402) 중인지 확인한다. 제한 중이면 available=false (배경은 check.sh).
+description: Supabase 가 프로젝트를 제한(402)하거나 일시 중지(주소 없음)했는지 확인한다. 그렇다면 available=false (배경은 check.sh).
 inputs:
   url:
     description: Supabase 프로젝트 URL
@@ -9,7 +9,7 @@ inputs:
     required: true
 outputs:
   available:
-    description: "true = 정상(또는 판단 불가), false = 제한 중"
+    description: "true = 정상(또는 판단 불가), false = 제한 또는 일시 중지"
     value: ${{ steps.check.outputs.available }}
 runs:
   using: composite
