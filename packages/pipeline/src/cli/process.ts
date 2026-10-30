@@ -1,9 +1,11 @@
 import { loadWorkspaceEnvironment } from "@ai-trend-radar/collectors";
 import { createCategoryClassifierFromEnv } from "@ai-trend-radar/llm";
+import { describeBrake, parseBillingCycleDay } from "@ai-trend-radar/types/egress";
 import { analysisBudgetMinutesFromEnv, analysisLimitFromEnv, autoApproveAnalyzedFromEnv } from "../config";
 import { BOOTSTRAP_SCORING_VERSION } from "../initial-score";
 import { createTrendAnalysisProviderFromSettings } from "../llm-provider-settings";
 import { SupabasePipelineRepository } from "../repository";
+import { brakeFromMeter, decideRun, meterSinceDay } from "../run-brake";
 import { runEntityPipeline } from "../runner";
 
 const env = loadWorkspaceEnvironment();
@@ -17,24 +19,33 @@ const analysisDeadline = new Date(Date.now() + analysisBudgetMinutesFromEnv(env.
 const repository = SupabasePipelineRepository.fromEnvironment(env);
 
 /**
- * 최근에 오늘자 채점을 마쳤으면 건너뛴다(--force 로 무시).
+ * 이번 실행을 할지 정한다(--force 로 무시). 규칙은 run-brake.ts.
  *
- * 예약 실행을 두 개로 늘렸기 때문이다(scheduled-pipeline.yml 참고). GitHub 이 예약을 건너뛰는 날은
- * 둘 중 하나만 돌고, 둘 다 도는 날은 두 번째가 여기서 빠져 원본 전량 읽기와 러너 시간을 아낀다.
- * 분석 전용 실행(hourly-analysis)은 채점을 하지 않으므로 이 판단과 무관하다.
+ * 채점 실행: 최근에 오늘자 채점을 마쳤으면 건너뛴다. 예약 실행이 두 개라(scheduled-pipeline.yml) 둘 다 도는
+ * 날은 두 번째가 여기서 빠져 원본 전량 읽기와 러너 시간을 아낀다. 간격은 평소 150분이고, Supabase 전송량이
+ * 경고·위험 단계면 자동 브레이크로 늘어난다. 분석 실행: 평소엔 늘 돌고, 브레이크가 걸리면 간격을 둔다.
  */
-const RESCORE_INTERVAL_MINUTES = 150;
-if (!skipAnalysis || analysisOnly || process.argv.includes("--force")) {
-  // 분석을 동반하는 실행은 언제나 진행한다 — 분석 대기열은 채점과 별개로 소진해야 한다.
-} else {
-  const scoreDate = new Date().toISOString().slice(0, 10);
-  const latest = await repository.latestSnapshotAt(scoreDate, BOOTSTRAP_SCORING_VERSION);
-  const minutesAgo = latest ? (Date.now() - latest.getTime()) / 60_000 : Number.POSITIVE_INFINITY;
-  if (minutesAgo < RESCORE_INTERVAL_MINUTES) {
-    process.stdout.write(`${JSON.stringify({ skipped: true, reason: `오늘자(${scoreDate}) 채점이 ${Math.round(minutesAgo)}분 전에 끝났습니다. ${RESCORE_INTERVAL_MINUTES}분 안에는 다시 채점하지 않습니다(--force 로 무시).` }, null, 2)}\n`);
-    process.exit(0);
-  }
+const mode = analysisOnly ? "analysis" : skipAnalysis ? "score" : "full";
+const now = new Date();
+const minutesSince = (at: Date | null) => (at ? (now.getTime() - at.getTime()) / 60_000 : null);
+const cycleDay = parseBillingCycleDay(env.SUPABASE_BILLING_CYCLE_DAY);
+const brake = brakeFromMeter(await repository.loadEgressDays(meterSinceDay(now, cycleDay)), now, cycleDay);
+const decision = decideRun({
+  mode,
+  force: process.argv.includes("--force"),
+  brake,
+  minutesSinceScore: mode === "score"
+    ? minutesSince(await repository.latestSnapshotAt(now.toISOString().slice(0, 10), BOOTSTRAP_SCORING_VERSION))
+    : null,
+  minutesSinceAnalysis: mode === "analysis" && brake.analysisIntervalMinutes > 0
+    ? minutesSince(await repository.latestAnalysisAt())
+    : null,
+});
+if (!decision.run) {
+  process.stdout.write(`${JSON.stringify({ skipped: true, egressBrake: brake.level, reason: decision.reason }, null, 2)}\n`);
+  process.exit(0);
 }
+if (brake.level !== "ok") process.stdout.write(`전송량 자동 브레이크(${brake.level}): ${describeBrake(brake)}\n`);
 
 // 분석 프로바이더는 관리자가 /admin/settings에서 고른 값(app_settings.trend_analysis_llm)을 따른다.
 // 카테고리 분류는 항상 Gemini 그대로 둔다(이번 전환 범위는 트렌드 분석만).

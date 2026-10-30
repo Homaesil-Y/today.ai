@@ -387,6 +387,33 @@ export class SupabasePipelineRepository {
     return Number.isNaN(at.getTime()) ? null : at;
   }
 
+  /**
+   * 전송량 계량 기록(일·바이트). 자동 브레이크 판단용(run-brake.ts). 테이블이 없거나 읽지 못하면 null —
+   * 브레이크 정보가 없다고 실행을 막지는 않는다.
+   */
+  async loadEgressDays(sinceDay: string): Promise<Array<{ day: string; bytes: number }> | null> {
+    const { data, error } = await this.client
+      .from("egress_meter_daily")
+      .select("day,bytes")
+      .gte("day", sinceDay)
+      .limit(2000);
+    if (error || !data) return null;
+    return data.map((row) => ({ day: String(row.day), bytes: Number(row.bytes) || 0 }));
+  }
+
+  /** 가장 최근 분석 저장 시각. 없거나 읽지 못하면 null. 브레이크의 분석 간격 판단용. */
+  async latestAnalysisAt(): Promise<Date | null> {
+    const { data, error } = await this.client
+      .from("ai_analyses")
+      .select("generated_at")
+      .order("generated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error || !data || typeof data.generated_at !== "string") return null;
+    const at = new Date(data.generated_at);
+    return Number.isNaN(at.getTime()) ? null : at;
+  }
+
   async loadAppSetting(key: string): Promise<unknown> {
     const { data, error } = await this.client.from("app_settings").select("value").eq("key", key).maybeSingle();
     if (error || !data) return null;

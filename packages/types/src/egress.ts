@@ -215,6 +215,47 @@ export function evaluateEgressBudget(params: {
   };
 }
 
+/**
+ * 자동 브레이크 — 경고 단계에 따라 우리 쪽 읽기 빈도를 스스로 줄인다.
+ *
+ * 2026-10-30 복구 뒤 Supabase 대시보드에 "Grace period is over"가 떴다. 다음에 한도를 넘으면 유예 없이
+ * 바로 제한된다는 뜻이라, 경고 메일만으로는 부족하다(사람이 대응하기 전에 넘을 수 있다). 그래서 사용량이
+ * 경고·위험 단계에 들어가면 사이트 캐시 주기와 파이프라인 실행 간격을 자동으로 늘린다. 데이터가 덜 자주
+ * 바뀔 뿐 사이트는 계속 뜬다. 주기가 바뀌어 사용량이 줄면 저절로 원래대로 돌아온다.
+ *
+ * 줄이는 폭(정상 대비 대략): 경고 = 사이트 목록 갱신 1/3, 채점 약 1/2, 분석 약 1/2.
+ *                           위험 = 사이트 목록 갱신 1/6, 채점·분석 하루 2회.
+ */
+export type EgressBrake = {
+  level: EgressLevel;
+  /** 사이트 데이터 캐시 주기에 곱하는 값. */
+  siteCacheMultiplier: number;
+  /** 채점 실행 사이 최소 간격(분). 이보다 가까우면 채점을 건너뛴다. */
+  rescoreIntervalMinutes: number;
+  /** 분석 실행 사이 최소 간격(분). 마지막 분석이 이보다 가까우면 건너뛴다. 0 이면 제한 없음. */
+  analysisIntervalMinutes: number;
+};
+
+export const EGRESS_BRAKES: Record<EgressLevel, EgressBrake> = {
+  ok: { level: "ok", siteCacheMultiplier: 1, rescoreIntervalMinutes: 150, analysisIntervalMinutes: 0 },
+  warn: { level: "warn", siteCacheMultiplier: 3, rescoreIntervalMinutes: 360, analysisIntervalMinutes: 360 },
+  alert: { level: "alert", siteCacheMultiplier: 6, rescoreIntervalMinutes: 720, analysisIntervalMinutes: 720 },
+};
+
+/** 가장 느린 단계의 캐시 배수. unstable_cache 의 revalidate 를 이만큼 길게 잡아야 브레이크가 먹는다. */
+export const MAX_SITE_CACHE_MULTIPLIER = Math.max(...Object.values(EGRESS_BRAKES).map((brake) => brake.siteCacheMultiplier));
+
+export function brakeFor(level: EgressLevel | null | undefined): EgressBrake {
+  return EGRESS_BRAKES[level ?? "ok"] ?? EGRESS_BRAKES.ok;
+}
+
+/** 사람이 읽는 브레이크 설명. */
+export function describeBrake(brake: EgressBrake): string {
+  if (brake.level === "ok") return "꺼짐 — 평소 주기로 갱신합니다.";
+  const hours = (minutes: number) => `${Math.round(minutes / 60)}시간`;
+  return `켜짐 — 사이트 갱신 ${brake.siteCacheMultiplier}배 느리게, 채점은 ${hours(brake.rescoreIntervalMinutes)}마다, 분석은 ${hours(brake.analysisIntervalMinutes)}마다.`;
+}
+
 /** 사람이 읽는 크기(10진 단위 — Supabase 대시보드와 같다). */
 export function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes < 0) return "—";

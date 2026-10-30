@@ -1,9 +1,11 @@
 import type { TrendEntity, TrendStatus } from "@ai-trend-radar/types";
+import { MAX_SITE_CACHE_MULTIPLIER } from "@ai-trend-radar/types/egress";
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
 import { z } from "zod";
 import { cacheBucket } from "@/lib/cache-bucket";
 import { readAllByIds, readAllPages } from "@/lib/supabase-paging";
+import { brakedSeconds } from "@/lib/egress-brake";
 import { withEgressMeter } from "@/lib/egress-meter";
 import { createPublicClient } from "@/lib/supabase/server";
 import { cleanDisplayName, logoTextFrom } from "./display-name";
@@ -297,10 +299,10 @@ const loadPublishedTrendsSlice = unstable_cache(async (bucket: number, index: nu
     console.error(`[published-trends] 조각 ${index} 이 ${usage.size}자 — Next 데이터 캐시 상한의 ${Math.round(usage.ratio * 100)}%. TREND_CACHE_SLICE_SIZE 를 줄여야 한다.`);
   }
   return slice;
-}, ["published-trends-slice"], { revalidate: TRENDS_REVALIDATE_SECONDS, tags: ["trends"] });
+}, ["published-trends-slice"], { revalidate: TRENDS_REVALIDATE_SECONDS * MAX_SITE_CACHE_MULTIPLIER, tags: ["trends"] });
 
 export const getPublishedTrends = cache(async (): Promise<TrendEntity[]> => {
-  const bucket = cacheBucket(TRENDS_REVALIDATE_SECONDS);
+  const bucket = cacheBucket(await brakedSeconds(TRENDS_REVALIDATE_SECONDS));
   const first = await loadPublishedTrendsSlice(bucket, 0);
   const rest = await Promise.all(
     Array.from({ length: Math.max(0, first.sliceCount - 1) }, (_, i) => loadPublishedTrendsSlice(bucket, i + 1)),
@@ -331,11 +333,11 @@ const loadTrendAnalyses = unstable_cache(async (entityIds: string[], _bucket: nu
     if (error) throw new Error(`AI 분석 상세 조회 실패: ${error.message}`);
     return z.array(analysisSchema).parse(data ?? []);
   });
-}, ["trend-analysis-detail"], { revalidate: TRENDS_REVALIDATE_SECONDS, tags: ["trends"] });
+}, ["trend-analysis-detail"], { revalidate: TRENDS_REVALIDATE_SECONDS * MAX_SITE_CACHE_MULTIPLIER, tags: ["trends"] });
 
 export const withTrendAnalysis = cache(async (trends: TrendEntity[]): Promise<TrendEntity[]> => {
   if (trends.length === 0) return trends;
-  const rows = await loadTrendAnalyses(trends.map(({ id }) => id), cacheBucket(TRENDS_REVALIDATE_SECONDS));
+  const rows = await loadTrendAnalyses(trends.map(({ id }) => id), cacheBucket(await brakedSeconds(TRENDS_REVALIDATE_SECONDS)));
   const byEntity = latestByEntity(rows);
   return trends.map((trend) => {
     const analysis = byEntity.get(trend.id);
@@ -379,9 +381,9 @@ const loadTrendScoreHistory = unstable_cache(async (entityId: string, _bucket: n
       measuredAt: row.calculated_at,
       score: Math.round(row.total_score * 10) / 10,
     }));
-}, ["trend-score-history"], { revalidate: TRENDS_REVALIDATE_SECONDS, tags: ["trends"] });
+}, ["trend-score-history"], { revalidate: TRENDS_REVALIDATE_SECONDS * MAX_SITE_CACHE_MULTIPLIER, tags: ["trends"] });
 
 export const getTrendScoreHistory = cache(
-  (entityId: string): Promise<TrendScoreHistoryPoint[]> =>
-    loadTrendScoreHistory(entityId, cacheBucket(TRENDS_REVALIDATE_SECONDS)),
+  async (entityId: string): Promise<TrendScoreHistoryPoint[]> =>
+    loadTrendScoreHistory(entityId, cacheBucket(await brakedSeconds(TRENDS_REVALIDATE_SECONDS))),
 );

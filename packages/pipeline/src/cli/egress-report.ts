@@ -2,6 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { loadWorkspaceEnvironment } from "@ai-trend-radar/collectors";
 import {
   billingCycleStart,
+  brakeFor,
+  describeBrake,
   evaluateEgressBudget,
   formatBytes,
   parseBillingCycleDay,
@@ -88,6 +90,7 @@ process.stdout.write(`${JSON.stringify({
   today: formatBytes(budget.todayBytes),
   todayBySource,
   level: budget.level,
+  brake: describeBrake(brakeFor(budget.level)),
   reasons: budget.reasons,
   ...(warnings.length > 0 ? { warnings: [...new Set(warnings)] } : {}),
 }, null, 2)}\n`);

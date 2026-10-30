@@ -1,5 +1,5 @@
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
-import { DAILY_EGRESS_BUDGET_BYTES, formatBytes } from "@ai-trend-radar/types/egress";
+import { brakeFor, DAILY_EGRESS_BUDGET_BYTES, describeBrake, formatBytes } from "@ai-trend-radar/types/egress";
 import type { EgressSummary } from "./egress-summary";
 
 /**
@@ -42,6 +42,7 @@ export function EgressCard({ egress }: { egress: EgressSummary }) {
                 </span>
               </p>
               {budget.reasons.length > 0 && <p className="ops-note-sub">{budget.reasons.join(" · ")}</p>}
+              <p className="ops-note-sub">자동 브레이크: {describeBrake(brakeFor(budget.level))}</p>
               <div
                 className="ops-egress-gauge"
                 role="img"

@@ -1,7 +1,9 @@
+import { MAX_SITE_CACHE_MULTIPLIER } from "@ai-trend-radar/types/egress";
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
 import { z } from "zod";
 import { cacheBucket } from "@/lib/cache-bucket";
+import { brakedSeconds } from "@/lib/egress-brake";
 import { withEgressMeter } from "@/lib/egress-meter";
 import { createPublicClient } from "@/lib/supabase/server";
 
@@ -67,10 +69,10 @@ const loadPublishedReports = unstable_cache(async (_bucket: number): Promise<Rep
     summary: row.summary,
     publishedAt: row.published_at,
   }));
-}), ["published-reports"], { revalidate: REPORTS_REVALIDATE_SECONDS, tags: ["reports"] });
+}), ["published-reports"], { revalidate: REPORTS_REVALIDATE_SECONDS * MAX_SITE_CACHE_MULTIPLIER, tags: ["reports"] });
 
 export const getPublishedReports = cache(
-  (): Promise<ReportSummary[]> => loadPublishedReports(cacheBucket(REPORTS_REVALIDATE_SECONDS)),
+  async (): Promise<ReportSummary[]> => loadPublishedReports(cacheBucket(await brakedSeconds(REPORTS_REVALIDATE_SECONDS))),
 );
 
 const loadDailyReport = unstable_cache(async (reportDate: string, _bucket: number): Promise<DailyReport | null> => {
@@ -91,9 +93,9 @@ const loadDailyReport = unstable_cache(async (reportDate: string, _bucket: numbe
     publishedAt: row.published_at,
     content: contentSchema.catch({ totalPublic: 0, topServices: [] }).parse(row.content_json),
   };
-}, ["daily-report"], { revalidate: REPORTS_REVALIDATE_SECONDS, tags: ["reports"] });
+}, ["daily-report"], { revalidate: REPORTS_REVALIDATE_SECONDS * MAX_SITE_CACHE_MULTIPLIER, tags: ["reports"] });
 
 export const getDailyReport = cache(
-  (reportDate: string): Promise<DailyReport | null> =>
-    loadDailyReport(reportDate, cacheBucket(REPORTS_REVALIDATE_SECONDS)),
+  async (reportDate: string): Promise<DailyReport | null> =>
+    loadDailyReport(reportDate, cacheBucket(await brakedSeconds(REPORTS_REVALIDATE_SECONDS))),
 );

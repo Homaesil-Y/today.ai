@@ -1,7 +1,9 @@
+import { MAX_SITE_CACHE_MULTIPLIER } from "@ai-trend-radar/types/egress";
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
 import { z } from "zod";
 import { cacheBucket } from "@/lib/cache-bucket";
+import { brakedSeconds } from "@/lib/egress-brake";
 import { withEgressMeter } from "@/lib/egress-meter";
 import { createPublicClient } from "@/lib/supabase/server";
 
@@ -67,11 +69,11 @@ const loadNewsPage = unstable_cache(async (params: { q: string; page: number; pa
   } catch {
     return { items: [], total: 0 };
   }
-}, ["news-page"], { revalidate: NEWS_REVALIDATE_SECONDS, tags: ["news"] });
+}, ["news-page"], { revalidate: NEWS_REVALIDATE_SECONDS * MAX_SITE_CACHE_MULTIPLIER, tags: ["news"] });
 
 export const getNewsPage = cache(
-  (params: { q: string; page: number; pageSize: number }): Promise<{ items: NewsItem[]; total: number }> =>
-    loadNewsPage(params, cacheBucket(NEWS_REVALIDATE_SECONDS)),
+  async (params: { q: string; page: number; pageSize: number }): Promise<{ items: NewsItem[]; total: number }> =>
+    loadNewsPage(params, cacheBucket(await brakedSeconds(NEWS_REVALIDATE_SECONDS))),
 );
 
 // 공개된 뉴스를 최신순으로 읽는다. 테이블 미생성/오류 시 빈 배열을 반환해 페이지가 빈 상태를 보여주게 한다.
